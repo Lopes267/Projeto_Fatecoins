@@ -1,0 +1,253 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1"/>
+<title>Entrar – Mercado Local</title>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,300;0,9..144,700;1,9..144,400&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet"/>
+<script src="app.js"></script>
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --bg:#0d0d0d;--card:#161616;--border:#2a2a2a;
+  --text:#f0ece3;--muted:#888;--accent:#e8854a;--accent2:#f4c56a;--green:#5dcfa0;
+  --red:#e85a5a;
+}
+body{background:var(--bg);color:var(--text);font-family:'DM Sans',sans-serif;min-height:100vh;display:flex;flex-direction:column}
+/* noise */
+body::before{content:'';position:fixed;inset:0;pointer-events:none;z-index:999;
+  background-image:url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.04'/%3E%3C/svg%3E");opacity:.4}
+
+nav{padding:1.2rem 2rem;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:1rem}
+.logo{font-family:'Fraunces',serif;font-size:1.4rem;color:var(--accent);text-decoration:none}
+.logo span{color:var(--text)}
+nav a.back{color:var(--muted);font-size:.85rem;text-decoration:none;margin-left:auto}
+nav a.back:hover{color:var(--text)}
+
+main{flex:1;display:flex;align-items:center;justify-content:center;padding:2rem;
+  background:radial-gradient(ellipse 50% 60% at 30% 50%,rgba(232,133,74,.08) 0%,transparent 70%)}
+
+.card{
+  background:var(--card);border:1px solid var(--border);border-radius:20px;
+  padding:2.5rem;width:100%;max-width:440px;animation:fadeUp .5s ease;
+}
+.card h2{font-family:'Fraunces',serif;font-size:2rem;font-weight:700;margin-bottom:.3rem}
+.card .sub{color:var(--muted);font-size:.9rem;margin-bottom:2rem}
+.card .sub a{color:var(--accent);text-decoration:none}
+
+.tabs{display:flex;gap:.3rem;background:var(--bg);border:1px solid var(--border);border-radius:10px;padding:.3rem;margin-bottom:2rem}
+.tab{flex:1;padding:.6rem;text-align:center;border-radius:7px;cursor:pointer;font-weight:500;font-size:.9rem;color:var(--muted);transition:all .2s}
+.tab.active{background:var(--card);color:var(--text);box-shadow:0 1px 6px rgba(0,0,0,.4)}
+
+.form-group{margin-bottom:1.2rem}
+label{display:block;font-size:.82rem;font-weight:600;color:var(--muted);margin-bottom:.4rem;letter-spacing:.04em;text-transform:uppercase}
+input,select{
+  width:100%;padding:.75rem 1rem;background:var(--bg);border:1px solid var(--border);
+  border-radius:10px;color:var(--text);font-family:'DM Sans',sans-serif;font-size:.95rem;
+  transition:border-color .2s,box-shadow .2s;outline:none;
+}
+input:focus,select:focus{border-color:var(--accent);box-shadow:0 0 0 3px rgba(232,133,74,.12)}
+select option{background:var(--bg)}
+
+.tipo-selector{display:grid;grid-template-columns:1fr 1fr;gap:.8rem;margin-bottom:1.2rem}
+.tipo-btn{
+  display:flex;flex-direction:column;align-items:center;gap:.4rem;
+  padding:1rem;border-radius:12px;border:2px solid var(--border);
+  cursor:pointer;transition:all .2s;text-align:center;
+}
+.tipo-btn:hover{border-color:var(--muted)}
+.tipo-btn.active{border-color:var(--accent);background:rgba(232,133,74,.08)}
+.tipo-btn .icon{font-size:1.8rem}
+.tipo-btn .name{font-weight:600;font-size:.9rem}
+.tipo-btn .desc{font-size:.75rem;color:var(--muted)}
+
+.btn{
+  display:flex;align-items:center;justify-content:center;gap:.5rem;
+  width:100%;padding:.85rem;border-radius:10px;font-weight:600;
+  font-size:1rem;cursor:pointer;border:none;
+  transition:all .2s;font-family:'DM Sans',sans-serif;
+}
+.btn-primary{background:var(--accent);color:#fff}
+.btn-primary:hover{background:#d9733c;transform:translateY(-1px)}
+.btn-primary:disabled{opacity:.5;cursor:default;transform:none}
+
+.error-msg{
+  background:rgba(232,90,90,.1);border:1px solid rgba(232,90,90,.3);
+  color:var(--red);border-radius:8px;padding:.75rem 1rem;font-size:.85rem;
+  margin-bottom:1rem;display:none;
+}
+.error-msg.show{display:block}
+
+.divider{
+  display:flex;align-items:center;gap:.8rem;margin:1.5rem 0;
+  color:var(--muted);font-size:.8rem;
+}
+.divider::before,.divider::after{content:'';flex:1;height:1px;background:var(--border)}
+
+.demo-hint{
+  background:rgba(93,207,160,.08);border:1px solid rgba(93,207,160,.2);
+  color:var(--green);border-radius:8px;padding:.8rem 1rem;font-size:.82rem;
+  line-height:1.5;
+}
+.demo-hint strong{display:block;margin-bottom:.3rem}
+
+/* toast */
+.toast{
+  position:fixed;bottom:2rem;right:2rem;z-index:1000;
+  background:var(--card);border:1px solid var(--border);border-radius:10px;
+  padding:.75rem 1.2rem;font-size:.9rem;transform:translateY(20px);opacity:0;
+  transition:all .3s;max-width:300px;
+}
+.toast.show{transform:translateY(0);opacity:1}
+.toast-success{border-color:rgba(93,207,160,.4);color:var(--green)}
+.toast-error{border-color:rgba(232,90,90,.4);color:var(--red)}
+
+@keyframes fadeUp{from{opacity:0;transform:translateY(20px)}to{opacity:1;transform:translateY(0)}}
+</style>
+</head>
+<body>
+<nav>
+  <a href="index.html" class="logo">mercado<span>local</span></a>
+  <a href="index.html" class="back">← Voltar ao início</a>
+</nav>
+
+<main>
+  <div class="card">
+    <div class="tabs">
+      <div class="tab active" id="tab-login" onclick="switchTab('login')">Entrar</div>
+      <div class="tab" id="tab-cadastro" onclick="switchTab('cadastro')">Criar conta</div>
+    </div>
+
+    <!-- LOGIN FORM -->
+    <div id="form-login">
+      <h2>Bem-vindo de volta</h2>
+      <p class="sub">Ainda não tem conta? <a href="#" onclick="switchTab('cadastro')">Crie agora</a></p>
+      <div class="error-msg" id="login-error"></div>
+      <div class="form-group">
+        <label>E-mail</label>
+        <input type="email" id="login-email" placeholder="seu@email.com"/>
+      </div>
+      <div class="form-group">
+        <label>Senha</label>
+        <input type="password" id="login-senha" placeholder="••••••••" onkeydown="if(event.key==='Enter')doLogin()"/>
+      </div>
+      <button class="btn btn-primary" onclick="doLogin()">Entrar na conta →</button>
+
+      <div class="divider">contas de demonstração</div>
+      <div class="demo-hint">
+        <strong>🏪 Lojista demo</strong>
+        loja@demo.com · senha: 123456
+      </div>
+      <div class="demo-hint" style="margin-top:.6rem">
+        <strong>🛒 Cliente demo</strong>
+        cliente@demo.com · senha: 123456
+      </div>
+    </div>
+
+    <!-- CADASTRO FORM -->
+    <div id="form-cadastro" style="display:none">
+      <h2>Criar conta</h2>
+      <p class="sub">Já tem conta? <a href="#" onclick="switchTab('login')">Faça login</a></p>
+      <div class="error-msg" id="cad-error"></div>
+
+      <div class="form-group">
+        <label>Tipo de conta</label>
+        <div class="tipo-selector">
+          <div class="tipo-btn active" id="tipo-lojista" onclick="selectTipo('lojista')">
+            <span class="icon">🏪</span>
+            <span class="name">Lojista</span>
+            <span class="desc">Quero vender</span>
+          </div>
+          <div class="tipo-btn" id="tipo-cliente" onclick="selectTipo('cliente')">
+            <span class="icon">🛒</span>
+            <span class="name">Cliente</span>
+            <span class="desc">Quero comprar</span>
+          </div>
+        </div>
+        <input type="hidden" id="cad-tipo" value="lojista"/>
+      </div>
+
+      <div class="form-group">
+        <label>Nome completo</label>
+        <input type="text" id="cad-nome" placeholder="Seu nome"/>
+      </div>
+      <div class="form-group">
+        <label>E-mail</label>
+        <input type="email" id="cad-email" placeholder="seu@email.com"/>
+      </div>
+      <div class="form-group">
+        <label>Senha</label>
+        <input type="password" id="cad-senha" placeholder="Mínimo 6 caracteres" onkeydown="if(event.key==='Enter')doCadastro()"/>
+      </div>
+      <button class="btn btn-primary" onclick="doCadastro()">Criar conta grátis →</button>
+    </div>
+  </div>
+</main>
+
+<script>
+const params = new URLSearchParams(location.search);
+if(params.get('modo')==='cadastro') switchTab('cadastro');
+
+let tipoSelecionado = 'lojista';
+
+function switchTab(tab){
+  document.getElementById('tab-login').classList.toggle('active', tab==='login');
+  document.getElementById('tab-cadastro').classList.toggle('active', tab==='cadastro');
+  document.getElementById('form-login').style.display = tab==='login'?'':'none';
+  document.getElementById('form-cadastro').style.display = tab==='cadastro'?'':'none';
+}
+
+function selectTipo(tipo){
+  tipoSelecionado = tipo;
+  document.getElementById('tipo-lojista').classList.toggle('active', tipo==='lojista');
+  document.getElementById('tipo-cliente').classList.toggle('active', tipo==='cliente');
+  document.getElementById('cad-tipo').value = tipo;
+}
+
+function showError(id, msg){
+  const el = document.getElementById(id);
+  el.textContent = msg;
+  el.classList.add('show');
+}
+function hideError(id){ document.getElementById(id).classList.remove('show'); }
+
+function doLogin(){
+  hideError('login-error');
+  const email = document.getElementById('login-email').value.trim();
+  const senha = document.getElementById('login-senha').value;
+  if(!email || !senha){ showError('login-error','Preencha e-mail e senha.'); return; }
+  
+  (async () => {
+    const res = await DB.loginUser(email, senha);
+    if(!res.ok){ showError('login-error', res.msg); return; }
+    toast('Login realizado! Redirecionando…');
+    setTimeout(()=>{
+      window.location.href = res.user.tipo === 'lojista' ? 'dashboard.html' : 'marketplace.html';
+    }, 800);
+  })();
+}
+
+function doCadastro(){
+  hideError('cad-error');
+  const nome  = document.getElementById('cad-nome').value.trim();
+  const email = document.getElementById('cad-email').value.trim();
+  const senha = document.getElementById('cad-senha').value;
+  const tipo  = tipoSelecionado;
+  if(!nome || !email || !senha){ showError('cad-error','Preencha todos os campos.'); return; }
+  if(senha.length < 6){ showError('cad-error','Senha deve ter pelo menos 6 caracteres.'); return; }
+  
+  (async () => {
+    const res = await DB.registerUser(nome, email, senha, tipo);
+    if(!res.ok){ showError('cad-error', res.msg); return; }
+    const loginRes = await DB.loginUser(email, senha);
+    if(loginRes.ok) {
+      toast('Conta criada com sucesso!');
+      setTimeout(()=>{
+        window.location.href = tipo === 'lojista' ? 'dashboard.html' : 'marketplace.html';
+      }, 800);
+    }
+  })();
+}
+</script>
+</body>
+</html>

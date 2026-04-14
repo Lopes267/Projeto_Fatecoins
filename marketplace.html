@@ -1,0 +1,426 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1"/>
+<title>Marketplace – Mercado Local</title>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,700&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet"/>
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --bg:#0d0d0d;--card:#161616;--card2:#1c1c1c;--border:#2a2a2a;
+  --text:#f0ece3;--muted:#888;--accent:#e8854a;--accent2:#f4c56a;
+  --green:#5dcfa0;--red:#e85a5a;
+}
+body{background:var(--bg);color:var(--text);font-family:'DM Sans',sans-serif;min-height:100vh}
+body::before{content:'';position:fixed;inset:0;pointer-events:none;z-index:50;
+  background-image:url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.04'/%3E%3C/svg%3E");opacity:.4}
+
+/* NAV */
+nav{
+  position:sticky;top:0;z-index:40;
+  background:rgba(13,13,13,.85);backdrop-filter:blur(16px);
+  border-bottom:1px solid var(--border);padding:1rem 2.5rem;
+  display:flex;align-items:center;gap:1rem;
+}
+.logo{font-family:'Fraunces',serif;font-size:1.4rem;color:var(--accent);text-decoration:none;flex-shrink:0}
+.logo span{color:var(--text)}
+.search-bar{
+  flex:1;max-width:480px;margin:0 1.5rem;
+  display:flex;align-items:center;background:var(--card);
+  border:1px solid var(--border);border-radius:50px;overflow:hidden;
+  transition:border-color .2s;
+}
+.search-bar:focus-within{border-color:var(--accent)}
+.search-bar input{
+  flex:1;padding:.65rem 1rem;background:transparent;border:none;
+  color:var(--text);font-family:'DM Sans',sans-serif;font-size:.92rem;outline:none;
+}
+.search-bar button{
+  padding:.65rem 1.2rem;background:var(--accent);border:none;color:#fff;
+  cursor:pointer;font-size:.85rem;font-weight:600;font-family:'DM Sans',sans-serif;
+  transition:background .2s;flex-shrink:0;
+}
+.search-bar button:hover{background:#d9733c}
+.nav-right{display:flex;align-items:center;gap:.8rem;margin-left:auto}
+.btn{
+  display:inline-flex;align-items:center;gap:.5rem;
+  padding:.55rem 1.1rem;border-radius:8px;font-weight:600;font-size:.85rem;
+  cursor:pointer;border:none;font-family:'DM Sans',sans-serif;transition:all .2s;text-decoration:none;
+}
+.btn-primary{background:var(--accent);color:#fff}
+.btn-primary:hover{background:#d9733c}
+.btn-ghost{background:transparent;border:1px solid var(--border);color:var(--text)}
+.btn-ghost:hover{border-color:var(--accent);color:var(--accent)}
+
+/* USER CHIP */
+.user-chip-nav{
+  display:flex;align-items:center;gap:.6rem;
+  background:var(--card);border:1px solid var(--border);border-radius:8px;padding:.4rem .8rem;
+  font-size:.85rem;font-weight:500;
+}
+.avatar-sm{
+  width:26px;height:26px;border-radius:50%;background:var(--accent);
+  display:flex;align-items:center;justify-content:center;font-size:.75rem;font-weight:700;color:#fff;
+}
+
+/* HERO BANNER */
+.hero-banner{
+  padding:3rem 2.5rem 2rem;
+  background:radial-gradient(ellipse 60% 80% at 80% 50%,rgba(232,133,74,.1) 0%,transparent 70%);
+}
+.hero-banner h1{font-family:'Fraunces',serif;font-size:clamp(2rem,4vw,3rem);font-weight:700;letter-spacing:-.02em}
+.hero-banner h1 em{color:var(--accent);font-style:italic}
+.hero-banner p{color:var(--muted);margin-top:.5rem;font-size:1rem}
+
+/* FILTERS */
+.filters-bar{
+  display:flex;align-items:center;gap:.6rem;padding:.8rem 2.5rem;
+  border-bottom:1px solid var(--border);overflow-x:auto;
+  scrollbar-width:none;
+}
+.filters-bar::-webkit-scrollbar{display:none}
+.filter-chip{
+  padding:.4rem 1rem;border-radius:50px;border:1px solid var(--border);
+  cursor:pointer;font-size:.82rem;font-weight:500;color:var(--muted);
+  white-space:nowrap;transition:all .2s;background:transparent;
+  font-family:'DM Sans',sans-serif;
+}
+.filter-chip:hover{border-color:var(--muted);color:var(--text)}
+.filter-chip.active{border-color:var(--accent);color:var(--accent);background:rgba(232,133,74,.08)}
+
+/* TABS */
+.tabs-row{display:flex;gap:.3rem;padding:.8rem 2.5rem;border-bottom:1px solid var(--border)}
+.tab{
+  padding:.5rem 1.2rem;border-radius:8px;cursor:pointer;font-size:.88rem;
+  font-weight:500;color:var(--muted);transition:all .2s;border:none;background:transparent;
+  font-family:'DM Sans',sans-serif;
+}
+.tab.active{background:var(--card);color:var(--text)}
+
+/* CONTENT */
+.content{padding:2rem 2.5rem}
+.results-info{color:var(--muted);font-size:.85rem;margin-bottom:1.5rem}
+.results-info strong{color:var(--text)}
+
+/* PRODUCT GRID */
+.product-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:1.2rem}
+.product-card{
+  background:var(--card);border:1px solid var(--border);border-radius:16px;overflow:hidden;
+  cursor:pointer;transition:transform .2s,border-color .2s;
+}
+.product-card:hover{transform:translateY(-4px);border-color:var(--accent)}
+.prod-img{
+  height:160px;background:var(--card2);display:flex;align-items:center;
+  justify-content:center;font-size:3.5rem;border-bottom:1px solid var(--border);
+}
+.prod-body{padding:1rem}
+.prod-cat{font-size:.72rem;color:var(--muted);text-transform:uppercase;letter-spacing:.05em;margin-bottom:.3rem}
+.prod-name{font-weight:600;font-size:.95rem;margin-bottom:.3rem;
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.prod-desc{font-size:.8rem;color:var(--muted);margin-bottom:.7rem;
+  display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+.prod-footer{display:flex;align-items:center;justify-content:space-between}
+.prod-price{font-family:'Fraunces',serif;font-size:1.15rem;font-weight:700;color:var(--accent2)}
+.prod-store{font-size:.75rem;color:var(--muted);display:flex;align-items:center;gap:.3rem;margin-top:.4rem}
+
+/* STORE GRID */
+.store-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:1.2rem}
+.store-card{
+  background:var(--card);border:1px solid var(--border);border-radius:16px;
+  padding:1.5rem;cursor:pointer;transition:transform .2s,border-color .2s;
+}
+.store-card:hover{transform:translateY(-4px);border-color:var(--accent)}
+.store-avatar{
+  width:56px;height:56px;border-radius:14px;background:var(--card2);
+  display:flex;align-items:center;justify-content:center;font-size:1.8rem;margin-bottom:1rem;
+}
+.store-name{font-family:'Fraunces',serif;font-size:1.15rem;font-weight:700;margin-bottom:.3rem}
+.store-desc{font-size:.83rem;color:var(--muted);line-height:1.5;
+  display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;margin-bottom:.8rem}
+.store-meta{display:flex;gap:.8rem;flex-wrap:wrap}
+.meta-tag{
+  font-size:.75rem;background:var(--card2);border:1px solid var(--border);
+  border-radius:50px;padding:.2rem .7rem;color:var(--muted);
+}
+.meta-tag.accent{border-color:rgba(232,133,74,.3);color:var(--accent)}
+
+/* STORE DETAIL PANEL */
+.store-panel{display:none;animation:fadeUp .2s ease}
+.store-panel.open{display:block}
+.panel-head{
+  display:flex;align-items:center;gap:1rem;margin-bottom:2rem;
+  padding-bottom:1.5rem;border-bottom:1px solid var(--border);
+}
+.panel-store-avatar{
+  width:64px;height:64px;border-radius:16px;background:var(--card);border:1px solid var(--border);
+  display:flex;align-items:center;justify-content:center;font-size:2rem;
+}
+.panel-store-name{font-family:'Fraunces',serif;font-size:1.6rem;font-weight:700}
+.panel-store-meta{color:var(--muted);font-size:.88rem;margin-top:.2rem}
+.back-btn{
+  display:flex;align-items:center;gap:.5rem;color:var(--muted);font-size:.9rem;
+  cursor:pointer;margin-bottom:1.5rem;background:none;border:none;font-family:'DM Sans',sans-serif;
+  transition:color .2s;padding:0;
+}
+.back-btn:hover{color:var(--accent)}
+
+/* EMPTY */
+.empty-state{
+  text-align:center;padding:5rem 1rem;
+  display:flex;flex-direction:column;align-items:center;gap:1rem;
+}
+.empty-state .icon{font-size:4rem}
+.empty-state p{color:var(--muted);font-size:.95rem}
+
+/* TOAST */
+.toast{
+  position:fixed;bottom:2rem;right:2rem;z-index:100;
+  background:var(--card);border:1px solid var(--border);border-radius:10px;
+  padding:.75rem 1.2rem;font-size:.9rem;transform:translateY(20px);opacity:0;
+  transition:all .3s;pointer-events:none;
+}
+.toast.show{transform:translateY(0);opacity:1}
+.toast-success{border-color:rgba(93,207,160,.4);color:var(--green)}
+
+@keyframes fadeUp{from{opacity:0;transform:translateY(12px)}to{opacity:1;transform:translateY(0)}}
+
+@media(max-width:768px){
+  nav{padding:.8rem 1rem;gap:.5rem}
+  .search-bar{margin:0 .5rem}
+  .hero-banner,.content,.tabs-row,.filters-bar{padding-left:1rem;padding-right:1rem}
+  .product-grid{grid-template-columns:repeat(auto-fill,minmax(160px,1fr))}
+  .store-grid{grid-template-columns:1fr}
+}
+</style>
+</head>
+<body>
+
+<nav>
+  <a href="index.html" class="logo">mercado<span>local</span></a>
+  <div class="search-bar">
+    <input type="text" id="search-input" placeholder="Buscar produtos ou lojas…" oninput="onSearch()" onkeydown="if(event.key==='Enter')onSearch()"/>
+    <button onclick="onSearch()">🔍 Buscar</button>
+  </div>
+  <div class="nav-right" id="nav-right">
+    <!-- filled by JS -->
+  </div>
+</nav>
+
+<div class="hero-banner">
+  <h1>Descubra <em>produtos incríveis</em><br/>perto de você</h1>
+  <p>Milhares de lojas esperando por você. Explore, compare e compre.</p>
+</div>
+
+<div class="filters-bar" id="filters-bar">
+  <button class="filter-chip active" onclick="setCategoria('todas',this)">Todas</button>
+  <button class="filter-chip" onclick="setCategoria('Eletrônicos',this)">💻 Eletrônicos</button>
+  <button class="filter-chip" onclick="setCategoria('Moda',this)">👗 Moda</button>
+  <button class="filter-chip" onclick="setCategoria('Alimentos',this)">🍎 Alimentos</button>
+  <button class="filter-chip" onclick="setCategoria('Casa & Decoração',this)">🏠 Casa</button>
+  <button class="filter-chip" onclick="setCategoria('Esportes',this)">⚽ Esportes</button>
+  <button class="filter-chip" onclick="setCategoria('Beleza',this)">💄 Beleza</button>
+  <button class="filter-chip" onclick="setCategoria('Livros',this)">📚 Livros</button>
+</div>
+
+<div class="tabs-row">
+  <button class="tab active" id="tab-products" onclick="switchView('products',this)">📦 Produtos</button>
+  <button class="tab" id="tab-stores" onclick="switchView('stores',this)">🏪 Lojas</button>
+</div>
+
+<div class="content">
+  <div class="results-info" id="results-info"></div>
+
+  <!-- PRODUCTS VIEW -->
+  <div id="view-products">
+    <div class="product-grid" id="product-grid"></div>
+  </div>
+
+  <!-- STORES VIEW -->
+  <div id="view-stores" style="display:none">
+    <div class="store-grid" id="store-grid"></div>
+  </div>
+
+  <!-- STORE DETAIL -->
+  <div class="store-panel" id="store-panel">
+    <button class="back-btn" onclick="closeStorePanel()">← Voltar às lojas</button>
+    <div class="panel-head">
+      <div class="panel-store-avatar" id="panel-avatar">🏪</div>
+      <div>
+        <div class="panel-store-name" id="panel-name"></div>
+        <div class="panel-store-meta" id="panel-meta"></div>
+      </div>
+    </div>
+    <div class="product-grid" id="panel-products"></div>
+  </div>
+</div>
+
+<script src="app.js"></script>
+<script>
+let currentView = 'products';
+let currentCategoria = 'todas';
+let searchQuery = '';
+
+function catEmoji(cat){
+  const m={'Eletrônicos':'💻','Moda':'👗','Alimentos':'🍎','Casa & Decoração':'🏠','Esportes':'⚽','Beleza':'💄','Livros':'📚','Brinquedos':'🧸'};
+  return m[cat]||'📦';
+}
+
+// ---- NAV ----
+function renderNav(){
+  const user = DB.currentUser();
+  const el = document.getElementById('nav-right');
+  if(user){
+    const initial = user.nome[0].toUpperCase();
+    el.innerHTML = `
+      <div class="user-chip-nav">
+        <div class="avatar-sm">${initial}</div>
+        <span>${user.nome.split(' ')[0]}</span>
+      </div>
+      ${user.tipo==='lojista'?`<a href="dashboard.html" class="btn btn-ghost">Minha loja</a>`:''}
+      <button class="btn btn-ghost" onclick="doLogout()">Sair</button>
+    `;
+  } else {
+    el.innerHTML = `
+      <a href="login.html" class="btn btn-ghost">Entrar</a>
+      <a href="login.html?modo=cadastro" class="btn btn-primary">Criar conta</a>
+    `;
+  }
+}
+
+function doLogout(){ DB.logout(); renderNav(); toast('Saiu da conta.'); }
+
+// ---- SEARCH / FILTER ----
+async function onSearch(){ searchQuery = document.getElementById('search-input').value.trim(); await render(); }
+async function setCategoria(cat, el){
+  currentCategoria = cat;
+  document.querySelectorAll('.filter-chip').forEach(c=>c.classList.remove('active'));
+  el.classList.add('active');
+  await render();
+}
+async function switchView(view, el){
+  currentView = view;
+  document.querySelectorAll('.tab').forEach(t=>t.classList.remove('active'));
+  el.classList.add('active');
+  document.getElementById('view-products').style.display = view==='products'?'':'none';
+  document.getElementById('view-stores').style.display = view==='stores'?'':'none';
+  document.getElementById('store-panel').classList.remove('open');
+  await render();
+}
+
+// ---- RENDER ----
+async function render(){
+  document.getElementById('store-panel').classList.remove('open');
+  if(currentView==='products') await renderProducts();
+  else await renderStores();
+}
+
+async function renderProducts(){
+  const prods = await DB.searchProducts(searchQuery, currentCategoria);
+  const grid = document.getElementById('product-grid');
+  document.getElementById('results-info').innerHTML = `<strong>${prods.length} produto${prods.length!==1?'s':''}</strong> encontrado${prods.length!==1?'s':''}`;
+  if(!prods.length){
+    grid.innerHTML=`<div class="empty-state" style="grid-column:1/-1">
+      <div class="icon">🔍</div><p>Nenhum produto encontrado.<br/>Tente outro termo ou categoria.</p>
+    </div>`; return;
+  }
+  grid.innerHTML = prods.map(p=>`
+    <div class="product-card" onclick="openStore('${p.loja.id}')">
+      <div class="prod-img">${catEmoji(p.categoria)}</div>
+      <div class="prod-body">
+        <div class="prod-cat">${p.categoria||'Produto'}</div>
+        <div class="prod-name">${p.nome}</div>
+        <div class="prod-desc">${p.descricao||'Sem descrição'}</div>
+        <div class="prod-footer">
+          <div class="prod-price">${formatPrice(p.preco)}</div>
+        </div>
+        <div class="prod-store">🏪 ${p.loja.nome||'Loja'} ${p.loja.cidade?'· '+p.loja.cidade:''}</div>
+      </div>
+    </div>
+  `).join('');
+}
+
+async function renderStores(){
+  const stores = await DB.getPublicStores(searchQuery);
+  const grid = document.getElementById('store-grid');
+  document.getElementById('results-info').innerHTML = `<strong>${stores.length} loja${stores.length!==1?'s':''}</strong> encontrada${stores.length!==1?'s':''}`;
+  if(!stores.length){
+    grid.innerHTML=`<div class="empty-state" style="grid-column:1/-1">
+      <div class="icon">🏪</div><p>Nenhuma loja encontrada.</p>
+    </div>`; return;
+  }
+  grid.innerHTML = stores.map(s=>`
+    <div class="store-card" onclick="openStore('${s.id}')">
+      <div class="store-avatar">${catEmoji(s.categoria)}</div>
+      <div class="store-name">${s.nome}</div>
+      <div class="store-desc">${s.descricao||'Sem descrição'}</div>
+      <div class="store-meta">
+        ${s.categoria?`<span class="meta-tag accent">${s.categoria}</span>`:''}
+        ${s.cidade?`<span class="meta-tag">📍 ${s.cidade}${s.estado?' - '+s.estado:''}</span>`:''}
+        <span class="meta-tag">📦 ${s.totalProdutos} produto${s.totalProdutos!==1?'s':''}</span>
+      </div>
+    </div>
+  `).join('');
+}
+
+// ---- STORE PANEL ----
+async function openStore(storeId){
+  const stores = await DB.getPublicStores();
+  const store = stores.find(s=>s.id===storeId);
+  if(!store) return;
+  const prods = await DB.getStoreProducts(storeId);
+
+  document.getElementById('view-products').style.display='none';
+  document.getElementById('view-stores').style.display='none';
+  const panel = document.getElementById('store-panel');
+  panel.classList.add('open');
+
+  document.getElementById('panel-avatar').textContent = catEmoji(store.categoria);
+  document.getElementById('panel-name').textContent = store.nome;
+  document.getElementById('panel-meta').innerHTML = `
+    ${store.categoria||''} ${store.cidade?'· 📍 '+store.cidade:''}
+    ${store.estado?' - '+store.estado:''}
+    ${store.telefone?'· 📞 '+store.telefone:''}
+    · ${prods.length} produto${prods.length!==1?'s':''}
+  `;
+  document.getElementById('results-info').innerHTML = `Produtos de <strong>${store.nome}</strong>`;
+
+  const grid = document.getElementById('panel-products');
+  if(!prods.length){
+    grid.innerHTML=`<div class="empty-state" style="grid-column:1/-1">
+      <div class="icon">📦</div><p>Esta loja ainda não tem produtos.</p>
+    </div>`; return;
+  }
+  grid.innerHTML = prods.map(p=>`
+    <div class="product-card">
+      <div class="prod-img">${catEmoji(p.categoria)}</div>
+      <div class="prod-body">
+        <div class="prod-cat">${p.categoria||'Produto'}</div>
+        <div class="prod-name">${p.nome}</div>
+        <div class="prod-desc">${p.descricao||''}</div>
+        <div class="prod-footer">
+          <div class="prod-price">${formatPrice(p.preco)}</div>
+          <span style="font-size:.75rem;color:${(p.estoque||0)>0?'var(--green)':'var(--red)'}">
+            ${(p.estoque||0)>0?p.estoque+' em estoque':'Indisponível'}
+          </span>
+        </div>
+      </div>
+    </div>
+  `).join('');
+}
+
+async function closeStorePanel(){
+  document.getElementById('store-panel').classList.remove('open');
+  document.getElementById('view-products').style.display = currentView==='products'?'':'none';
+  document.getElementById('view-stores').style.display = currentView==='stores'?'':'none';
+  await render();
+}
+
+// ---- INIT ----
+document.addEventListener('DOMContentLoaded', async ()=>{
+  renderNav();
+  await render();
+});
+</script>
+</body>
+</html>

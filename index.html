@@ -1,0 +1,332 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1"/>
+<title>Mercado Local – Sua loja, seu jeito</title>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,300;0,9..144,700;1,9..144,400&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet"/>
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+
+:root{
+  --bg:#0d0d0d;
+  --card:#161616;
+  --border:#2a2a2a;
+  --text:#f0ece3;
+  --muted:#888;
+  --accent:#e8854a;
+  --accent2:#f4c56a;
+  --green:#5dcfa0;
+}
+
+html{scroll-behavior:smooth}
+body{background:var(--bg);color:var(--text);font-family:'DM Sans',sans-serif;overflow-x:hidden}
+
+/* ---- NOISE OVERLAY ---- */
+body::before{
+  content:'';position:fixed;inset:0;pointer-events:none;z-index:999;
+  background-image:url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.04'/%3E%3C/svg%3E");
+  opacity:.4;
+}
+
+/* ---- NAV ---- */
+nav{
+  position:fixed;top:0;left:0;right:0;z-index:100;
+  display:flex;align-items:center;justify-content:space-between;
+  padding:1.2rem 4rem;
+  background:rgba(13,13,13,.8);backdrop-filter:blur(16px);
+  border-bottom:1px solid var(--border);
+}
+.logo{font-family:'Fraunces',serif;font-size:1.6rem;color:var(--accent);letter-spacing:-.02em}
+.logo span{color:var(--text)}
+.nav-links{display:flex;gap:1rem;align-items:center}
+.nav-links a{
+  text-decoration:none;color:var(--muted);font-size:.9rem;font-weight:500;
+  padding:.5rem 1rem;border-radius:6px;transition:all .2s;
+}
+.nav-links a:hover{color:var(--text);background:var(--card)}
+.btn{
+  display:inline-flex;align-items:center;gap:.5rem;
+  padding:.6rem 1.4rem;border-radius:8px;font-weight:600;
+  font-size:.9rem;text-decoration:none;cursor:pointer;border:none;
+  transition:all .2s;font-family:'DM Sans',sans-serif;
+}
+.btn-primary{background:var(--accent);color:#fff}
+.btn-primary:hover{background:#d9733c;transform:translateY(-1px)}
+.btn-ghost{background:transparent;color:var(--text);border:1px solid var(--border)}
+.btn-ghost:hover{border-color:var(--accent);color:var(--accent)}
+
+/* ---- HERO ---- */
+.hero{
+  min-height:100vh;display:flex;align-items:center;
+  padding:8rem 4rem 4rem;position:relative;overflow:hidden;
+}
+.hero-bg{
+  position:absolute;inset:0;
+  background:radial-gradient(ellipse 60% 60% at 70% 50%, rgba(232,133,74,.12) 0%, transparent 70%),
+             radial-gradient(ellipse 40% 40% at 20% 80%, rgba(93,207,160,.08) 0%, transparent 60%);
+}
+.hero-content{position:relative;z-index:1;max-width:680px}
+.hero-badge{
+  display:inline-flex;align-items:center;gap:.5rem;
+  background:rgba(232,133,74,.12);border:1px solid rgba(232,133,74,.3);
+  color:var(--accent);padding:.4rem 1rem;border-radius:50px;
+  font-size:.8rem;font-weight:600;letter-spacing:.05em;text-transform:uppercase;
+  margin-bottom:2rem;animation:fadeUp .6s ease both;
+}
+.hero h1{
+  font-family:'Fraunces',serif;font-size:clamp(3rem,6vw,5rem);
+  line-height:1.05;font-weight:700;letter-spacing:-.03em;
+  animation:fadeUp .6s .1s ease both;
+}
+.hero h1 em{color:var(--accent);font-style:italic}
+.hero p{
+  margin-top:1.5rem;font-size:1.15rem;color:var(--muted);line-height:1.7;
+  max-width:520px;animation:fadeUp .6s .2s ease both;
+}
+.hero-actions{
+  display:flex;gap:1rem;flex-wrap:wrap;margin-top:2.5rem;
+  animation:fadeUp .6s .3s ease both;
+}
+.hero-stats{
+  display:flex;gap:3rem;margin-top:4rem;
+  animation:fadeUp .6s .4s ease both;
+  padding-top:2rem;border-top:1px solid var(--border);
+}
+.stat{display:flex;flex-direction:column;gap:.2rem}
+.stat-n{font-family:'Fraunces',serif;font-size:2.2rem;font-weight:700;color:var(--accent2)}
+.stat-l{font-size:.8rem;color:var(--muted);text-transform:uppercase;letter-spacing:.06em}
+
+/* ---- FLOATING CARDS ---- */
+.hero-visual{
+  position:absolute;right:4rem;top:50%;transform:translateY(-50%);
+  display:flex;flex-direction:column;gap:1rem;
+  animation:floatIn .8s .4s ease both;
+}
+.fcard{
+  background:var(--card);border:1px solid var(--border);
+  border-radius:14px;padding:1rem 1.4rem;min-width:220px;
+  position:relative;overflow:hidden;
+}
+.fcard::after{
+  content:'';position:absolute;inset:0;
+  background:linear-gradient(135deg,rgba(255,255,255,.03),transparent);
+}
+.fcard-label{font-size:.75rem;color:var(--muted);margin-bottom:.4rem}
+.fcard-val{font-family:'Fraunces',serif;font-size:1.4rem;font-weight:700}
+.fcard-val.green{color:var(--green)}
+.fcard-val.orange{color:var(--accent)}
+.fcard .tag{
+  display:inline-block;background:rgba(93,207,160,.15);color:var(--green);
+  font-size:.72rem;padding:.2rem .6rem;border-radius:50px;margin-top:.4rem;
+}
+
+/* ---- SECTIONS ---- */
+section{padding:5rem 4rem}
+.section-label{
+  font-size:.75rem;letter-spacing:.1em;text-transform:uppercase;
+  color:var(--accent);font-weight:600;margin-bottom:.8rem;
+}
+.section-title{
+  font-family:'Fraunces',serif;font-size:clamp(2rem,4vw,3rem);
+  font-weight:700;letter-spacing:-.02em;line-height:1.1;
+}
+.section-title span{color:var(--accent)}
+.section-sub{color:var(--muted);font-size:1rem;line-height:1.7;margin-top:.8rem;max-width:500px}
+
+/* ---- FEATURES ---- */
+.features-grid{
+  display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));
+  gap:1.5rem;margin-top:3rem;
+}
+.feature{
+  background:var(--card);border:1px solid var(--border);border-radius:16px;
+  padding:2rem;transition:border-color .2s,transform .2s;
+}
+.feature:hover{border-color:var(--accent);transform:translateY(-4px)}
+.feat-icon{
+  width:48px;height:48px;border-radius:12px;display:flex;align-items:center;
+  justify-content:center;font-size:1.4rem;margin-bottom:1.2rem;
+}
+.feat-icon.o{background:rgba(232,133,74,.15)}
+.feat-icon.g{background:rgba(93,207,160,.15)}
+.feat-icon.y{background:rgba(244,197,106,.15)}
+.feature h3{font-family:'Fraunces',serif;font-size:1.2rem;font-weight:700;margin-bottom:.5rem}
+.feature p{color:var(--muted);font-size:.9rem;line-height:1.6}
+
+/* ---- HOW IT WORKS ---- */
+.how{background:var(--card);border-top:1px solid var(--border);border-bottom:1px solid var(--border)}
+.steps{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:2rem;margin-top:3rem;position:relative}
+.steps::before{
+  content:'';position:absolute;top:2rem;left:10%;right:10%;height:1px;
+  background:linear-gradient(90deg,transparent,var(--border),transparent);
+}
+.step{text-align:center}
+.step-num{
+  width:56px;height:56px;border-radius:50%;
+  display:flex;align-items:center;justify-content:center;margin:0 auto 1rem;
+  font-family:'Fraunces',serif;font-size:1.4rem;font-weight:700;
+  background:var(--bg);border:2px solid var(--accent);color:var(--accent);
+  position:relative;z-index:1;
+}
+.step h4{font-weight:600;margin-bottom:.4rem}
+.step p{color:var(--muted);font-size:.85rem;line-height:1.5}
+
+/* ---- CTA ---- */
+.cta-section{
+  text-align:center;
+  background:radial-gradient(ellipse 80% 80% at 50% 50%, rgba(232,133,74,.1) 0%, transparent 70%);
+}
+.cta-section .section-title{font-size:clamp(2rem,5vw,3.5rem)}
+.cta-section p{color:var(--muted);font-size:1.1rem;margin:1rem auto 2.5rem;max-width:460px}
+.cta-btns{display:flex;gap:1rem;justify-content:center;flex-wrap:wrap}
+
+/* ---- FOOTER ---- */
+footer{
+  padding:2rem 4rem;border-top:1px solid var(--border);
+  display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:1rem;
+}
+footer .logo{font-size:1.2rem}
+footer p{color:var(--muted);font-size:.8rem}
+
+/* ---- ANIMATIONS ---- */
+@keyframes fadeUp{from{opacity:0;transform:translateY(24px)}to{opacity:1;transform:translateY(0)}}
+@keyframes floatIn{from{opacity:0;transform:translateY(-50%) translateX(40px)}to{opacity:1;transform:translateY(-50%) translateX(0)}}
+
+/* ---- RESPONSIVE ---- */
+@media(max-width:900px){
+  nav{padding:1rem 1.5rem}
+  .hero{padding:7rem 1.5rem 4rem;min-height:auto}
+  .hero-visual{display:none}
+  section{padding:3.5rem 1.5rem}
+  footer{padding:1.5rem}
+  .hero-stats{gap:2rem}
+}
+</style>
+</head>
+<body>
+
+<nav>
+  <div class="logo">mercado<span>local</span></div>
+  <div class="nav-links">
+    <a href="marketplace.html">Ver Lojas</a>
+    <a href="login.html" class="btn btn-ghost">Entrar</a>
+    <a href="login.html?modo=cadastro" class="btn btn-primary">Criar conta</a>
+  </div>
+</nav>
+
+<section class="hero">
+  <div class="hero-bg"></div>
+  <div class="hero-content">
+    <div class="hero-badge">✦ Plataforma gratuita</div>
+    <h1>Sua loja online,<br/><em>do seu jeito</em></h1>
+    <p>Crie sua loja em minutos, gerencie produtos e alcance clientes em todo o Brasil. Simples, rápido e sem complicação.</p>
+    <div class="hero-actions">
+      <a href="login.html?modo=cadastro" class="btn btn-primary" style="font-size:1rem;padding:.8rem 2rem">Abrir minha loja →</a>
+      <a href="marketplace.html" class="btn btn-ghost" style="font-size:1rem;padding:.8rem 2rem">Explorar lojas</a>
+    </div>
+    <div class="hero-stats">
+      <div class="stat"><span class="stat-n">12k+</span><span class="stat-l">Lojistas</span></div>
+      <div class="stat"><span class="stat-n">85k+</span><span class="stat-l">Produtos</span></div>
+      <div class="stat"><span class="stat-n">4.9★</span><span class="stat-l">Avaliação</span></div>
+    </div>
+  </div>
+
+  <div class="hero-visual">
+    <div class="fcard">
+      <div class="fcard-label">Venda hoje</div>
+      <div class="fcard-val orange">R$ 1.240,00</div>
+      <span class="tag">↑ +18% esta semana</span>
+    </div>
+    <div class="fcard">
+      <div class="fcard-label">Produtos ativos</div>
+      <div class="fcard-val green">24 produtos</div>
+    </div>
+    <div class="fcard">
+      <div class="fcard-label">Novos clientes</div>
+      <div class="fcard-val" style="color:var(--accent2)">+8 hoje</div>
+    </div>
+  </div>
+</section>
+
+<section class="features">
+  <div class="section-label">Por que usar</div>
+  <div class="section-title">Tudo que você precisa<br/><span>em um só lugar</span></div>
+  <p class="section-sub">Ferramentas pensadas para quem quer vender mais sem perder tempo com tecnologia.</p>
+  <div class="features-grid">
+    <div class="feature">
+      <div class="feat-icon o">🏪</div>
+      <h3>Loja personalizada</h3>
+      <p>Monte o perfil da sua loja com nome, descrição, categoria e contato. Tudo em poucos cliques.</p>
+    </div>
+    <div class="feature">
+      <div class="feat-icon g">📦</div>
+      <h3>Gestão de produtos</h3>
+      <p>Adicione, edite e remova produtos com fotos, preços e controle de estoque em tempo real.</p>
+    </div>
+    <div class="feature">
+      <div class="feat-icon y">🔍</div>
+      <h3>Encontre qualquer produto</h3>
+      <p>Os clientes encontram o que precisam buscando por nome, categoria ou cidade da loja.</p>
+    </div>
+    <div class="feature">
+      <div class="feat-icon o">🚀</div>
+      <h3>Sem taxa de cadastro</h3>
+      <p>Abra sua loja gratuitamente. Você só paga quando vende — e olha que ainda nem cobramos isso!</p>
+    </div>
+    <div class="feature">
+      <div class="feat-icon g">📱</div>
+      <h3>Funciona em tudo</h3>
+      <p>Interface responsiva para desktop, tablet e celular. Venda de onde estiver.</p>
+    </div>
+    <div class="feature">
+      <div class="feat-icon y">🔒</div>
+      <h3>Seguro e confiável</h3>
+      <p>Seus dados ficam protegidos. Autenticação segura para lojistas e clientes.</p>
+    </div>
+  </div>
+</section>
+
+<section class="how">
+  <div class="section-label">Como funciona</div>
+  <div class="section-title">Simples como <span>1, 2, 3</span></div>
+  <div class="steps">
+    <div class="step">
+      <div class="step-num">1</div>
+      <h4>Crie sua conta</h4>
+      <p>Cadastre-se como lojista em menos de 1 minuto, sem necessidade de cartão.</p>
+    </div>
+    <div class="step">
+      <div class="step-num">2</div>
+      <h4>Monte sua loja</h4>
+      <p>Adicione o nome, descrição e produtos da sua loja no painel de controle.</p>
+    </div>
+    <div class="step">
+      <div class="step-num">3</div>
+      <h4>Comece a vender</h4>
+      <p>Sua loja aparece para milhares de clientes pesquisando seus produtos agora.</p>
+    </div>
+  </div>
+</section>
+
+<section class="cta-section">
+  <div class="section-label">Comece agora</div>
+  <div class="section-title">Pronto para <span>vender mais?</span></div>
+  <p>Junte-se a milhares de lojistas que já cresceram com o Mercado Local.</p>
+  <div class="cta-btns">
+    <a href="login.html?modo=cadastro" class="btn btn-primary" style="font-size:1.05rem;padding:.9rem 2.2rem">Criar loja grátis →</a>
+    <a href="marketplace.html" class="btn btn-ghost" style="font-size:1.05rem;padding:.9rem 2.2rem">Ver marketplace</a>
+  </div>
+</section>
+
+<footer>
+  <div class="logo">mercado<span>local</span></div>
+  <p>© 2025 Mercado Local. Feito com ♥ no Brasil.</p>
+  <div style="display:flex;gap:1rem">
+    <a href="login.html" style="color:var(--muted);font-size:.85rem;text-decoration:none">Login</a>
+    <a href="marketplace.html" style="color:var(--muted);font-size:.85rem;text-decoration:none">Explorar</a>
+  </div>
+</footer>
+
+</body>
+</html>

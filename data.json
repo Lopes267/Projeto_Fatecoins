@@ -1,0 +1,150 @@
+{
+  "users": [
+    {
+      "id": "mnyl5e41g2mszbni6gk",
+      "nome": "João Silva",
+      "email": "loja@demo.com",
+      "senha": "MTIzNDU2",
+      "tipo": "lojista",
+      "criadoEm": "2026-04-14T12:16:17.329Z"
+    },
+    {
+      "id": "mnyl5e42ku81tujb95q",
+      "nome": "Maria Santos",
+      "email": "maria@demo.com",
+      "senha": "MTIzNDU2",
+      "tipo": "lojista",
+      "criadoEm": "2026-04-14T12:16:17.330Z"
+    },
+    {
+      "id": "mnyl5e42jnlalbn3e1b",
+      "nome": "Cliente Demo",
+      "email": "cliente@demo.com",
+      "senha": "MTIzNDU2",
+      "tipo": "cliente",
+      "criadoEm": "2026-04-14T12:16:17.330Z"
+    },
+    {
+      "id": "mnyl82h5pwwwkvjifk",
+      "nome": "Enzo Lopes de Paula",
+      "email": "Enzopaula05@gmail.com",
+      "senha": "MTIzNDU2",
+      "tipo": "lojista",
+      "criadoEm": "2026-04-14T12:18:22.217Z"
+    },
+    {
+      "id": "mnylv0pqd2rrvokwi9",
+      "nome": "Enzo Lopes de Paula",
+      "email": "enzopaula05@gmail.com",
+      "senha": "MTIzNDU2",
+      "tipo": "cliente",
+      "criadoEm": "2026-04-14T12:36:13.022Z"
+    }
+  ],
+  "stores": [
+    {
+      "id": "mnyl5e425ehvcgc76fy",
+      "userId": "mnyl5e41g2mszbni6gk",
+      "nome": "Tech & Cia",
+      "descricao": "Os melhores eletrônicos da cidade.",
+      "categoria": "Eletrônicos",
+      "cidade": "São Paulo",
+      "estado": "SP",
+      "telefone": "(11) 99999-0001",
+      "ativa": true,
+      "criadoEm": "2026-04-14T12:16:17.330Z"
+    },
+    {
+      "id": "mnyl5e42l0eupphe3l",
+      "userId": "mnyl5e42ku81tujb95q",
+      "nome": "Moda Chic",
+      "descricao": "Roupas e acessórios para todos os estilos.",
+      "categoria": "Moda",
+      "cidade": "Rio de Janeiro",
+      "estado": "RJ",
+      "telefone": "(21) 99999-0002",
+      "ativa": true,
+      "criadoEm": "2026-04-14T12:16:17.330Z"
+    }
+  ],
+  "products": [
+    {
+      "nome": "Fone Bluetooth Pro",
+      "preco": 299.9,
+      "categoria": "Eletrônicos",
+      "estoque": 10,
+      "descricao": "Fone sem fio com cancelamento de ruído.",
+      "storeId": "mnyl5e425ehvcgc76fy",
+      "id": "mnyl5e432w6s0xkuq6t",
+      "ativo": true,
+      "criadoEm": "2026-04-14T12:16:17.331Z",
+      "updatedAt": "2026-04-14T12:35:12.598Z"
+    },
+    {
+      "nome": "Smartwatch X500",
+      "preco": 599,
+      "categoria": "Eletrônicos",
+      "estoque": 8,
+      "descricao": "Monitora saúde e notificações.",
+      "storeId": "mnyl5e425ehvcgc76fy",
+      "id": "mnyl5e43v9cbtig2vss",
+      "ativo": true,
+      "criadoEm": "2026-04-14T12:16:17.331Z"
+    },
+    {
+      "nome": "Carregador Turbo 65W",
+      "preco": 89.9,
+      "categoria": "Eletrônicos",
+      "estoque": 30,
+      "descricao": "Carrega qualquer dispositivo em minutos.",
+      "storeId": "mnyl5e425ehvcgc76fy",
+      "id": "mnyl5e431iuuxpisflm",
+      "ativo": true,
+      "criadoEm": "2026-04-14T12:16:17.331Z"
+    },
+    {
+      "nome": "Blusa Floral Verão",
+      "preco": 79.9,
+      "categoria": "Moda",
+      "estoque": 20,
+      "descricao": "Tecido leve e estampado.",
+      "storeId": "mnyl5e42l0eupphe3l",
+      "id": "mnyl5e4302vgrlp5qa6l",
+      "ativo": true,
+      "criadoEm": "2026-04-14T12:16:17.331Z"
+    },
+    {
+      "nome": "Calça Jeans Slim",
+      "preco": 149.9,
+      "categoria": "Moda",
+      "estoque": 12,
+      "descricao": "Corte moderno e confortável.",
+      "storeId": "mnyl5e42l0eupphe3l",
+      "id": "mnyl5e43czodomymvci",
+      "ativo": true,
+      "criadoEm": "2026-04-14T12:16:17.331Z"
+    },
+    {
+      "nome": "Bolsa de Couro",
+      "preco": 249,
+      "categoria": "Moda",
+      "estoque": 5,
+      "descricao": "Elegante para o dia a dia.",
+      "storeId": "mnyl5e42l0eupphe3l",
+      "id": "mnyl5e43gf17k8hmtfh",
+      "ativo": true,
+      "criadoEm": "2026-04-14T12:16:17.331Z"
+    },
+    {
+      "id": "mnylwljb884pegztwlk",
+      "storeId": "mnyl5e425ehvcgc76fy",
+      "nome": "Carregador 12V",
+      "preco": 60,
+      "descricao": "Carregador de 12V para notebook",
+      "categoria": "Eletrônicos",
+      "estoque": 10,
+      "ativo": true,
+      "criadoEm": "2026-04-14T12:37:26.663Z"
+    }
+  ]
+}
