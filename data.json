@@ -6,7 +6,9 @@
       "email": "loja@demo.com",
       "senha": "MTIzNDU2",
       "tipo": "lojista",
-      "criadoEm": "2026-04-14T12:16:17.329Z"
+      "criadoEm": "2026-04-14T12:16:17.329Z",
+      "profileImage": "/images/profile-1776255590677.png",
+      "updatedAt": "2026-04-15T12:19:50.684Z"
     },
     {
       "id": "mnyl5e42ku81tujb95q",
@@ -22,7 +24,9 @@
       "email": "cliente@demo.com",
       "senha": "MTIzNDU2",
       "tipo": "cliente",
-      "criadoEm": "2026-04-14T12:16:17.330Z"
+      "criadoEm": "2026-04-14T12:16:17.330Z",
+      "profileImage": "/images/profile-1776255558133.png",
+      "updatedAt": "2026-04-15T12:19:18.156Z"
     },
     {
       "id": "mnyl82h5pwwwkvjifk",

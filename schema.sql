@@ -1,78 +1,82 @@
 -- ============================================
---  MARKETPLACE DATABASE SCHEMA
+--  MARKETPLACE DATABASE SCHEMA (SQLite)
 -- ============================================
 
-CREATE DATABASE IF NOT EXISTS marketplace;
-USE marketplace;
-
 -- Tabela de usuários (lojistas e clientes)
-CREATE TABLE usuarios (
-    id          INT AUTO_INCREMENT PRIMARY KEY,
-    nome        VARCHAR(100) NOT NULL,
-    email       VARCHAR(150) NOT NULL UNIQUE,
-    senha_hash  VARCHAR(255) NOT NULL,
-    tipo        ENUM('lojista', 'cliente') NOT NULL DEFAULT 'cliente',
-    criado_em   TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+CREATE TABLE IF NOT EXISTS usuarios (
+    id          INTEGER PRIMARY KEY AUTOINCREMENT,
+    nome        TEXT NOT NULL,
+    email       TEXT NOT NULL UNIQUE,
+    senha_hash  TEXT NOT NULL,
+    tipo        TEXT NOT NULL DEFAULT 'cliente' CHECK (tipo IN ('lojista', 'cliente')),
+    profile_image TEXT,
+    telefone    TEXT,
+    data_nasc   TEXT,
+    endereco    TEXT,
+    cidade      TEXT,
+    estado      TEXT,
+    cep         TEXT,
+    criado_em   DATETIME DEFAULT CURRENT_TIMESTAMP
 );
 
 -- Tabela de lojas (uma por lojista)
-CREATE TABLE lojas (
-    id              INT AUTO_INCREMENT PRIMARY KEY,
-    usuario_id      INT NOT NULL,
-    nome            VARCHAR(150) NOT NULL,
+CREATE TABLE IF NOT EXISTS lojas (
+    id              INTEGER PRIMARY KEY AUTOINCREMENT,
+    usuario_id      INTEGER NOT NULL,
+    nome            TEXT NOT NULL,
     descricao       TEXT,
-    categoria       VARCHAR(80),
-    logo_url        VARCHAR(255),
-    banner_url      VARCHAR(255),
-    telefone        VARCHAR(20),
-    endereco        VARCHAR(255),
-    cidade          VARCHAR(100),
-    estado          VARCHAR(50),
-    ativa           BOOLEAN DEFAULT TRUE,
-    criado_em       TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    atualizado_em   TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    categoria       TEXT,
+    logo_url        TEXT,
+    banner_url      TEXT,
+    telefone        TEXT,
+    endereco        TEXT,
+    cidade          TEXT,
+    estado          TEXT,
+    ativa           INTEGER DEFAULT 1,
+    criado_em       DATETIME DEFAULT CURRENT_TIMESTAMP,
+    atualizado_em   DATETIME DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (usuario_id) REFERENCES usuarios(id) ON DELETE CASCADE
 );
 
 -- Tabela de categorias de produto
-CREATE TABLE categorias (
-    id      INT AUTO_INCREMENT PRIMARY KEY,
-    nome    VARCHAR(100) NOT NULL UNIQUE
+CREATE TABLE IF NOT EXISTS categorias (
+    id      INTEGER PRIMARY KEY AUTOINCREMENT,
+    nome    TEXT NOT NULL UNIQUE
 );
 
-INSERT INTO categorias (nome) VALUES
+INSERT OR IGNORE INTO categorias (nome) VALUES
   ('Eletrônicos'), ('Moda'), ('Alimentos'), ('Casa & Decoração'),
   ('Esportes'), ('Beleza'), ('Livros'), ('Brinquedos'), ('Outros');
 
 -- Tabela de produtos
-CREATE TABLE produtos (
-    id              INT AUTO_INCREMENT PRIMARY KEY,
-    loja_id         INT NOT NULL,
-    categoria_id    INT,
-    nome            VARCHAR(200) NOT NULL,
+CREATE TABLE IF NOT EXISTS produtos (
+    id              INTEGER PRIMARY KEY AUTOINCREMENT,
+    loja_id         INTEGER NOT NULL,
+    categoria_id    INTEGER,
+    nome            TEXT NOT NULL,
     descricao       TEXT,
-    preco           DECIMAL(10,2) NOT NULL,
-    estoque         INT DEFAULT 0,
-    imagem_url      VARCHAR(255),
-    ativo           BOOLEAN DEFAULT TRUE,
-    criado_em       TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    atualizado_em   TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    preco           REAL NOT NULL,
+    estoque         INTEGER DEFAULT 0,
+    imagem_url      TEXT,
+    ativo           INTEGER DEFAULT 1,
+    criado_em       DATETIME DEFAULT CURRENT_TIMESTAMP,
+    atualizado_em   DATETIME DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (loja_id)      REFERENCES lojas(id)      ON DELETE CASCADE,
     FOREIGN KEY (categoria_id) REFERENCES categorias(id) ON DELETE SET NULL
 );
 
 -- Índices para buscas rápidas
-CREATE INDEX idx_produtos_loja      ON produtos(loja_id);
-CREATE INDEX idx_produtos_categoria ON produtos(categoria_id);
-CREATE INDEX idx_lojas_usuario      ON lojas(usuario_id);
-CREATE INDEX idx_usuarios_email     ON usuarios(email);
+CREATE INDEX IF NOT EXISTS idx_produtos_loja      ON produtos(loja_id);
+CREATE INDEX IF NOT EXISTS idx_produtos_categoria ON produtos(categoria_id);
+CREATE INDEX IF NOT EXISTS idx_lojas_usuario      ON lojas(usuario_id);
+CREATE INDEX IF NOT EXISTS idx_usuarios_email     ON usuarios(email);
 
 -- ============================================
 -- VIEWS ÚTEIS
 -- ============================================
 
 -- Visão pública: lojas com contagem de produtos
-CREATE VIEW v_lojas_publicas AS
+CREATE VIEW IF NOT EXISTS v_lojas_publicas AS
 SELECT
     l.id,
     l.nome            AS loja_nome,
@@ -86,12 +90,12 @@ SELECT
     MIN(p.preco)      AS menor_preco
 FROM lojas l
 JOIN usuarios u ON u.id = l.usuario_id
-LEFT JOIN produtos p ON p.loja_id = l.id AND p.ativo = TRUE
-WHERE l.ativa = TRUE
+LEFT JOIN produtos p ON p.loja_id = l.id AND p.ativo = 1
+WHERE l.ativa = 1
 GROUP BY l.id;
 
 -- Visão de produtos com info da loja
-CREATE VIEW v_produtos_publicos AS
+CREATE VIEW IF NOT EXISTS v_produtos_publicos AS
 SELECT
     p.id,
     p.nome            AS produto_nome,
@@ -99,12 +103,15 @@ SELECT
     p.preco,
     p.estoque,
     p.imagem_url,
+    p.ativo,
     c.nome            AS categoria_nome,
     l.id              AS loja_id,
     l.nome            AS loja_nome,
     l.cidade,
-    l.estado
+    l.estado,
+    u.nome            AS lojista_nome
 FROM produtos p
 JOIN lojas l      ON l.id = p.loja_id
+JOIN usuarios u ON u.id = l.usuario_id
 LEFT JOIN categorias c ON c.id = p.categoria_id
-WHERE p.ativo = TRUE AND l.ativa = TRUE;
+WHERE p.ativo = 1 AND l.ativa = 1;

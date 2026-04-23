@@ -29,16 +29,50 @@ const DB = {
     });
     const data = await res.json();
     if (data.ok) {
-      sessionStorage.setItem('mp_session', JSON.stringify(data.user));
+      // Armazenar com timestamp de expiração (24 horas)
+      const sessionData = {
+        user: data.user,
+        loginTime: Date.now(),
+        expiresAt: Date.now() + (24 * 60 * 60 * 1000) // 24 horas em ms
+      };
+      localStorage.setItem('mp_session', JSON.stringify(sessionData));
     }
     return data;
   },
 
-  logout() { sessionStorage.removeItem('mp_session'); },
+  logout() { localStorage.removeItem('mp_session'); },
 
   currentUser() {
-    const s = sessionStorage.getItem('mp_session');
-    return s ? JSON.parse(s) : null;
+    const s = localStorage.getItem('mp_session');
+    if (!s) return null;
+    
+    try {
+      const sessionData = JSON.parse(s);
+      
+      // Verificar se a sessão expirou
+      if (Date.now() > sessionData.expiresAt) {
+        console.warn('⏰ Sessão expirada (24h)');
+        localStorage.removeItem('mp_session');
+        return null;
+      }
+      
+      return sessionData.user;
+    } catch (e) {
+      console.error('Erro ao parsear sessão:', e);
+      localStorage.removeItem('mp_session');
+      return null;
+    }
+  },
+  
+  isSessionExpired() {
+    const s = localStorage.getItem('mp_session');
+    if (!s) return false;
+    try {
+      const sessionData = JSON.parse(s);
+      return Date.now() > sessionData.expiresAt;
+    } catch {
+      return false;
+    }
   },
 
   // ---------- stores ----------
@@ -140,6 +174,40 @@ function toast(msg, tipo = 'success') {
 function formatPrice(n) {
   return new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(n);
 }
+
+// ============================================================
+//  VALIDAÇÃO DE SESSÃO
+// ============================================================
+
+function checkSessionExpiry() {
+  const s = localStorage.getItem('mp_session');
+  if (!s) return;
+  
+  try {
+    const sessionData = JSON.parse(s);
+    const timeLeft = sessionData.expiresAt - Date.now();
+    
+    if (timeLeft <= 0) {
+      // Sessão expirada
+      console.warn('⏰ Sessão expirada!');
+      localStorage.removeItem('mp_session');
+      if (!window.location.href.includes('login.html') && !window.location.href.includes('index.html')) {
+        toast('Sua sessão expirou. Faça login novamente.', 'error');
+        setTimeout(() => window.location.href = 'login.html', 2000);
+      }
+    } else if (timeLeft < (60 * 60 * 1000)) {
+      // Faltam menos de 1 hora
+      console.warn(`⏰ Sessão expira em ${Math.round(timeLeft / (60 * 1000))} minutos`);
+    }
+  } catch (e) {
+    console.error('Erro ao verificar sessão:', e);
+  }
+}
+
+// Verificar sessão a cada 5 minutos
+setInterval(checkSessionExpiry, 5 * 60 * 1000);
+// Verificar também ao carregar a página
+document.addEventListener('DOMContentLoaded', checkSessionExpiry);
 
 // ============================================================
 //  SEED DATA (demo)

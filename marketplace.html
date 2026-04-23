@@ -272,9 +272,12 @@ function renderNav(){
   const el = document.getElementById('nav-right');
   if(user){
     const initial = user.nome[0].toUpperCase();
+    const avatarHTML = user.profileImage 
+      ? `<div class="avatar-sm" style="background-image:url('${user.profileImage}');background-size:cover;background-position:center"></div>`
+      : `<div class="avatar-sm">${initial}</div>`;
     el.innerHTML = `
-      <div class="user-chip-nav">
-        <div class="avatar-sm">${initial}</div>
+      <div class="user-chip-nav" onclick="goToProfile()" title="Clique para editar perfil" style="cursor:pointer;opacity:.8;transition:opacity .2s" onmouseover="this.style.opacity='1'" onmouseout="this.style.opacity='.8'">
+        ${avatarHTML}
         <span>${user.nome.split(' ')[0]}</span>
       </div>
       ${user.tipo==='lojista'?`<a href="dashboard.html" class="btn btn-ghost">Minha loja</a>`:''}
@@ -285,6 +288,16 @@ function renderNav(){
       <a href="login.html" class="btn btn-ghost">Entrar</a>
       <a href="login.html?modo=cadastro" class="btn btn-primary">Criar conta</a>
     `;
+  }
+}
+
+function goToProfile(){
+  const user = DB.currentUser();
+  if(!user) return;
+  if(user.tipo === 'lojista'){
+    window.location.href = 'profile.html';
+  } else {
+    window.location.href = 'client-profile.html';
   }
 }
 

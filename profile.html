@@ -1,0 +1,473 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width,initial-scale=1"/>
+  <title>Meu Perfil – Mercado Local</title>
+  <link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,700&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet"/>
+  <style>
+    *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+    :root{
+      --bg:#0d0d0d;--card:#161616;--card2:#1c1c1c;--border:#2a2a2a;
+      --text:#f0ece3;--muted:#888;--accent:#e8854a;--accent2:#f4c56a;
+      --green:#5dcfa0;--red:#e85a5a;
+    }
+    body{background:var(--bg);color:var(--text);font-family:'DM Sans',sans-serif;display:flex;min-height:100vh}
+
+    /* SIDEBAR */
+    .sidebar{
+      width:240px;flex-shrink:0;background:var(--card);border-right:1px solid var(--border);
+      display:flex;flex-direction:column;padding:1.5rem;position:sticky;top:0;height:100vh;
+    }
+    .logo{font-family:'Fraunces',serif;font-size:1.3rem;color:var(--accent);margin-bottom:2rem}
+    .logo span{color:var(--text)}
+    .nav-section{font-size:.7rem;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);font-weight:600;margin-bottom:.5rem;margin-top:1rem}
+    .nav-item{
+      display:flex;align-items:center;gap:.7rem;padding:.7rem .9rem;border-radius:9px;
+      cursor:pointer;color:var(--muted);font-size:.9rem;font-weight:500;transition:all .2s;
+      margin-bottom:.2rem;
+    }
+    .nav-item:hover{background:var(--card2);color:var(--text)}
+    .nav-item.active{background:rgba(232,133,74,.12);color:var(--accent)}
+    .nav-item .icon{font-size:1.1rem;width:20px;text-align:center}
+    .sidebar-footer{margin-top:auto;padding-top:1.5rem;border-top:1px solid var(--border)}
+    .user-chip{display:flex;align-items:center;gap:.7rem;margin-bottom:1rem;cursor:pointer;opacity:.7;transition:opacity .2s}
+    .user-chip:hover{opacity:1}
+    .avatar{
+      width:34px;height:34px;border-radius:50%;background:var(--accent);
+      display:flex;align-items:center;justify-content:center;font-size:.85rem;font-weight:700;color:#fff;
+    }
+    .user-info{flex:1;min-width:0}
+    .user-name{font-size:.85rem;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+    .user-role{font-size:.73rem;color:var(--muted)}
+    .logout-btn{
+      width:100%;padding:.6rem;border-radius:8px;background:transparent;
+      border:1px solid var(--border);color:var(--muted);cursor:pointer;font-size:.85rem;
+      font-family:'DM Sans',sans-serif;transition:all .2s;
+    }
+    .logout-btn:hover{border-color:var(--red);color:var(--red)}
+
+    /* MAIN */
+    .main{flex:1;overflow-y:auto;padding:2.5rem;display:flex;flex-direction:column;gap:2rem;max-width:900px}
+
+    /* TOPBAR */
+    .topbar{display:flex;align-items:center;justify-content:space-between;margin-bottom:2rem}
+    .page-title{font-family:'Fraunces',serif;font-size:1.8rem;font-weight:700}
+    .page-sub{color:var(--muted);font-size:.9rem;margin-top:.2rem}
+    .back-btn{
+      background:transparent;border:1px solid var(--border);color:var(--muted);
+      padding:.5rem 1rem;border-radius:8px;cursor:pointer;font-size:.9rem;
+      font-family:'DM Sans',sans-serif;transition:all .2s;text-decoration:none;
+      display:inline-flex;align-items:center;gap:.4rem;
+    }
+    .back-btn:hover{border-color:var(--accent);color:var(--accent)}
+
+    /* PROFILE CARD */
+    .profile-header{
+      display:grid;grid-template-columns:auto 1fr;gap:2rem;align-items:center;
+      background:var(--card);border:1px solid var(--border);border-radius:16px;
+      padding:2rem;margin-bottom:2rem;
+    }
+    .profile-avatar{
+      width:100px;height:100px;border-radius:50%;
+      background:var(--accent);display:flex;align-items:center;justify-content:center;
+      font-size:3rem;font-weight:700;color:#fff;
+      background-size:cover;background-position:center;background-repeat:no-repeat;
+      border:3px solid var(--border);
+    }
+    .profile-info h2{font-family:'Fraunces',serif;font-size:1.5rem;margin-bottom:.4rem}
+    .profile-info p{color:var(--muted);font-size:.95rem}
+
+    /* FORM CARD */
+    .form-card{background:var(--card);border:1px solid var(--border);border-radius:16px;padding:2rem;margin-bottom:2rem}
+    .form-card h3{font-family:'Fraunces',serif;font-size:1.2rem;font-weight:700;margin-bottom:1.5rem}
+    .form-grid{display:grid;grid-template-columns:1fr 1fr;gap:1rem}
+    .form-grid.full{grid-template-columns:1fr}
+    .form-group{display:flex;flex-direction:column;gap:.4rem}
+    .form-group.span2{grid-column:span 2}
+    label{font-size:.78rem;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.04em}
+    input,select,textarea{
+      padding:.7rem 1rem;background:var(--bg);border:1px solid var(--border);
+      border-radius:9px;color:var(--text);font-family:'DM Sans',sans-serif;font-size:.92rem;
+      outline:none;transition:border-color .2s,box-shadow .2s;
+    }
+    input:focus,select:focus,textarea:focus{border-color:var(--accent);box-shadow:0 0 0 3px rgba(232,133,74,.1)}
+    textarea{resize:vertical;min-height:80px}
+    select option{background:var(--bg)}
+
+    /* BUTTONS */
+    .btn{
+      display:inline-flex;align-items:center;gap:.5rem;
+      padding:.65rem 1.4rem;border-radius:9px;font-weight:600;font-size:.9rem;
+      cursor:pointer;border:none;font-family:'DM Sans',sans-serif;transition:all .2s;
+    }
+    .btn-primary{background:var(--accent);color:#fff}
+    .btn-primary:hover{background:#d9733c}
+    .btn-primary:disabled{background:var(--muted);cursor:not-allowed;opacity:.6}
+    .btn-ghost{background:transparent;border:1px solid var(--border);color:var(--text)}
+    .btn-ghost:hover{border-color:var(--accent);color:var(--accent)}
+    .btn-danger{background:transparent;border:1px solid rgba(232,90,90,.3);color:var(--red)}
+    .btn-danger:hover{background:rgba(232,90,90,.1)}
+    .action-btns{display:flex;gap:.8rem;margin-top:1.5rem;flex-wrap:wrap}
+
+    /* TOAST */
+    .toast{
+      position:fixed;bottom:2rem;right:2rem;z-index:300;
+      background:var(--card);border:1px solid var(--border);border-radius:10px;
+      padding:.75rem 1.2rem;font-size:.9rem;transform:translateY(20px);opacity:0;
+      transition:all .3s;pointer-events:none;
+    }
+    .toast.show{transform:translateY(0);opacity:1}
+    .toast-success{border-color:rgba(93,207,160,.4);color:var(--green)}
+    .toast-error{border-color:rgba(232,90,90,.4);color:var(--red)}
+
+    /* SECTION */
+    .section-divider{border:none;border-top:1px solid var(--border);margin:2rem 0;opacity:.5}
+
+    /* RESPONSIVE */
+    @media(max-width:768px){
+      .sidebar{display:none}
+      .main{padding:1.2rem}
+      .profile-header{grid-template-columns:1fr;text-align:center}
+      .form-grid{grid-template-columns:1fr}
+      .form-group.span2{grid-column:span 1}
+    }
+  </style>
+</head>
+<body>
+
+<!-- SIDEBAR -->
+<aside class="sidebar">
+  <div class="logo">mercado<span>local</span></div>
+  <div class="nav-section">Minha Loja</div>
+  <div class="nav-item" onclick="window.location.href='dashboard.html'"><span class="icon">📊</span> Visão Geral</div>
+  <div class="nav-item" onclick="window.location.href='dashboard.html?page=loja'"><span class="icon">🏪</span> Dados da Loja</div>
+  <div class="nav-item" onclick="window.location.href='dashboard.html?page=produtos'"><span class="icon">📦</span> Produtos</div>
+  <div class="nav-section">Explorar</div>
+  <div class="nav-item" onclick="window.location.href='marketplace.html'"><span class="icon">🔍</span> Marketplace</div>
+  <div class="sidebar-footer">
+    <div class="user-chip" onclick="window.location.href='profile.html'">
+      <div class="avatar" id="avatar-letter">?</div>
+      <div class="user-info">
+        <div class="user-name" id="user-name-display">Carregando…</div>
+        <div class="user-role">Perfil</div>
+      </div>
+    </div>
+    <button class="logout-btn" onclick="doLogout()">Sair da conta</button>
+  </div>
+</aside>
+
+<!-- MAIN -->
+<main class="main">
+  <div class="topbar">
+    <div>
+      <div class="page-title">Meu Perfil</div>
+      <div class="page-sub">Atualize suas informações pessoais</div>
+    </div>
+    <a href="javascript:history.back()" class="back-btn">← Voltar</a>
+  </div>
+
+  <!-- PROFILE HEADER -->
+  <div class="profile-header">
+    <div class="profile-avatar" id="profile-avatar">?</div>
+    <div class="profile-info">
+      <h2 id="profile-name">Carregando…</h2>
+      <p id="profile-email" style="margin-bottom:.5rem">email@exemplo.com</p>
+      <p id="profile-type" style="color:var(--accent);font-size:.85rem">Carregando…</p>
+      <button class="btn btn-ghost" style="margin-top:1rem;font-size:.8rem;padding:.3rem .8rem" onclick="document.getElementById('image-upload-lojista').click()">📷 Alterar foto</button>
+      <input type="file" id="image-upload-lojista" style="display:none" accept="image/*" onchange="uploadProfileImage(event, 'lojista')"/>
+    </div>
+  </div>
+
+  <!-- INFORMAÇÕES PESSOAIS -->
+  <div class="form-card">
+    <h3>📋 Informações Pessoais</h3>
+    <div class="form-grid">
+      <div class="form-group span2">
+        <label>Nome Completo *</label>
+        <input type="text" id="profile-nome" placeholder="Digite seu nome completo"/>
+      </div>
+      <div class="form-group span2">
+        <label>Email *</label>
+        <input type="email" id="profile-email-input" placeholder="seu@email.com" readonly style="opacity:.6;cursor:not-allowed;"/>
+        <small style="color:var(--muted);font-size:.75rem;margin-top:.3rem">Email não pode ser alterado</small>
+      </div>
+      <div class="form-group">
+        <label>Telefone</label>
+        <input type="tel" id="profile-telefone" placeholder="(11) 99999-0000"/>
+      </div>
+      <div class="form-group">
+        <label>Data de Nascimento</label>
+        <input type="date" id="profile-data-nasc"/>
+      </div>
+    </div>
+    <div class="action-btns">
+      <button class="btn btn-primary" id="save-profile-btn" onclick="saveProfile()">Salvar alterações</button>
+      <button class="btn btn-ghost" onclick="window.history.back()">Cancelar</button>
+    </div>
+  </div>
+
+  <hr class="section-divider"/>
+
+  <!-- SEGURANÇA -->
+  <div class="form-card">
+    <h3>🔒 Segurança</h3>
+    <div class="form-grid">
+      <div class="form-group span2">
+        <label>Senha Atual *</label>
+        <input type="password" id="profile-senha-atual" placeholder="Digite sua senha atual"/>
+      </div>
+      <div class="form-group">
+        <label>Nova Senha</label>
+        <input type="password" id="profile-senha-nova" placeholder="Deixe em branco para manter a atual"/>
+      </div>
+      <div class="form-group">
+        <label>Confirmar Nova Senha</label>
+        <input type="password" id="profile-senha-conf" placeholder="Confirme a nova senha"/>
+      </div>
+    </div>
+    <div class="action-btns">
+      <button class="btn btn-primary" onclick="changePassword()">Alterar senha</button>
+    </div>
+  </div>
+
+  <hr class="section-divider"/>
+
+  <!-- DELETAR CONTA -->
+  <div class="form-card" style="border-color:rgba(232,90,90,.3);background:rgba(232,90,90,.03)">
+    <h3>⚠️ Zona de Risco</h3>
+    <p style="color:var(--muted);font-size:.92rem;margin-bottom:1.5rem">Esta ação não pode ser desfeita. Sua conta e todos os dados associados serão permanentemente deletados.</p>
+    <div class="action-btns">
+      <button class="btn btn-danger" onclick="deleteAccount()">Deletar minha conta</button>
+    </div>
+  </div>
+
+</main>
+
+<div class="toast" id="toast"></div>
+
+<script src="app.js"></script>
+<script>
+let currentUser = null;
+
+// ---- INIT ----
+document.addEventListener('DOMContentLoaded', async ()=>{
+  currentUser = requireAuth();
+  if(!currentUser) return;
+  
+  // Carregar dados do usuário
+  document.getElementById('user-name-display').textContent = currentUser.nome;
+  document.getElementById('avatar-letter').textContent = currentUser.nome[0].toUpperCase();
+  document.getElementById('profile-name').textContent = currentUser.nome;
+  document.getElementById('profile-email').textContent = currentUser.email;
+  document.getElementById('profile-email-input').value = currentUser.email;
+  
+  // Exibir imagem de perfil ou iniciais
+  if(currentUser.profileImage){
+    document.getElementById('profile-avatar').style.backgroundImage = `url('${currentUser.profileImage}')`;
+    document.getElementById('profile-avatar').textContent = '';
+  } else {
+    document.getElementById('profile-avatar').textContent = currentUser.nome[0].toUpperCase();
+  }
+  
+  // Tipo de usuário
+  const typeText = currentUser.tipo === 'lojista' ? '🏪 Lojista' : '🛍️ Cliente';
+  document.getElementById('profile-type').textContent = typeText;
+  
+  // Preencher formulário
+  document.getElementById('profile-nome').value = currentUser.nome || '';
+  document.getElementById('profile-telefone').value = currentUser.telefone || '';
+  document.getElementById('profile-data-nasc').value = currentUser.data_nasc || '';
+});
+
+// ---- SALVAR PERFIL ----
+async function saveProfile(){
+  const nome = document.getElementById('profile-nome').value.trim();
+  const telefone = document.getElementById('profile-telefone').value.trim();
+  const data_nasc = document.getElementById('profile-data-nasc').value;
+  
+  if(!nome){
+    toast('Nome é obrigatório', 'error');
+    return;
+  }
+  
+  try {
+    document.getElementById('save-profile-btn').disabled = true;
+    const res = await fetch(`${API_URL}/api/users/${currentUser.id}`, {
+      method: 'PUT',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({nome, telefone, data_nasc})
+    });
+    
+    const data = await res.json();
+    if(!data.ok){
+      toast(data.msg || 'Erro ao atualizar perfil', 'error');
+      return;
+    }
+    
+    // Atualizar localStorage mantendo timestamp
+    const currentSession = JSON.parse(localStorage.getItem('mp_session'));
+    if (currentSession) {
+      currentSession.user.nome = nome;
+      currentSession.user.telefone = telefone;
+      currentSession.user.data_nasc = data_nasc;
+      localStorage.setItem('mp_session', JSON.stringify(currentSession));
+    }
+    
+    toast('Perfil atualizado com sucesso!', 'success');
+    setTimeout(() => window.location.reload(), 1500);
+  } catch(e) {
+    toast('Erro na conexão: ' + e.message, 'error');
+  } finally {
+    document.getElementById('save-profile-btn').disabled = false;
+  }
+}
+
+// ---- ALTERAR SENHA ----
+async function changePassword(){
+  const senhaAtual = document.getElementById('profile-senha-atual').value;
+  const senhaNova = document.getElementById('profile-senha-nova').value;
+  const senhaConf = document.getElementById('profile-senha-conf').value;
+  
+  if(!senhaAtual){
+    toast('Senha atual é obrigatória', 'error');
+    return;
+  }
+  
+  if(!senhaNova){
+    toast('Digite uma nova senha', 'error');
+    return;
+  }
+  
+  if(senhaNova !== senhaConf){
+    toast('As senhas não conferem', 'error');
+    return;
+  }
+  
+  if(senhaNova.length < 6){
+    toast('A senha deve ter pelo menos 6 caracteres', 'error');
+    return;
+  }
+  
+  try {
+    const res = await fetch(`${API_URL}/api/users/${currentUser.id}/change-password`, {
+      method: 'POST',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({
+        senhaAtual,
+        senhaNova
+      })
+    });
+    
+    const data = await res.json();
+    if(!data.ok){
+      toast(data.msg || 'Erro ao alterar senha', 'error');
+      return;
+    }
+    
+    toast('Senha alterada com sucesso!', 'success');
+    document.getElementById('profile-senha-atual').value = '';
+    document.getElementById('profile-senha-nova').value = '';
+    document.getElementById('profile-senha-conf').value = '';
+  } catch(e) {
+    toast('Erro na conexão: ' + e.message, 'error');
+  }
+}
+
+// ---- DELETAR CONTA ----
+async function deleteAccount(){
+  if(!confirm('⚠️ ATENÇÃO!\n\nVocê tem certeza? Esta ação NÃO pode ser desfeita.\nSua conta e todos os dados serão deletados permanentemente.')){
+    return;
+  }
+  
+  const confirmCode = prompt('Para confirmar, digite sua senha:');
+  if(!confirmCode) return;
+  
+  try {
+    const res = await fetch(`${API_URL}/api/users/${currentUser.id}`, {
+      method: 'DELETE',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({senha: confirmCode})
+    });
+    
+    const data = await res.json();
+    if(!data.ok){
+      toast(data.msg || 'Erro ao deletar conta', 'error');
+      return;
+    }
+    
+    toast('Conta deletada. Redirecionando...', 'success');
+    localStorage.removeItem('mp_session');
+    setTimeout(() => window.location.href = 'index.html', 2000);
+  } catch(e) {
+    toast('Erro na conexão: ' + e.message, 'error');
+  }
+}
+
+// ---- TOAST ----
+function toast(msg, type='success'){
+  const el = document.getElementById('toast');
+  el.className = `toast ${type === 'success' ? 'toast-success' : 'toast-error'} show`;
+  el.textContent = msg;
+  setTimeout(() => el.classList.remove('show'), 3500);
+}
+
+// ---- LOGOUT ----
+function doLogout(){
+  DB.logout();
+  window.location.href='login.html';
+}
+
+// ---- UPLOAD DE IMAGEM ----
+async function uploadProfileImage(event, type){
+  const file = event.target.files[0];
+  if(!file) return;
+  
+  try {
+    const formData = new FormData();
+    formData.append('image', file);
+    
+    const res = await fetch(`${API_URL}/api/upload-image`, {
+      method: 'POST',
+      body: formData
+    });
+    
+    const data = await res.json();
+    if(!data.ok){
+      toast('Erro ao enviar imagem: ' + (data.msg || 'Desconhecido'), 'error');
+      return;
+    }
+    
+    // Atualizar perfil com a imagem
+    const updateRes = await fetch(`${API_URL}/api/users/${currentUser.id}/profile-image`, {
+      method: 'PUT',
+      headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({imagePath: data.imagePath})
+    });
+    
+    const updateData = await updateRes.json();
+    if(!updateData.ok){
+      toast('Erro ao atualizar perfil', 'error');
+      return;
+    }
+    
+    // Atualizar localStorage
+    const currentSession = JSON.parse(localStorage.getItem('mp_session'));
+    if (currentSession) {
+      currentSession.user.profileImage = data.imagePath;
+      localStorage.setItem('mp_session', JSON.stringify(currentSession));
+      currentUser.profileImage = data.imagePath;
+    }
+    
+    // Exibir nova imagem
+    document.getElementById('profile-avatar').style.backgroundImage = `url('${data.imagePath}')`;
+    document.getElementById('profile-avatar').textContent = '';
+    
+    toast('Foto de perfil atualizada com sucesso!', 'success');
+  } catch(e) {
+    toast('Erro na conexão: ' + e.message, 'error');
+  }
+}
+</script>
+</body>
+</html>
