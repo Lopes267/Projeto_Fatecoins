@@ -1,9 +1,25 @@
 // ============================================================
 //  app.js  –  Marketplace logic (conectado a Node.js)
-//  Backend: http://localhost:5800
 // ============================================================
 
-const API_URL = 'http://localhost:5800';
+// Detectar URL da API dinamicamente
+let API_URL = 'http://localhost:4000'; // fallback
+
+async function initAPI() {
+  try {
+    const res = await fetch('http://localhost:4000/api/config');
+    if (res.ok) {
+      const config = await res.json();
+      API_URL = config.api_url;
+      console.log('API URL detectada:', API_URL);
+    }
+  } catch (err) {
+    console.log('Usando API URL padrão:', API_URL);
+  }
+}
+
+// Inicializar API na carga da página
+initAPI();
 
 const DB = {
   // ---------- helpers ----------
@@ -13,6 +29,19 @@ const DB = {
 
   // ---------- users ----------
   async registerUser(nome, email, senha, tipo = 'cliente') {
+    // Validação básica de email no cliente
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    if (!emailRegex.test(email)) {
+      return { ok: false, msg: 'Formato de e-mail inválido.' };
+    }
+
+    // Verificar se é um email comum (não disposable)
+    const commonDomains = ['gmail.com', 'yahoo.com', 'hotmail.com', 'outlook.com', 'icloud.com'];
+    const domain = email.split('@')[1];
+    if (!commonDomains.includes(domain.toLowerCase())) {
+      console.warn('Domínio de e-mail não comum detectado:', domain);
+    }
+
     const res = await fetch(`${API_URL}/api/auth/register`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },

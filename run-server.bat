@@ -7,7 +7,7 @@ if not exist "node_modules" (
     npm install
 )
 
-REM Iniciar servidor em nova janela que pode ser fechada
+REM Iniciar servidor (porta automática)
 start cmd /k "npm start"
 
 REM Fechar esta janela automaticamente
