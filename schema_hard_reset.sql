@@ -1,10 +1,31 @@
 -- ============================================
---  MARKETPLACE DATABASE SCHEMA (PostgreSQL)
+--  HARD RESET - LIMPEZA COMPLETA
 -- ============================================
 
--- Tabela de usuários (lojistas e clientes)
-CREATE TABLE IF NOT EXISTS usuarios (
-    id          SERIAL PRIMARY KEY,
+-- ATENÇÃO: Este script vai deletar TODOS os dados e recriar do zero
+
+-- Deletar todas as tabelas existentes
+DROP TABLE IF EXISTS produtos CASCADE;
+DROP TABLE IF EXISTS lojas CASCADE;
+DROP TABLE IF EXISTS categorias CASCADE;
+DROP TABLE IF EXISTS usuarios CASCADE;
+
+-- Deletar views
+DROP VIEW IF EXISTS v_lojas_publicas;
+DROP VIEW IF EXISTS v_produtos_publicos;
+
+-- Criar bucket para imagens (se não existir)
+INSERT INTO storage.buckets (id, name, public)
+VALUES ('marketplace-images', 'marketplace-images', true)
+ON CONFLICT (id) DO NOTHING;
+
+-- ============================================
+--  RECREATE TABELAS DO ZERO
+-- ============================================
+
+-- Tabela de usuários com UUID
+CREATE TABLE usuarios (
+    id          UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     nome        TEXT NOT NULL,
     email       TEXT NOT NULL UNIQUE,
     senha_hash  TEXT NOT NULL,
@@ -19,34 +40,48 @@ CREATE TABLE IF NOT EXISTS usuarios (
     criado_em   TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
--- Desabilitar RLS para desenvolvimento (permitir operações públicas)
--- ALTER TABLE usuarios DISABLE ROW LEVEL SECURITY;
-
--- Habilitar RLS para segurança
+-- Habilitar RLS
 ALTER TABLE usuarios ENABLE ROW LEVEL SECURITY;
 
 -- Políticas RLS para usuários
--- Usuários podem ver seu próprio perfil
 CREATE POLICY "Users can view own profile" ON usuarios
   FOR SELECT USING (auth.uid()::text = id::text);
 
--- Usuários podem atualizar seu próprio perfil (exceto senha)
 CREATE POLICY "Users can update own profile" ON usuarios
   FOR UPDATE USING (auth.uid()::text = id::text)
   WITH CHECK (auth.uid()::text = id::text);
 
--- Permitir inserção para registro (será controlado pelo código)
 CREATE POLICY "Allow user registration" ON usuarios
   FOR INSERT WITH CHECK (true);
 
--- Permitir leitura pública para algumas operações (será controlado pelo código)
 CREATE POLICY "Allow public read for auth" ON usuarios
   FOR SELECT USING (true);
 
--- Tabela de lojas (uma por lojista)
-CREATE TABLE IF NOT EXISTS lojas (
+-- Tabela de categorias
+CREATE TABLE categorias (
+    id      SERIAL PRIMARY KEY,
+    nome    TEXT NOT NULL UNIQUE
+);
+
+-- Habilitar RLS
+ALTER TABLE categorias ENABLE ROW LEVEL SECURITY;
+
+-- Políticas RLS para categorias
+CREATE POLICY "Public can view categories" ON categorias
+  FOR SELECT USING (true);
+
+CREATE POLICY "Authenticated users can manage categories" ON categorias
+  FOR ALL USING (auth.uid() IS NOT NULL);
+
+-- Inserir categorias padrão
+INSERT INTO categorias (nome) VALUES
+  ('Eletrônicos'), ('Moda'), ('Alimentos'), ('Casa & Decoração'),
+  ('Esportes'), ('Beleza'), ('Livros'), ('Brinquedos'), ('Outros');
+
+-- Tabela de lojas
+CREATE TABLE lojas (
     id              SERIAL PRIMARY KEY,
-    usuario_id      INTEGER NOT NULL,
+    usuario_id      UUID NOT NULL,
     nome            TEXT NOT NULL,
     descricao       TEXT,
     categoria       TEXT,
@@ -62,60 +97,28 @@ CREATE TABLE IF NOT EXISTS lojas (
     FOREIGN KEY (usuario_id) REFERENCES usuarios(id) ON DELETE CASCADE
 );
 
-ALTER TABLE lojas DISABLE ROW LEVEL SECURITY;
-
--- Habilitar RLS para segurança
+-- Habilitar RLS
 ALTER TABLE lojas ENABLE ROW LEVEL SECURITY;
 
 -- Políticas RLS para lojas
--- Todos podem ver lojas ativas (público)
 CREATE POLICY "Public can view active stores" ON lojas
   FOR SELECT USING (ativa = true);
 
--- Lojistas podem ver suas próprias lojas (ativas ou não)
 CREATE POLICY "Store owners can view own stores" ON lojas
   FOR SELECT USING (auth.uid()::text = usuario_id::text);
 
--- Lojistas podem inserir suas próprias lojas
 CREATE POLICY "Store owners can insert own stores" ON lojas
   FOR INSERT WITH CHECK (auth.uid()::text = usuario_id::text);
 
--- Lojistas podem atualizar suas próprias lojas
 CREATE POLICY "Store owners can update own stores" ON lojas
   FOR UPDATE USING (auth.uid()::text = usuario_id::text)
   WITH CHECK (auth.uid()::text = usuario_id::text);
 
--- Lojistas podem deletar suas próprias lojas
 CREATE POLICY "Store owners can delete own stores" ON lojas
   FOR DELETE USING (auth.uid()::text = usuario_id::text);
 
--- Tabela de categorias de produto
-CREATE TABLE IF NOT EXISTS categorias (
-    id      SERIAL PRIMARY KEY,
-    nome    TEXT NOT NULL UNIQUE
-);
-
-ALTER TABLE categorias DISABLE ROW LEVEL SECURITY;
-
--- Habilitar RLS para segurança
-ALTER TABLE categorias ENABLE ROW LEVEL SECURITY;
-
--- Políticas RLS para categorias
--- Todos podem ver categorias
-CREATE POLICY "Public can view categories" ON categorias
-  FOR SELECT USING (true);
-
--- Usuários autenticados podem gerenciar categorias (por enquanto)
-CREATE POLICY "Authenticated users can manage categories" ON categorias
-  FOR ALL USING (auth.uid() IS NOT NULL);
-
-INSERT INTO categorias (nome) VALUES
-  ('Eletrônicos'), ('Moda'), ('Alimentos'), ('Casa & Decoração'),
-  ('Esportes'), ('Beleza'), ('Livros'), ('Brinquedos'), ('Outros')
-ON CONFLICT (nome) DO NOTHING;
-
 -- Tabela de produtos
-CREATE TABLE IF NOT EXISTS produtos (
+CREATE TABLE produtos (
     id              SERIAL PRIMARY KEY,
     loja_id         INTEGER NOT NULL,
     categoria_id    INTEGER,
@@ -131,13 +134,10 @@ CREATE TABLE IF NOT EXISTS produtos (
     FOREIGN KEY (categoria_id) REFERENCES categorias(id) ON DELETE SET NULL
 );
 
-ALTER TABLE produtos DISABLE ROW LEVEL SECURITY;
-
--- Habilitar RLS para segurança
+-- Habilitar RLS
 ALTER TABLE produtos ENABLE ROW LEVEL SECURITY;
 
 -- Políticas RLS para produtos
--- Todos podem ver produtos ativos de lojas ativas
 CREATE POLICY "Public can view active products" ON produtos
   FOR SELECT USING (
     ativo = true AND
@@ -147,7 +147,6 @@ CREATE POLICY "Public can view active products" ON produtos
     )
   );
 
--- Lojistas podem ver todos os seus produtos (ativos ou não)
 CREATE POLICY "Store owners can view own products" ON produtos
   FOR SELECT USING (
     EXISTS (
@@ -156,7 +155,6 @@ CREATE POLICY "Store owners can view own products" ON produtos
     )
   );
 
--- Lojistas podem inserir produtos em suas lojas
 CREATE POLICY "Store owners can insert products in own stores" ON produtos
   FOR INSERT WITH CHECK (
     EXISTS (
@@ -165,7 +163,6 @@ CREATE POLICY "Store owners can insert products in own stores" ON produtos
     )
   );
 
--- Lojistas podem atualizar seus próprios produtos
 CREATE POLICY "Store owners can update own products" ON produtos
   FOR UPDATE USING (
     EXISTS (
@@ -180,7 +177,6 @@ CREATE POLICY "Store owners can update own products" ON produtos
     )
   );
 
--- Lojistas podem deletar seus próprios produtos
 CREATE POLICY "Store owners can delete own products" ON produtos
   FOR DELETE USING (
     EXISTS (
@@ -189,18 +185,14 @@ CREATE POLICY "Store owners can delete own products" ON produtos
     )
   );
 
--- Índices para buscas rápidas
-CREATE INDEX IF NOT EXISTS idx_produtos_loja      ON produtos(loja_id);
-CREATE INDEX IF NOT EXISTS idx_produtos_categoria ON produtos(categoria_id);
-CREATE INDEX IF NOT EXISTS idx_lojas_usuario      ON lojas(usuario_id);
-CREATE INDEX IF NOT EXISTS idx_usuarios_email     ON usuarios(email);
+-- Índices
+CREATE INDEX idx_produtos_loja      ON produtos(loja_id);
+CREATE INDEX idx_produtos_categoria ON produtos(categoria_id);
+CREATE INDEX idx_lojas_usuario      ON lojas(usuario_id);
+CREATE INDEX idx_usuarios_email     ON usuarios(email);
 
--- ============================================
--- VIEWS ÚTEIS
--- ============================================
-
--- Visão pública: lojas com contagem de produtos
-CREATE OR REPLACE VIEW v_lojas_publicas AS
+-- Views
+CREATE VIEW v_lojas_publicas AS
 SELECT
     l.id,
     l.nome            AS loja_nome,
@@ -218,8 +210,7 @@ LEFT JOIN produtos p ON p.loja_id = l.id AND p.ativo = TRUE
 WHERE l.ativa = TRUE
 GROUP BY l.id, l.nome, l.descricao, l.categoria, l.logo_url, l.cidade, l.estado, u.nome;
 
--- Visão de produtos com info da loja
-CREATE OR REPLACE VIEW v_produtos_publicos AS
+CREATE VIEW v_produtos_publicos AS
 SELECT
     p.id,
     p.nome            AS produto_nome,

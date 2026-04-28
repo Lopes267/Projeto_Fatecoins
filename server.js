@@ -99,37 +99,62 @@ function findAvailablePort(startPort = 3000, maxAttempts = 100) {
 // Porta inicial preferida
 const PREFERRED_PORT = 4000;
 
-// Configurar multer para upload de imagens
-const uploadsDir = path.join(__dirname, 'images');
-if (!fs.existsSync(uploadsDir)) {
-  fs.mkdirSync(uploadsDir, { recursive: true });
-}
-
-const storage = multer.diskStorage({
-  destination: (req, file, cb) => {
-    cb(null, uploadsDir);
-  },
-  filename: (req, file, cb) => {
-    const ext = path.extname(file.originalname);
-    const name = `profile-${Date.now()}${ext}`;
-    cb(null, name);
-  }
-});
-
+// Configurar multer para upload de imagens (memory storage para Supabase)
 const upload = multer({
-  storage: storage,
+  storage: multer.memoryStorage(),
   limits: { fileSize: 5 * 1024 * 1024 }, // 5MB
   fileFilter: (req, file, cb) => {
-    const allowedTypes = /jpeg|jpg|png|gif/;
+    const allowedTypes = /jpeg|jpg|png|gif|webp/;
     const extname = allowedTypes.test(path.extname(file.originalname).toLowerCase());
     const mimetype = allowedTypes.test(file.mimetype);
     if (mimetype && extname) {
       return cb(null, true);
     } else {
-      cb(new Error('Apenas imagens são permitidas (JPEG, PNG, GIF)'));
+      cb(new Error('Apenas imagens são permitidas (JPEG, PNG, GIF, WebP)'));
     }
   }
 });
+
+// Função para upload para Supabase Storage
+async function uploadToSupabase(file, folder, filename) {
+  try {
+    const filePath = `${folder}/${filename}`;
+    
+    const { data, error } = await supabase.storage
+      .from('marketplace-images')
+      .upload(filePath, file.buffer, {
+        contentType: file.mimetype,
+        upsert: true
+      });
+
+    if (error) throw error;
+
+    // Obter URL pública
+    const { data: { publicUrl } } = supabase.storage
+      .from('marketplace-images')
+      .getPublicUrl(filePath);
+
+    return { success: true, url: publicUrl, path: filePath };
+  } catch (error) {
+    console.error('Erro no upload para Supabase:', error);
+    return { success: false, error: error.message };
+  }
+}
+
+// Função para deletar imagem do Supabase Storage
+async function deleteFromSupabase(filePath) {
+  try {
+    const { error } = await supabase.storage
+      .from('marketplace-images')
+      .remove([filePath]);
+
+    if (error) throw error;
+    return { success: true };
+  } catch (error) {
+    console.error('Erro ao deletar do Supabase:', error);
+    return { success: false, error: error.message };
+  }
+}
 
 // Middleware para verificar autenticação
 function authenticateToken(req, res, next) {
@@ -544,60 +569,277 @@ app.delete('/api/users/:id', authenticateToken, async (req, res) => {
 });
 
 // ============================================================
-//  UPLOAD DE IMAGENS
+//  UPLOAD DE IMAGENS COM SUPABASE STORAGE
 // ============================================================
 
-app.post('/api/upload-image', upload.single('image'), (req, res) => {
+// Upload genérico de imagem
+app.post('/api/upload-image', authenticateToken, upload.single('image'), async (req, res) => {
   if (!req.file) {
     return res.status(400).json({ ok: false, msg: 'Nenhuma imagem foi enviada.' });
   }
-  
-  const imagePath = `/images/${req.file.filename}`;
-  res.json({ ok: true, imagePath: imagePath, filename: req.file.filename });
+
+  try {
+    const { folder = 'general' } = req.body;
+    const filename = `${Date.now()}-${Math.round(Math.random() * 1E9)}${path.extname(req.file.originalname)}`;
+    
+    const uploadResult = await uploadToSupabase(req.file, folder, filename);
+    
+    if (!uploadResult.success) {
+      return res.status(500).json({ ok: false, msg: uploadResult.error });
+    }
+
+    res.json({ 
+      ok: true, 
+      imageUrl: uploadResult.url, 
+      path: uploadResult.path,
+      filename: filename 
+    });
+  } catch (err) {
+    console.error('Erro no upload:', err);
+    res.status(500).json({ ok: false, msg: 'Erro interno do servidor.' });
+  }
 });
 
-// Atualizar imagem de perfil do usuário
-app.put('/api/users/:id/profile-image', async (req, res) => {
-  const { imagePath } = req.body;
-
-  if (!imagePath) {
-    return res.status(400).json({ ok: false, msg: 'Caminho da imagem obrigatório.' });
+// Upload e atualização de imagem de perfil do usuário
+app.put('/api/users/:id/profile-image', authenticateToken, upload.single('image'), async (req, res) => {
+  if (!req.file) {
+    return res.status(400).json({ ok: false, msg: 'Nenhuma imagem foi enviada.' });
   }
 
   try {
-    const { data: user, error: userError } = await supabase
+    // Verificar se o usuário está atualizando seu próprio perfil
+    const { data: { user }, error: authError } = await req.supabase.auth.getUser();
+    if (authError || !user || user.id !== req.params.id) {
+      return res.status(403).json({ ok: false, msg: 'Acesso negado.' });
+    }
+
+    // Buscar imagem antiga
+    const { data: userData, error: userError } = await req.supabase
       .from('usuarios')
       .select('profile_image')
       .eq('id', req.params.id)
       .single();
 
-    if (userError || !user) {
+    if (userError || !userData) {
       return res.status(404).json({ ok: false, msg: 'Usuário não encontrado.' });
     }
 
-    if (user.profile_image) {
-      const oldImagePath = path.join(__dirname, user.profile_image);
-      if (fs.existsSync(oldImagePath)) {
-        try {
-          fs.unlinkSync(oldImagePath);
-        } catch (err) {
-          console.error('Erro ao deletar imagem antiga:', err);
-        }
+    // Fazer upload da nova imagem
+    const filename = `profile-${req.params.id}-${Date.now()}${path.extname(req.file.originalname)}`;
+    const uploadResult = await uploadToSupabase(req.file, 'profiles', filename);
+    
+    if (!uploadResult.success) {
+      return res.status(500).json({ ok: false, msg: uploadResult.error });
+    }
+
+    // Deletar imagem antiga se existir
+    if (userData.profile_image && userData.profile_image.includes('marketplace-images')) {
+      const oldPath = userData.profile_image.split('/').pop();
+      if (oldPath) {
+        await deleteFromSupabase(`profiles/${oldPath}`);
       }
     }
 
-    const { error: updateError } = await supabase
+    // Atualizar banco de dados
+    const { error: updateError } = await req.supabase
       .from('usuarios')
-      .update({ profile_image: imagePath })
+      .update({ profile_image: uploadResult.url })
       .eq('id', req.params.id);
 
     if (updateError) {
       throw updateError;
     }
 
-    res.json({ ok: true, imagePath });
+    res.json({ ok: true, imageUrl: uploadResult.url });
   } catch (err) {
     console.error('Erro ao atualizar imagem de perfil:', err);
+    res.status(500).json({ ok: false, msg: 'Erro interno do servidor.' });
+  }
+});
+
+// Upload e atualização de logo da loja
+app.put('/api/stores/:id/logo', authenticateToken, upload.single('image'), async (req, res) => {
+  if (!req.file) {
+    return res.status(400).json({ ok: false, msg: 'Nenhuma imagem foi enviada.' });
+  }
+
+  try {
+    // Verificar se o usuário é dono da loja
+    const { data: { user }, error: authError } = await req.supabase.auth.getUser();
+    if (authError || !user) {
+      return res.status(401).json({ ok: false, msg: 'Não autorizado.' });
+    }
+
+    const { data: store, error: storeError } = await req.supabase
+      .from('lojas')
+      .select('usuario_id, logo_url')
+      .eq('id', req.params.id)
+      .single();
+
+    if (storeError || !store) {
+      return res.status(404).json({ ok: false, msg: 'Loja não encontrada.' });
+    }
+
+    if (store.usuario_id !== user.id) {
+      return res.status(403).json({ ok: false, msg: 'Acesso negado.' });
+    }
+
+    // Fazer upload do logo
+    const filename = `logo-${req.params.id}-${Date.now()}${path.extname(req.file.originalname)}`;
+    const uploadResult = await uploadToSupabase(req.file, 'stores', filename);
+    
+    if (!uploadResult.success) {
+      return res.status(500).json({ ok: false, msg: uploadResult.error });
+    }
+
+    // Deletar logo antigo se existir
+    if (store.logo_url && store.logo_url.includes('marketplace-images')) {
+      const oldPath = store.logo_url.split('/').pop();
+      if (oldPath) {
+        await deleteFromSupabase(`stores/${oldPath}`);
+      }
+    }
+
+    // Atualizar banco de dados
+    const { error: updateError } = await req.supabase
+      .from('lojas')
+      .update({ logo_url: uploadResult.url })
+      .eq('id', req.params.id);
+
+    if (updateError) {
+      throw updateError;
+    }
+
+    res.json({ ok: true, logoUrl: uploadResult.url });
+  } catch (err) {
+    console.error('Erro ao atualizar logo da loja:', err);
+    res.status(500).json({ ok: false, msg: 'Erro interno do servidor.' });
+  }
+});
+
+// Upload e atualização de banner da loja
+app.put('/api/stores/:id/banner', authenticateToken, upload.single('image'), async (req, res) => {
+  if (!req.file) {
+    return res.status(400).json({ ok: false, msg: 'Nenhuma imagem foi enviada.' });
+  }
+
+  try {
+    // Verificar se o usuário é dono da loja
+    const { data: { user }, error: authError } = await req.supabase.auth.getUser();
+    if (authError || !user) {
+      return res.status(401).json({ ok: false, msg: 'Não autorizado.' });
+    }
+
+    const { data: store, error: storeError } = await req.supabase
+      .from('lojas')
+      .select('usuario_id, banner_url')
+      .eq('id', req.params.id)
+      .single();
+
+    if (storeError || !store) {
+      return res.status(404).json({ ok: false, msg: 'Loja não encontrada.' });
+    }
+
+    if (store.usuario_id !== user.id) {
+      return res.status(403).json({ ok: false, msg: 'Acesso negado.' });
+    }
+
+    // Fazer upload do banner
+    const filename = `banner-${req.params.id}-${Date.now()}${path.extname(req.file.originalname)}`;
+    const uploadResult = await uploadToSupabase(req.file, 'stores', filename);
+    
+    if (!uploadResult.success) {
+      return res.status(500).json({ ok: false, msg: uploadResult.error });
+    }
+
+    // Deletar banner antigo se existir
+    if (store.banner_url && store.banner_url.includes('marketplace-images')) {
+      const oldPath = store.banner_url.split('/').pop();
+      if (oldPath) {
+        await deleteFromSupabase(`stores/${oldPath}`);
+      }
+    }
+
+    // Atualizar banco de dados
+    const { error: updateError } = await req.supabase
+      .from('lojas')
+      .update({ banner_url: uploadResult.url })
+      .eq('id', req.params.id);
+
+    if (updateError) {
+      throw updateError;
+    }
+
+    res.json({ ok: true, bannerUrl: uploadResult.url });
+  } catch (err) {
+    console.error('Erro ao atualizar banner da loja:', err);
+    res.status(500).json({ ok: false, msg: 'Erro interno do servidor.' });
+  }
+});
+
+// Upload e atualização de imagem do produto
+app.put('/api/products/:id/image', authenticateToken, upload.single('image'), async (req, res) => {
+  if (!req.file) {
+    return res.status(400).json({ ok: false, msg: 'Nenhuma imagem foi enviada.' });
+  }
+
+  try {
+    // Verificar se o usuário é dono do produto
+    const { data: { user }, error: authError } = await req.supabase.auth.getUser();
+    if (authError || !user) {
+      return res.status(401).json({ ok: false, msg: 'Não autorizado.' });
+    }
+
+    // Verificar se o produto existe e pertence ao usuário
+    const { data: productCheck, error: checkError } = await req.supabase
+      .from('produtos')
+      .select('loja_id, imagem_url')
+      .eq('id', req.params.id)
+      .single();
+
+    if (checkError || !productCheck) {
+      return res.status(404).json({ ok: false, msg: 'Produto não encontrado.' });
+    }
+
+    const { data: store, error: storeError } = await req.supabase
+      .from('lojas')
+      .select('usuario_id')
+      .eq('id', productCheck.loja_id)
+      .single();
+
+    if (storeError || !store || store.usuario_id !== user.id) {
+      return res.status(403).json({ ok: false, msg: 'Acesso negado. Você não é dono deste produto.' });
+    }
+
+    // Fazer upload da imagem
+    const filename = `product-${req.params.id}-${Date.now()}${path.extname(req.file.originalname)}`;
+    const uploadResult = await uploadToSupabase(req.file, 'products', filename);
+    
+    if (!uploadResult.success) {
+      return res.status(500).json({ ok: false, msg: uploadResult.error });
+    }
+
+    // Deletar imagem antiga se existir
+    if (productCheck.imagem_url && productCheck.imagem_url.includes('marketplace-images')) {
+      const oldPath = productCheck.imagem_url.split('/').pop();
+      if (oldPath) {
+        await deleteFromSupabase(`products/${oldPath}`);
+      }
+    }
+
+    // Atualizar banco de dados
+    const { error: updateError } = await req.supabase
+      .from('produtos')
+      .update({ imagem_url: uploadResult.url })
+      .eq('id', req.params.id);
+
+    if (updateError) {
+      throw updateError;
+    }
+
+    res.json({ ok: true, imageUrl: uploadResult.url });
+  } catch (err) {
+    console.error('Erro ao atualizar imagem do produto:', err);
     res.status(500).json({ ok: false, msg: 'Erro interno do servidor.' });
   }
 });

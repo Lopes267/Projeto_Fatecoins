@@ -177,6 +177,108 @@ const DB = {
     const res = await fetch(`${API_URL}/api/products?${params}`);
     const data = await res.json();
     return data.products || [];
+  },
+
+  // ---------- image uploads ----------
+  async uploadImage(file, folder = 'general') {
+    const formData = new FormData();
+    formData.append('image', file);
+    formData.append('folder', folder);
+
+    const session = localStorage.getItem('mp_session');
+    const sessionData = JSON.parse(session);
+    const token = sessionData.session?.access_token;
+
+    const res = await fetch(`${API_URL}/api/upload-image`, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${token}`
+      },
+      body: formData
+    });
+
+    const data = await res.json();
+    return data;
+  },
+
+  async updateProfileImage(userId, file) {
+    const formData = new FormData();
+    formData.append('image', file);
+
+    const session = localStorage.getItem('mp_session');
+    const sessionData = JSON.parse(session);
+    const token = sessionData.session?.access_token;
+
+    const res = await fetch(`${API_URL}/api/users/${userId}/profile-image`, {
+      method: 'PUT',
+      headers: {
+        'Authorization': `Bearer ${token}`
+      },
+      body: formData
+    });
+
+    const data = await res.json();
+    return data;
+  },
+
+  async updateStoreLogo(storeId, file) {
+    const formData = new FormData();
+    formData.append('image', file);
+
+    const session = localStorage.getItem('mp_session');
+    const sessionData = JSON.parse(session);
+    const token = sessionData.session?.access_token;
+
+    const res = await fetch(`${API_URL}/api/stores/${storeId}/logo`, {
+      method: 'PUT',
+      headers: {
+        'Authorization': `Bearer ${token}`
+      },
+      body: formData
+    });
+
+    const data = await res.json();
+    return data;
+  },
+
+  async updateStoreBanner(storeId, file) {
+    const formData = new FormData();
+    formData.append('image', file);
+
+    const session = localStorage.getItem('mp_session');
+    const sessionData = JSON.parse(session);
+    const token = sessionData.session?.access_token;
+
+    const res = await fetch(`${API_URL}/api/stores/${storeId}/banner`, {
+      method: 'PUT',
+      headers: {
+        'Authorization': `Bearer ${token}`
+      },
+      body: formData
+    });
+
+    const data = await res.json();
+    return data;
+  },
+
+  async updateProductImage(productId, file) {
+    const formData = new FormData();
+    formData.append('image', file);
+
+    const session = localStorage.getItem('mp_session');
+    const sessionData = JSON.parse(session);
+    const token = sessionData.session?.access_token;
+
+    const res = await fetch(`${API_URL}/api/products/${productId}/image`, {
+      method: 'PUT',
+      headers: {
+        'Authorization': `Bearer ${token}`
+      },
+      body: formData
+    });
+
+    const data = await res.json();
+    return data;
   }
 };
 
@@ -202,6 +304,167 @@ function toast(msg, tipo = 'success') {
 
 function formatPrice(n) {
   return new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(n);
+}
+
+// ============================================================
+//  IMAGE UPLOAD HELPERS
+// ============================================================
+
+function createImageUploadHandler(inputId, previewId, uploadCallback) {
+  const input = document.getElementById(inputId);
+  const preview = document.getElementById(previewId);
+  
+  if (!input || !preview) return;
+
+  input.addEventListener('change', async (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+
+    // Validar arquivo
+    if (!file.type.startsWith('image/')) {
+      toast('Por favor, selecione uma imagem válida.', 'error');
+      input.value = '';
+      return;
+    }
+
+    if (file.size > 5 * 1024 * 1024) { // 5MB
+      toast('A imagem deve ter no máximo 5MB.', 'error');
+      input.value = '';
+      return;
+    }
+
+    // Mostrar preview
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      preview.innerHTML = `
+        <div style="position: relative; display: inline-block;">
+          <img src="${e.target.result}" style="max-width: 200px; max-height: 200px; border-radius: 8px; border: 1px solid var(--border);">
+          <button type="button" onclick="removeImage('${inputId}', '${previewId}')" 
+                  style="position: absolute; top: -8px; right: -8px; background: var(--red); color: white; 
+                         border: none; border-radius: 50%; width: 24px; height: 24px; cursor: pointer; 
+                         display: flex; align-items: center; justify-content: center; font-size: 12px;">
+            ×
+          </button>
+        </div>
+      `;
+    };
+    reader.readAsDataURL(file);
+
+    // Fazer upload
+    try {
+      if (uploadCallback) {
+        await uploadCallback(file);
+      }
+    } catch (error) {
+      console.error('Erro no upload:', error);
+      toast('Erro ao fazer upload da imagem.', 'error');
+      removeImage(inputId, previewId);
+    }
+  });
+}
+
+function removeImage(inputId, previewId) {
+  const input = document.getElementById(inputId);
+  const preview = document.getElementById(previewId);
+  
+  if (input) input.value = '';
+  if (preview) preview.innerHTML = '';
+}
+
+async function handleProfileImageUpload(userId) {
+  const input = document.getElementById('profile-image-input');
+  const file = input.files[0];
+  if (!file) return;
+
+  try {
+    const result = await DB.updateProfileImage(userId, file);
+    if (result.ok) {
+      toast('Foto de perfil atualizada com sucesso!');
+      // Atualizar avatar na interface
+      const user = DB.currentUser();
+      if (user) {
+        user.profile_image = result.imageUrl;
+        const sessionData = JSON.parse(localStorage.getItem('mp_session'));
+        sessionData.user = user;
+        localStorage.setItem('mp_session', JSON.stringify(sessionData));
+        renderNav(); // Atualizar navegação
+      }
+    } else {
+      toast(result.msg || 'Erro ao atualizar foto de perfil.', 'error');
+    }
+  } catch (error) {
+    console.error('Erro:', error);
+    toast('Erro ao atualizar foto de perfil.', 'error');
+  }
+}
+
+async function handleStoreLogoUpload(storeId) {
+  const input = document.getElementById('store-logo-input');
+  const file = input.files[0];
+  if (!file) return;
+
+  try {
+    const result = await DB.updateStoreLogo(storeId, file);
+    if (result.ok) {
+      toast('Logo da loja atualizado com sucesso!');
+      // Atualizar preview se existir
+      const preview = document.getElementById('logo-preview');
+      if (preview) {
+        preview.innerHTML = `<img src="${result.logoUrl}" style="max-width: 100px; max-height: 100px; border-radius: 8px;">`;
+      }
+    } else {
+      toast(result.msg || 'Erro ao atualizar logo.', 'error');
+    }
+  } catch (error) {
+    console.error('Erro:', error);
+    toast('Erro ao atualizar logo.', 'error');
+  }
+}
+
+async function handleStoreBannerUpload(storeId) {
+  const input = document.getElementById('store-banner-input');
+  const file = input.files[0];
+  if (!file) return;
+
+  try {
+    const result = await DB.updateStoreBanner(storeId, file);
+    if (result.ok) {
+      toast('Banner da loja atualizado com sucesso!');
+      // Atualizar preview se existir
+      const preview = document.getElementById('banner-preview');
+      if (preview) {
+        preview.innerHTML = `<img src="${result.bannerUrl}" style="max-width: 300px; max-height: 150px; border-radius: 8px;">`;
+      }
+    } else {
+      toast(result.msg || 'Erro ao atualizar banner.', 'error');
+    }
+  } catch (error) {
+    console.error('Erro:', error);
+    toast('Erro ao atualizar banner.', 'error');
+  }
+}
+
+async function handleProductImageUpload(productId) {
+  const input = document.getElementById('product-image-input');
+  const file = input.files[0];
+  if (!file) return;
+
+  try {
+    const result = await DB.updateProductImage(productId, file);
+    if (result.ok) {
+      toast('Imagem do produto atualizada com sucesso!');
+      // Atualizar preview se existir
+      const preview = document.getElementById('product-image-preview');
+      if (preview) {
+        preview.innerHTML = `<img src="${result.imageUrl}" style="max-width: 150px; max-height: 150px; border-radius: 8px;">`;
+      }
+    } else {
+      toast(result.msg || 'Erro ao atualizar imagem.', 'error');
+    }
+  } catch (error) {
+    console.error('Erro:', error);
+    toast('Erro ao atualizar imagem.', 'error');
+  }
 }
 
 // ============================================================

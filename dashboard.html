@@ -279,6 +279,39 @@ select option{background:var(--bg)}
         <button class="btn btn-primary" onclick="saveStore()">Salvar informações</button>
       </div>
     </div>
+
+    <!-- IMAGENS DA LOJA -->
+    <div class="form-card">
+      <h3>📷 Imagens da Loja</h3>
+      <div class="form-grid">
+        <div class="form-group">
+          <label>Logo da Loja</label>
+          <div style="display:flex;align-items:center;gap:1rem">
+            <div id="logo-preview" style="width:60px;height:60px;border:1px solid var(--border);border-radius:8px;display:flex;align-items:center;justify-content:center;background:var(--card2)">
+              <span style="font-size:1.5rem">🏪</span>
+            </div>
+            <div>
+              <input type="file" id="store-logo-input" style="display:none" accept="image/*" onchange="handleStoreLogoUpload(currentStore?.id)"/>
+              <button class="btn btn-ghost" style="font-size:.8rem" onclick="document.getElementById('store-logo-input').click()">📷 Escolher logo</button>
+              <p style="font-size:.75rem;color:var(--muted);margin-top:.3rem">Formato: JPG, PNG, GIF (máx 5MB)</p>
+            </div>
+          </div>
+        </div>
+        <div class="form-group">
+          <label>Banner da Loja</label>
+          <div style="display:flex;align-items:center;gap:1rem">
+            <div id="banner-preview" style="width:100px;height:60px;border:1px solid var(--border);border-radius:8px;display:flex;align-items:center;justify-content:center;background:var(--card2)">
+              <span style="font-size:1.2rem">🖼️</span>
+            </div>
+            <div>
+              <input type="file" id="store-banner-input" style="display:none" accept="image/*" onchange="handleStoreBannerUpload(currentStore?.id)"/>
+              <button class="btn btn-ghost" style="font-size:.8rem" onclick="document.getElementById('store-banner-input').click()">📷 Escolher banner</button>
+              <p style="font-size:.75rem;color:var(--muted);margin-top:.3rem">Formato: JPG, PNG, GIF (máx 5MB)</p>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
   </div>
 
   <!-- PRODUTOS PAGE -->
@@ -328,6 +361,19 @@ select option{background:var(--bg)}
         <label>Descrição</label>
         <textarea id="p-descricao" placeholder="Descreva o produto…"></textarea>
       </div>
+      <div class="form-group span2">
+        <label>Imagem do Produto</label>
+        <div style="display:flex;align-items:center;gap:1rem">
+          <div id="product-image-preview" style="width:80px;height:80px;border:1px solid var(--border);border-radius:8px;display:flex;align-items:center;justify-content:center;background:var(--card2)">
+            <span style="font-size:2rem">📦</span>
+          </div>
+          <div>
+            <input type="file" id="product-image-input" style="display:none" accept="image/*" onchange="handleProductImageUpload(currentEditingProductId)"/>
+            <button class="btn btn-ghost" style="font-size:.8rem" onclick="document.getElementById('product-image-input').click()">📷 Escolher imagem</button>
+            <p style="font-size:.75rem;color:var(--muted);margin-top:.3rem">Formato: JPG, PNG, GIF (máx 5MB)</p>
+          </div>
+        </div>
+      </div>
     </div>
     <input type="hidden" id="p-edit-id"/>
     <div class="modal-actions">
@@ -341,6 +387,7 @@ select option{background:var(--bg)}
 <script>
 let currentUser = null;
 let currentStore = null;
+let currentEditingProductId = null;
 
 // ---- INIT ----
 document.addEventListener('DOMContentLoaded', async ()=>{
@@ -382,6 +429,14 @@ function loadLojaForm(){
     const el = document.getElementById('loja-'+f);
     if(el) el.value = currentStore[f] || '';
   });
+
+  // Carregar previews de imagens
+  if(currentStore.logo_url) {
+    document.getElementById('logo-preview').innerHTML = `<img src="${currentStore.logo_url}" style="width:100%;height:100%;object-fit:cover;border-radius:8px;">`;
+  }
+  if(currentStore.banner_url) {
+    document.getElementById('banner-preview').innerHTML = `<img src="${currentStore.banner_url}" style="width:100%;height:100%;object-fit:cover;border-radius:8px;">`;
+  }
 }
 
 function saveStore(){
@@ -453,6 +508,9 @@ function openAddModal(){
   ['p-nome','p-preco','p-estoque','p-descricao'].forEach(id=>document.getElementById(id).value='');
   document.getElementById('p-categoria').value='';
   document.getElementById('p-edit-id').value='';
+  currentEditingProductId = null;
+  document.getElementById('product-image-preview').innerHTML = '<span style="font-size:2rem">📦</span>';
+  document.getElementById('product-image-input').value = '';
   document.getElementById('product-overlay').classList.add('open');
 }
 
@@ -469,6 +527,16 @@ async function openEditModal(id){
   document.getElementById('p-categoria').value=prod.categoria||'';
   document.getElementById('p-descricao').value=prod.descricao||'';
   document.getElementById('p-edit-id').value=id;
+  currentEditingProductId = id;
+  
+  // Carregar preview da imagem se existir
+  if(prod.imagem_url) {
+    document.getElementById('product-image-preview').innerHTML = `<img src="${prod.imagem_url}" style="width:100%;height:100%;object-fit:cover;border-radius:8px;">`;
+  } else {
+    document.getElementById('product-image-preview').innerHTML = '<span style="font-size:2rem">📦</span>';
+  }
+  document.getElementById('product-image-input').value = '';
+  
   document.getElementById('product-overlay').classList.add('open');
 }
 
