@@ -256,8 +256,10 @@ document.addEventListener('DOMContentLoaded', async ()=>{
   document.getElementById('client-email').value = currentUser.email;
   
   // Exibir imagem de perfil ou iniciais
-  if(currentUser.profileImage){
-    document.getElementById('profile-avatar').style.backgroundImage = `url('${currentUser.profileImage}')`;
+  if(currentUser.profile_image){
+    document.getElementById('profile-avatar').style.backgroundImage = `url('${currentUser.profile_image}')`;
+    document.getElementById('profile-avatar').style.backgroundSize = 'cover';
+    document.getElementById('profile-avatar').style.backgroundPosition = 'center';
     document.getElementById('profile-avatar').textContent = '';
   } else {
     document.getElementById('profile-avatar').textContent = currentUser.nome[0].toUpperCase();
@@ -440,7 +442,9 @@ async function uploadProfileImage(event, type){
     }
     
     // Exibir nova imagem
-    document.getElementById('profile-avatar').style.backgroundImage = `url('${data.imagePath}')`;
+    document.getElementById('profile-avatar').style.backgroundImage = `url('${result.imageUrl}')`;
+    document.getElementById('profile-avatar').style.backgroundSize = 'cover';
+    document.getElementById('profile-avatar').style.backgroundPosition = 'center';
     document.getElementById('profile-avatar').textContent = '';
     
     toast('Foto de perfil atualizada com sucesso!', 'success');

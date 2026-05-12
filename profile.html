@@ -265,8 +265,10 @@ document.addEventListener('DOMContentLoaded', async ()=>{
   document.getElementById('profile-email-input').value = currentUser.email;
   
   // Exibir imagem de perfil ou iniciais
-  if(currentUser.profileImage){
-    document.getElementById('profile-avatar').style.backgroundImage = `url('${currentUser.profileImage}')`;
+  if(currentUser.profile_image){
+    document.getElementById('profile-avatar').style.backgroundImage = `url('${currentUser.profile_image}')`;
+    document.getElementById('profile-avatar').style.backgroundSize = 'cover';
+    document.getElementById('profile-avatar').style.backgroundPosition = 'center';
     document.getElementById('profile-avatar').textContent = '';
   } else {
     document.getElementById('profile-avatar').textContent = currentUser.nome[0].toUpperCase();

@@ -120,6 +120,7 @@ select option{background:var(--bg)}
 .prod-emoji{
   width:42px;height:42px;border-radius:10px;background:var(--card2);
   display:flex;align-items:center;justify-content:center;font-size:1.3rem;flex-shrink:0;
+  overflow:hidden;
 }
 .prod-info{flex:1;min-width:0}
 .prod-name{font-weight:600;font-size:.95rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
@@ -398,8 +399,8 @@ document.addEventListener('DOMContentLoaded', async ()=>{
   
   // Exibir imagem de perfil ou iniciais
   const avatarEl = document.getElementById('avatar-letter');
-  if(currentUser.profileImage){
-    avatarEl.style.backgroundImage = `url('${currentUser.profileImage}')`;
+  if(currentUser.profile_image){
+    avatarEl.style.backgroundImage = `url('${currentUser.profile_image}')`;
     avatarEl.style.backgroundSize = 'cover';
     avatarEl.style.backgroundPosition = 'center';
     avatarEl.textContent = '';
@@ -485,7 +486,7 @@ async function renderProductList(containerId, limit){
   }
   container.innerHTML = prods.map(p=>`
     <div class="product-item">
-      <div class="prod-emoji">${catEmoji(p.categoria)}</div>
+      <div class="prod-emoji">${p.imagem_url ? `<img src="${p.imagem_url}" style="width:100%;height:100%;object-fit:cover;display:block;">` : catEmoji(p.categoria)}</div>
       <div class="prod-info">
         <div class="prod-name">${p.nome}</div>
         <div class="prod-meta">${p.categoria||'Sem categoria'} · ${p.estoque||0} em estoque

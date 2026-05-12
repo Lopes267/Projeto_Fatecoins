@@ -113,6 +113,7 @@ nav{
 .prod-img{
   height:160px;background:var(--card2);display:flex;align-items:center;
   justify-content:center;font-size:3.5rem;border-bottom:1px solid var(--border);
+  overflow:hidden;
 }
 .prod-body{padding:1rem}
 .prod-cat{font-size:.72rem;color:var(--muted);text-transform:uppercase;letter-spacing:.05em;margin-bottom:.3rem}
@@ -134,6 +135,7 @@ nav{
 .store-avatar{
   width:56px;height:56px;border-radius:14px;background:var(--card2);
   display:flex;align-items:center;justify-content:center;font-size:1.8rem;margin-bottom:1rem;
+  overflow:hidden;
 }
 .store-name{font-family:'Fraunces',serif;font-size:1.15rem;font-weight:700;margin-bottom:.3rem}
 .store-desc{font-size:.83rem;color:var(--muted);line-height:1.5;
@@ -155,6 +157,7 @@ nav{
 .panel-store-avatar{
   width:64px;height:64px;border-radius:16px;background:var(--card);border:1px solid var(--border);
   display:flex;align-items:center;justify-content:center;font-size:2rem;
+  overflow:hidden;
 }
 .panel-store-name{font-family:'Fraunces',serif;font-size:1.6rem;font-weight:700}
 .panel-store-meta{color:var(--muted);font-size:.88rem;margin-top:.2rem}
@@ -272,8 +275,8 @@ function renderNav(){
   const el = document.getElementById('nav-right');
   if(user){
     const initial = user.nome[0].toUpperCase();
-    const avatarHTML = user.profileImage 
-      ? `<div class="avatar-sm" style="background-image:url('${user.profileImage}');background-size:cover;background-position:center"></div>`
+    const avatarHTML = user.profile_image
+      ? `<div class="avatar-sm" style="background-image:url('${user.profile_image}');background-size:cover;background-position:center"></div>`
       : `<div class="avatar-sm">${initial}</div>`;
     el.innerHTML = `
       <div class="user-chip-nav" onclick="goToProfile()" title="Clique para editar perfil" style="cursor:pointer;opacity:.8;transition:opacity .2s" onmouseover="this.style.opacity='1'" onmouseout="this.style.opacity='.8'">
@@ -339,7 +342,7 @@ async function renderProducts(){
   }
   grid.innerHTML = prods.map(p=>`
     <div class="product-card" onclick="openStore('${p.loja.id}')">
-      <div class="prod-img">${catEmoji(p.categoria)}</div>
+      <div class="prod-img">${p.imagem_url ? `<img src="${p.imagem_url}" style="width:100%;height:100%;object-fit:cover;display:block;">` : catEmoji(p.categoria)}</div>
       <div class="prod-body">
         <div class="prod-cat">${p.categoria||'Produto'}</div>
         <div class="prod-name">${p.nome}</div>
@@ -364,7 +367,7 @@ async function renderStores(){
   }
   grid.innerHTML = stores.map(s=>`
     <div class="store-card" onclick="openStore('${s.id}')">
-      <div class="store-avatar">${catEmoji(s.categoria)}</div>
+      <div class="store-avatar">${s.logo_url ? `<img src="${s.logo_url}" style="width:100%;height:100%;object-fit:cover;display:block;">` : catEmoji(s.categoria)}</div>
       <div class="store-name">${s.nome}</div>
       <div class="store-desc">${s.descricao||'Sem descrição'}</div>
       <div class="store-meta">
@@ -388,7 +391,12 @@ async function openStore(storeId){
   const panel = document.getElementById('store-panel');
   panel.classList.add('open');
 
-  document.getElementById('panel-avatar').textContent = catEmoji(store.categoria);
+  const panelAvatar = document.getElementById('panel-avatar');
+  if(store.logo_url){
+    panelAvatar.innerHTML = `<img src="${store.logo_url}" style="width:100%;height:100%;object-fit:cover;display:block;">`;
+  } else {
+    panelAvatar.textContent = catEmoji(store.categoria);
+  }
   document.getElementById('panel-name').textContent = store.nome;
   document.getElementById('panel-meta').innerHTML = `
     ${store.categoria||''} ${store.cidade?'· 📍 '+store.cidade:''}
@@ -406,7 +414,7 @@ async function openStore(storeId){
   }
   grid.innerHTML = prods.map(p=>`
     <div class="product-card">
-      <div class="prod-img">${catEmoji(p.categoria)}</div>
+      <div class="prod-img">${p.imagem_url ? `<img src="${p.imagem_url}" style="width:100%;height:100%;object-fit:cover;display:block;">` : catEmoji(p.categoria)}</div>
       <div class="prod-body">
         <div class="prod-cat">${p.categoria||'Produto'}</div>
         <div class="prod-name">${p.nome}</div>

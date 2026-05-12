@@ -386,7 +386,6 @@ async function handleProfileImageUpload(userId) {
     const result = await DB.updateProfileImage(userId, file);
     if (result.ok) {
       toast('Foto de perfil atualizada com sucesso!');
-      // Atualizar avatar na interface
       const user = DB.currentUser();
       if (user) {
         user.profile_image = result.imageUrl;
@@ -394,6 +393,14 @@ async function handleProfileImageUpload(userId) {
         sessionData.user = user;
         localStorage.setItem('mp_session', JSON.stringify(sessionData));
         if (typeof renderNav === 'function') renderNav();
+      }
+      // Atualizar avatar visualmente na página de perfil
+      const avatarEl = document.getElementById('profile-avatar');
+      if (avatarEl) {
+        avatarEl.style.backgroundImage = `url('${result.imageUrl}')`;
+        avatarEl.style.backgroundSize = 'cover';
+        avatarEl.style.backgroundPosition = 'center';
+        avatarEl.textContent = '';
       }
     } else {
       toast(result.msg || 'Erro ao atualizar foto de perfil.', 'error');

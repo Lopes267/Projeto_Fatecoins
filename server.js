@@ -2,6 +2,8 @@
 //  server.js – Backend com Express + Firebase
 // ============================================================
 
+require('dotenv').config();
+
 const express = require('express');
 const fs      = require('fs');
 const path    = require('path');
@@ -14,13 +16,11 @@ const admin   = require('firebase-admin');
 
 // ============================================================
 //  FIREBASE – CONFIGURAÇÃO
-//  ⚠️  Preencha os dois valores abaixo antes de rodar
 // ============================================================
 
-// 1. Web API Key → Firebase Console > Configurações do Projeto > Geral > "Chave de API da Web"
-const FIREBASE_WEB_API_KEY = 'AIzaSyBmNxe5U3O8UisG5FK57wg5IDmac__PvS0';
+const FIREBASE_WEB_API_KEY = process.env.FIREBASE_WEB_API_KEY;
 
-const serviceAccount = require('./fatecoin-mercado-firebase-adminsdk-fbsvc-dde6eb5a64.json');
+const serviceAccount = require('./' + process.env.FIREBASE_SERVICE_ACCOUNT);
 
 admin.initializeApp({
   credential: admin.credential.cert(serviceAccount)
@@ -34,9 +34,9 @@ const db = admin.firestore();
 
 const cloudinary = require('cloudinary').v2;
 cloudinary.config({
-  cloud_name: 'dqejzo53v',
-  api_key:    '621853287296758',
-  api_secret: 'AAq-zoHMRi5BFepO_EV36Z6c1No'
+  cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
+  api_key:    process.env.CLOUDINARY_API_KEY,
+  api_secret: process.env.CLOUDINARY_API_SECRET
 });
 
 // ============================================================
