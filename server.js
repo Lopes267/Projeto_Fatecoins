@@ -18,7 +18,7 @@ const admin   = require('firebase-admin');
 // ============================================================
 
 // 1. Web API Key → Firebase Console > Configurações do Projeto > Geral > "Chave de API da Web"
-const FIREBASE_WEB_API_KEY = 'AIzaSyBmNxe5U3O8UisG5FK57wg5IDmac__PvS0';
+const FIREBASE_WEB_API_KEY = 'API';
 
 const serviceAccount = require('./fatecoin-mercado-firebase-adminsdk-fbsvc-dde6eb5a64.json');
 
@@ -35,8 +35,8 @@ const db = admin.firestore();
 const cloudinary = require('cloudinary').v2;
 cloudinary.config({
   cloud_name: 'dqejzo53v',
-  api_key:    '621853287296758',
-  api_secret: 'AAq-zoHMRi5BFepO_EV36Z6c1No'
+  api_key:    'API',
+  api_secret: 'API'
 });
 
 // ============================================================
