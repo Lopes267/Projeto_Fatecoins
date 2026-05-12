@@ -290,9 +290,10 @@ async function saveProfile(){
   
   try {
     document.getElementById('save-profile-btn').disabled = true;
+    const token = JSON.parse(localStorage.getItem('mp_session') || '{}').access_token;
     const res = await fetch(`${API_URL}/api/users/${currentUser.id}`, {
       method: 'PUT',
-      headers: {'Content-Type': 'application/json'},
+      headers: {'Content-Type': 'application/json', 'Authorization': `Bearer ${token}`},
       body: JSON.stringify({nome, telefone, data_nasc, endereco, cidade, estado, cep})
     });
     
@@ -351,13 +352,11 @@ async function changePassword(){
   }
   
   try {
+    const token = JSON.parse(localStorage.getItem('mp_session') || '{}').access_token;
     const res = await fetch(`${API_URL}/api/users/${currentUser.id}/change-password`, {
       method: 'POST',
-      headers: {'Content-Type': 'application/json'},
-      body: JSON.stringify({
-        senhaAtual,
-        senhaNova
-      })
+      headers: {'Content-Type': 'application/json', 'Authorization': `Bearer ${token}`},
+      body: JSON.stringify({senhaAtual, senhaNova})
     });
     
     const data = await res.json();
@@ -385,9 +384,10 @@ async function deleteAccount(){
   if(!confirmCode) return;
   
   try {
+    const token = JSON.parse(localStorage.getItem('mp_session') || '{}').access_token;
     const res = await fetch(`${API_URL}/api/users/${currentUser.id}`, {
       method: 'DELETE',
-      headers: {'Content-Type': 'application/json'},
+      headers: {'Content-Type': 'application/json', 'Authorization': `Bearer ${token}`},
       body: JSON.stringify({senha: confirmCode})
     });
     
@@ -423,41 +423,20 @@ function doLogout(){
 async function uploadProfileImage(event, type){
   const file = event.target.files[0];
   if(!file) return;
-  
+
   try {
-    const formData = new FormData();
-    formData.append('image', file);
-    
-    const res = await fetch(`${API_URL}/api/upload-image`, {
-      method: 'POST',
-      body: formData
-    });
-    
-    const data = await res.json();
-    if(!data.ok){
-      toast('Erro ao enviar imagem: ' + (data.msg || 'Desconhecido'), 'error');
+    const result = await DB.updateProfileImage(currentUser.id, file);
+    if(!result.ok){
+      toast('Erro ao enviar imagem: ' + (result.msg || 'Desconhecido'), 'error');
       return;
     }
-    
-    // Atualizar perfil com a imagem
-    const updateRes = await fetch(`${API_URL}/api/users/${currentUser.id}/profile-image`, {
-      method: 'PUT',
-      headers: {'Content-Type': 'application/json'},
-      body: JSON.stringify({imagePath: data.imagePath})
-    });
-    
-    const updateData = await updateRes.json();
-    if(!updateData.ok){
-      toast('Erro ao atualizar perfil', 'error');
-      return;
-    }
-    
+
     // Atualizar localStorage
     const currentSession = JSON.parse(localStorage.getItem('mp_session'));
     if (currentSession) {
-      currentSession.user.profileImage = data.imagePath;
+      currentSession.user.profile_image = result.imageUrl;
       localStorage.setItem('mp_session', JSON.stringify(currentSession));
-      currentUser.profileImage = data.imagePath;
+      currentUser.profile_image = result.imageUrl;
     }
     
     // Exibir nova imagem

@@ -1,0 +1,21 @@
+# Firebase - chave privada (NUNCA subir)
+*firebase-adminsdk*.json
+
+# Dependencias
+node_modules/
+
+# Banco local
+marketplace.db
+
+# Variaveis de ambiente
+.env
+.env.local
+.env.production
+
+# Logs
+*.log
+npm-debug.log*
+
+# Sistema operacional
+.DS_Store
+Thumbs.db

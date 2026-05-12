@@ -26,6 +26,16 @@ const DB = {
   _get: (key) => JSON.parse(localStorage.getItem(key) || '[]'),
   _set: (key, val) => localStorage.setItem(key, JSON.stringify(val)),
   _id: () => Date.now() + Math.random().toString(36).slice(2),
+  _getToken() {
+    try {
+      const s = localStorage.getItem('mp_session');
+      return s ? JSON.parse(s).access_token : null;
+    } catch { return null; }
+  },
+  _authHeaders() {
+    const token = this._getToken();
+    return token ? { 'Authorization': `Bearer ${token}` } : {};
+  },
 
   // ---------- users ----------
   async registerUser(nome, email, senha, tipo = 'cliente') {
@@ -58,11 +68,12 @@ const DB = {
     });
     const data = await res.json();
     if (data.ok) {
-      // Armazenar com timestamp de expiração (24 horas)
+      // Token Firebase dura 1 hora — salvar com 55 min para dar margem
       const sessionData = {
         user: data.user,
+        access_token: data.session?.access_token,
         loginTime: Date.now(),
-        expiresAt: Date.now() + (24 * 60 * 60 * 1000) // 24 horas em ms
+        expiresAt: Date.now() + (55 * 60 * 1000)
       };
       localStorage.setItem('mp_session', JSON.stringify(sessionData));
     }
@@ -106,7 +117,9 @@ const DB = {
 
   // ---------- stores ----------
   async getMyStore(userId) {
-    const res = await fetch(`${API_URL}/api/stores/${userId}`);
+    const res = await fetch(`${API_URL}/api/stores/${userId}`, {
+      headers: { ...this._authHeaders() }
+    });
     const data = await res.json();
     return data.store || null;
   },
@@ -114,7 +127,7 @@ const DB = {
   async saveStore(userId, data) {
     const res = await fetch(`${API_URL}/api/stores`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 'Content-Type': 'application/json', ...this._authHeaders() },
       body: JSON.stringify({ userId, ...data })
     });
     const result = await res.json();
@@ -140,7 +153,7 @@ const DB = {
   async addProduct(storeId, data) {
     const res = await fetch(`${API_URL}/api/products`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 'Content-Type': 'application/json', ...this._authHeaders() },
       body: JSON.stringify({ storeId, ...data })
     });
     const result = await res.json();
@@ -156,7 +169,7 @@ const DB = {
   async updateProduct(id, data) {
     const res = await fetch(`${API_URL}/api/products/${id}`, {
       method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 'Content-Type': 'application/json', ...this._authHeaders() },
       body: JSON.stringify(data)
     });
     const result = await res.json();
@@ -164,7 +177,10 @@ const DB = {
   },
 
   async deleteProduct(id) {
-    const res = await fetch(`${API_URL}/api/products/${id}`, { method: 'DELETE' });
+    const res = await fetch(`${API_URL}/api/products/${id}`, {
+      method: 'DELETE',
+      headers: { ...this._authHeaders() }
+    });
     return await res.json();
   },
 
@@ -185,9 +201,7 @@ const DB = {
     formData.append('image', file);
     formData.append('folder', folder);
 
-    const session = localStorage.getItem('mp_session');
-    const sessionData = JSON.parse(session);
-    const token = sessionData.session?.access_token;
+    const token = this._getToken();
 
     const res = await fetch(`${API_URL}/api/upload-image`, {
       method: 'POST',
@@ -205,9 +219,7 @@ const DB = {
     const formData = new FormData();
     formData.append('image', file);
 
-    const session = localStorage.getItem('mp_session');
-    const sessionData = JSON.parse(session);
-    const token = sessionData.session?.access_token;
+    const token = this._getToken();
 
     const res = await fetch(`${API_URL}/api/users/${userId}/profile-image`, {
       method: 'PUT',
@@ -225,9 +237,7 @@ const DB = {
     const formData = new FormData();
     formData.append('image', file);
 
-    const session = localStorage.getItem('mp_session');
-    const sessionData = JSON.parse(session);
-    const token = sessionData.session?.access_token;
+    const token = this._getToken();
 
     const res = await fetch(`${API_URL}/api/stores/${storeId}/logo`, {
       method: 'PUT',
@@ -245,9 +255,7 @@ const DB = {
     const formData = new FormData();
     formData.append('image', file);
 
-    const session = localStorage.getItem('mp_session');
-    const sessionData = JSON.parse(session);
-    const token = sessionData.session?.access_token;
+    const token = this._getToken();
 
     const res = await fetch(`${API_URL}/api/stores/${storeId}/banner`, {
       method: 'PUT',
@@ -265,9 +273,7 @@ const DB = {
     const formData = new FormData();
     formData.append('image', file);
 
-    const session = localStorage.getItem('mp_session');
-    const sessionData = JSON.parse(session);
-    const token = sessionData.session?.access_token;
+    const token = this._getToken();
 
     const res = await fetch(`${API_URL}/api/products/${productId}/image`, {
       method: 'PUT',
@@ -387,7 +393,7 @@ async function handleProfileImageUpload(userId) {
         const sessionData = JSON.parse(localStorage.getItem('mp_session'));
         sessionData.user = user;
         localStorage.setItem('mp_session', JSON.stringify(sessionData));
-        renderNav(); // Atualizar navegação
+        if (typeof renderNav === 'function') renderNav();
       }
     } else {
       toast(result.msg || 'Erro ao atualizar foto de perfil.', 'error');
@@ -487,8 +493,8 @@ function checkSessionExpiry() {
         toast('Sua sessão expirou. Faça login novamente.', 'error');
         setTimeout(() => window.location.href = 'login.html', 2000);
       }
-    } else if (timeLeft < (60 * 60 * 1000)) {
-      // Faltam menos de 1 hora
+    } else if (timeLeft < (10 * 60 * 1000)) {
+      // Faltam menos de 10 minutos
       console.warn(`⏰ Sessão expira em ${Math.round(timeLeft / (60 * 1000))} minutos`);
     }
   } catch (e) {

@@ -295,9 +295,10 @@ async function saveProfile(){
   
   try {
     document.getElementById('save-profile-btn').disabled = true;
+    const token = JSON.parse(localStorage.getItem('mp_session') || '{}').access_token;
     const res = await fetch(`${API_URL}/api/users/${currentUser.id}`, {
       method: 'PUT',
-      headers: {'Content-Type': 'application/json'},
+      headers: {'Content-Type': 'application/json', 'Authorization': `Bearer ${token}`},
       body: JSON.stringify({nome, telefone, data_nasc})
     });
     
@@ -352,13 +353,11 @@ async function changePassword(){
   }
   
   try {
+    const token = JSON.parse(localStorage.getItem('mp_session') || '{}').access_token;
     const res = await fetch(`${API_URL}/api/users/${currentUser.id}/change-password`, {
       method: 'POST',
-      headers: {'Content-Type': 'application/json'},
-      body: JSON.stringify({
-        senhaAtual,
-        senhaNova
-      })
+      headers: {'Content-Type': 'application/json', 'Authorization': `Bearer ${token}`},
+      body: JSON.stringify({senhaAtual, senhaNova})
     });
     
     const data = await res.json();
@@ -386,9 +385,10 @@ async function deleteAccount(){
   if(!confirmCode) return;
   
   try {
+    const token = JSON.parse(localStorage.getItem('mp_session') || '{}').access_token;
     const res = await fetch(`${API_URL}/api/users/${currentUser.id}`, {
       method: 'DELETE',
-      headers: {'Content-Type': 'application/json'},
+      headers: {'Content-Type': 'application/json', 'Authorization': `Bearer ${token}`},
       body: JSON.stringify({senha: confirmCode})
     });
     

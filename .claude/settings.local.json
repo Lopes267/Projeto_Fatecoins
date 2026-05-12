@@ -1,0 +1,10 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(npm install *)",
+      "Bash(npm uninstall *)",
+      "Bash(node -e \"require\\('firebase-admin'\\); console.log\\('firebase-admin OK'\\)\")",
+      "Bash(del restart-server.bat run-server.bat start-server.bat)"
+    ]
+  }
+}
