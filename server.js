@@ -168,6 +168,19 @@ app.get('/api/config', (req, res) => {
   res.json({ api_url: `http://localhost:${req.socket.localPort}`, version: '1.0.0', environment: 'development' });
 });
 
+app.get('/api/stats', async (req, res) => {
+  try {
+    const [usersSnap, productsSnap] = await Promise.all([
+      db.collection('usuarios').where('tipo', '==', 'cliente').get(),
+      db.collection('produtos').get()
+    ]);
+    res.json({ ok: true, clientes: usersSnap.size, produtos: productsSnap.size });
+  } catch (err) {
+    console.error('Erro ao buscar stats:', err);
+    res.status(500).json({ ok: false, clientes: 0, produtos: 0 });
+  }
+});
+
 // ============================================================
 //  AUTH – REGISTRO
 // ============================================================
@@ -542,11 +555,15 @@ app.get('/api/stores-public', async (req, res) => {
     const stores = [];
     for (const doc of snap.docs) {
       const data = doc.data();
-      const userDoc = await db.collection('usuarios').doc(data.usuario_id).get();
+      const [userDoc, prodsSnap] = await Promise.all([
+        db.collection('usuarios').doc(data.usuario_id).get(),
+        db.collection('produtos').where('loja_id', '==', doc.id).where('ativo', '==', true).get()
+      ]);
       stores.push({
         id: doc.id, ...data,
         usuario_nome:  userDoc.exists ? userDoc.data().nome  : null,
-        usuario_email: userDoc.exists ? userDoc.data().email : null
+        usuario_email: userDoc.exists ? userDoc.data().email : null,
+        totalProdutos: prodsSnap.size
       });
     }
     res.json({ ok: true, stores });
@@ -667,16 +684,19 @@ app.get('/api/products', async (req, res) => {
       const storeDoc = await db.collection('lojas').doc(data.loja_id).get();
       if (!storeDoc.exists || !storeDoc.data().ativa) continue;
       products.push({
-        id: doc.id,
-        produto_nome:  data.nome,
-        preco:         data.preco,
-        descricao:     data.descricao,
-        imagem_url:    data.imagem_url,
-        categoria_nome: data.categoria,
-        loja_id:       data.loja_id,
-        loja_nome:     storeDoc.data().nome,
-        loja_cidade:   storeDoc.data().cidade,
-        loja_estado:   storeDoc.data().estado
+        id:         doc.id,
+        nome:       data.nome,
+        preco:      data.preco,
+        descricao:  data.descricao,
+        imagem_url: data.imagem_url,
+        categoria:  data.categoria,
+        estoque:    data.estoque,
+        loja: {
+          id:     data.loja_id,
+          nome:   storeDoc.data().nome,
+          cidade: storeDoc.data().cidade,
+          estado: storeDoc.data().estado
+        }
       });
     }
 

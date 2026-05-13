@@ -107,6 +107,12 @@ nav{
   background:var(--card);border:1px solid var(--border);
   border-radius:14px;padding:1rem 1.4rem;min-width:220px;
   position:relative;overflow:hidden;
+  transition:border-color .25s,box-shadow .25s,transform .25s;cursor:default;
+}
+.fcard:hover{
+  border-color:var(--accent);
+  box-shadow:0 0 0 1px var(--accent),0 8px 32px rgba(232,133,74,.18);
+  transform:translateY(-3px);
 }
 .fcard::after{
   content:'';position:absolute;inset:0;
@@ -226,8 +232,8 @@ footer p{color:var(--muted);font-size:.8rem}
       <a href="marketplace.html" class="btn btn-ghost" style="font-size:1rem;padding:.8rem 2rem">Explorar lojas</a>
     </div>
     <div class="hero-stats">
-      <div class="stat"><span class="stat-n">12k+</span><span class="stat-l">Lojistas</span></div>
-      <div class="stat"><span class="stat-n">85k+</span><span class="stat-l">Produtos</span></div>
+      <div class="stat"><span class="stat-n" id="stat-clientes">…</span><span class="stat-l">Clientes</span></div>
+      <div class="stat"><span class="stat-n" id="stat-produtos">…</span><span class="stat-l">Produtos</span></div>
       <div class="stat"><span class="stat-n">4.9★</span><span class="stat-l">Avaliação</span></div>
     </div>
   </div>
@@ -239,12 +245,12 @@ footer p{color:var(--muted);font-size:.8rem}
       <span class="tag">↑ +18% esta semana</span>
     </div>
     <div class="fcard">
-      <div class="fcard-label">Produtos ativos</div>
-      <div class="fcard-val green">24 produtos</div>
+      <div class="fcard-label">Clientes</div>
+      <div class="fcard-val green" id="fcard-clientes">…</div>
     </div>
     <div class="fcard">
-      <div class="fcard-label">Novos clientes</div>
-      <div class="fcard-val" style="color:var(--accent2)">+8 hoje</div>
+      <div class="fcard-label">Contagem total</div>
+      <div class="fcard-val" style="color:var(--accent2)" id="fcard-total">…</div>
     </div>
   </div>
 </section>
@@ -288,8 +294,8 @@ footer p{color:var(--muted);font-size:.8rem}
 </section>
 
 <section class="how">
-  <div class="section-label">Como funciona</div>
-  <div class="section-title">Simples como <span>1, 2, 3</span></div>
+  <div class="section-label"></div>
+  <div class="section-title">Como Funciona<span></span></div>
   <div class="steps">
     <div class="step">
       <div class="step-num">1</div>
@@ -328,5 +334,25 @@ footer p{color:var(--muted);font-size:.8rem}
   </div>
 </footer>
 
+<script>
+async function loadStats() {
+  try {
+    const res = await fetch('http://localhost:4000/api/stats');
+    const data = await res.json();
+    if (data.ok) {
+      document.getElementById('stat-clientes').textContent = data.clientes;
+      document.getElementById('stat-produtos').textContent = data.produtos;
+      document.getElementById('fcard-clientes').textContent = data.clientes + ' clientes';
+      document.getElementById('fcard-total').textContent = (data.clientes + data.produtos) + ' registros';
+    }
+  } catch {
+    document.getElementById('stat-clientes').textContent = '–';
+    document.getElementById('stat-produtos').textContent = '–';
+    document.getElementById('fcard-clientes').textContent = '–';
+    document.getElementById('fcard-total').textContent = '–';
+  }
+}
+document.addEventListener('DOMContentLoaded', loadStats);
+</script>
 </body>
 </html>
