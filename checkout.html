@@ -1,0 +1,665 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1"/>
+<title>Checkout – Mercado Local</title>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,700&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet"/>
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --bg:#0d0d0d;--card:#161616;--card2:#1c1c1c;--border:#2a2a2a;
+  --text:#f0ece3;--muted:#888;--accent:#e8854a;--accent2:#f4c56a;
+  --green:#5dcfa0;--red:#e85a5a;
+}
+body{background:var(--bg);color:var(--text);font-family:'DM Sans',sans-serif;min-height:100vh}
+body::before{content:'';position:fixed;inset:0;pointer-events:none;z-index:0;
+  background-image:url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.04'/%3E%3C/svg%3E");opacity:.4}
+
+/* NAV */
+nav{
+  position:sticky;top:0;z-index:40;
+  background:rgba(13,13,13,.88);backdrop-filter:blur(16px);
+  border-bottom:1px solid var(--border);padding:1rem 2.5rem;
+  display:flex;align-items:center;justify-content:space-between;
+}
+.logo{font-family:'Fraunces',serif;font-size:1.4rem;color:var(--accent);text-decoration:none}
+.logo span{color:var(--text)}
+.nav-steps{display:flex;align-items:center;gap:.5rem;font-size:.82rem}
+.step{
+  padding:.3rem .75rem;border-radius:50px;border:1px solid var(--border);
+  color:var(--muted);transition:all .2s;
+}
+.step.active{border-color:var(--accent);color:var(--accent);background:rgba(232,133,74,.08)}
+.step.done{border-color:rgba(93,207,160,.35);color:var(--green);background:rgba(93,207,160,.05)}
+.step-sep{color:var(--border);font-size:.75rem;margin:0 .1rem}
+
+/* LAYOUT */
+.checkout-layout{
+  display:grid;grid-template-columns:420px 1fr;min-height:calc(100vh - 65px);
+  position:relative;z-index:1;
+}
+
+/* ORDER SUMMARY */
+.summary-panel{
+  padding:2.5rem 2rem;border-right:1px solid var(--border);
+  background:rgba(16,16,16,.6);
+}
+.panel-label{
+  font-size:.7rem;font-weight:700;color:var(--muted);text-transform:uppercase;
+  letter-spacing:.12em;margin-bottom:1.5rem;
+}
+.summary-items{display:flex;flex-direction:column;gap:.7rem;margin-bottom:2rem}
+.summary-item{
+  display:flex;gap:.85rem;align-items:center;
+  padding:.85rem;background:var(--card);border:1px solid var(--border);border-radius:12px;
+  transition:border-color .2s;
+}
+.summary-item:hover{border-color:rgba(232,133,74,.2)}
+.summary-item-img{
+  width:50px;height:50px;border-radius:8px;background:var(--card2);
+  overflow:hidden;flex-shrink:0;display:flex;align-items:center;justify-content:center;font-size:1.4rem;
+}
+.summary-item-info{flex:1;min-width:0}
+.summary-item-name{font-weight:600;font-size:.88rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.summary-item-qty{font-size:.75rem;color:var(--muted);margin-top:.15rem}
+.summary-item-price{font-family:'Fraunces',serif;color:var(--accent2);font-size:.95rem;flex-shrink:0}
+.summary-rows{margin-top:1.5rem;padding-top:1.5rem;border-top:1px solid var(--border)}
+.summary-row{
+  display:flex;justify-content:space-between;align-items:center;
+  font-size:.88rem;margin-bottom:.6rem;
+}
+.summary-row .lbl{color:var(--muted)}
+.summary-row.total{
+  padding-top:1rem;margin-top:.4rem;border-top:1px solid var(--border);
+  font-size:1rem;font-weight:700;
+}
+.summary-row.total .val{font-family:'Fraunces',serif;font-size:1.4rem;color:var(--accent2)}
+.free-tag{color:var(--green);font-weight:600;font-size:.82rem}
+
+/* PAYMENT PANEL */
+.payment-panel{padding:2.5rem 3rem}
+.payment-panel h2{font-family:'Fraunces',serif;font-size:1.9rem;font-weight:700;letter-spacing:-.02em;margin-bottom:.3rem}
+.payment-panel .sub{color:var(--muted);font-size:.9rem;margin-bottom:2rem}
+
+/* PAYMENT TABS */
+.pay-tabs{display:flex;gap:.6rem;margin-bottom:2rem}
+.pay-tab{
+  flex:1;padding:.7rem .5rem;border-radius:10px;border:1px solid var(--border);
+  background:transparent;color:var(--muted);cursor:pointer;font-family:'DM Sans',sans-serif;
+  font-size:.85rem;font-weight:600;transition:all .2s;text-align:center;
+}
+.pay-tab:hover{border-color:rgba(240,236,227,.25);color:var(--text)}
+.pay-tab.active{border-color:var(--accent);color:var(--accent);background:rgba(232,133,74,.07)}
+
+/* PAYMENT CONTENT */
+.pay-content{display:none;animation:fadeUp .25s ease}
+.pay-content.active{display:block}
+
+/* PIX */
+.pix-wrap{display:flex;flex-direction:column;align-items:center;padding:.5rem 0 1.5rem}
+.pix-timer{
+  display:inline-flex;align-items:center;gap:.5rem;margin-bottom:1.5rem;
+  background:rgba(244,197,106,.07);border:1px solid rgba(244,197,106,.2);
+  border-radius:50px;padding:.4rem 1.1rem;font-size:.82rem;color:var(--accent2);font-weight:600;
+}
+.qr-box{
+  width:190px;height:190px;background:var(--card);border:1px solid var(--border);border-radius:16px;
+  display:flex;align-items:center;justify-content:center;
+  margin-bottom:1.5rem;padding:10px;
+  box-shadow:0 8px 32px rgba(0,0,0,.4);
+}
+.qr-inner{width:100%;height:100%;display:grid;gap:1.5px}
+.pix-key-row{
+  width:100%;max-width:360px;background:var(--card);border:1px solid var(--border);
+  border-radius:10px;padding:.75rem 1rem;display:flex;align-items:center;gap:.8rem;margin-bottom:1rem;
+}
+.pix-key-txt{flex:1;font-size:.75rem;color:var(--muted);word-break:break-all;text-align:left;line-height:1.4}
+.copy-btn{
+  padding:.4rem .85rem;background:transparent;border:1px solid var(--accent);
+  color:var(--accent);border-radius:6px;font-size:.78rem;font-weight:600;
+  cursor:pointer;font-family:'DM Sans',sans-serif;transition:all .15s;white-space:nowrap;flex-shrink:0;
+}
+.copy-btn:hover{background:var(--accent);color:#fff}
+.pix-note{font-size:.78rem;color:var(--muted);text-align:center;max-width:320px;line-height:1.6}
+
+/* CARD */
+.card-visual{
+  background:linear-gradient(135deg,#1a1a2e 0%,#2a2a45 50%,#1e1e35 100%);
+  border:1px solid rgba(232,133,74,.12);border-radius:18px;
+  padding:1.5rem 1.8rem;margin-bottom:2rem;
+  position:relative;overflow:hidden;
+  box-shadow:0 12px 40px rgba(0,0,0,.5);
+}
+.card-visual::before{
+  content:'';position:absolute;top:-50px;right:-50px;
+  width:160px;height:160px;border-radius:50%;background:rgba(232,133,74,.06);
+}
+.card-visual::after{
+  content:'';position:absolute;bottom:-40px;left:10px;
+  width:120px;height:120px;border-radius:50%;background:rgba(244,197,106,.04);
+}
+.card-chip{
+  width:38px;height:29px;
+  background:linear-gradient(135deg,#c8a84b,#e8c56a,#b89038);
+  border-radius:5px;margin-bottom:1.5rem;position:relative;z-index:1;
+}
+.card-chip::after{
+  content:'';position:absolute;left:50%;top:0;bottom:0;width:1px;
+  background:rgba(0,0,0,.2);transform:translateX(-50%);
+}
+.card-num-disp{
+  font-size:1.3rem;letter-spacing:.2em;font-weight:600;
+  margin-bottom:1.3rem;position:relative;z-index:1;
+  font-family:'DM Sans',sans-serif;color:#e0dbd0;
+}
+.card-btm{display:flex;justify-content:space-between;position:relative;z-index:1}
+.card-lbl{font-size:.6rem;text-transform:uppercase;letter-spacing:.1em;color:rgba(240,236,227,.4);margin-bottom:.25rem}
+.card-val{font-size:.88rem;font-weight:600;text-transform:uppercase;letter-spacing:.05em;color:#e0dbd0}
+
+.form-grid{display:grid;grid-template-columns:1fr 1fr;gap:1rem}
+.form-grid.full{grid-template-columns:1fr}
+.form-group{margin-bottom:1rem}
+.form-group label{
+  display:block;font-size:.72rem;font-weight:700;color:var(--muted);
+  margin-bottom:.4rem;text-transform:uppercase;letter-spacing:.07em;
+}
+.form-group input,.form-group select{
+  width:100%;padding:.7rem .9rem;background:var(--card);border:1px solid var(--border);
+  border-radius:8px;color:var(--text);font-family:'DM Sans',sans-serif;font-size:.9rem;
+  transition:border-color .2s;outline:none;
+}
+.form-group input::placeholder{color:rgba(136,136,136,.6)}
+.form-group input:focus,.form-group select:focus{border-color:var(--accent)}
+.form-group select{
+  cursor:pointer;appearance:none;
+  background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='7' viewBox='0 0 12 7'%3E%3Cpath d='M1 1l5 5 5-5' stroke='%23888' fill='none' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+  background-repeat:no-repeat;background-position:calc(100% - 12px) center;padding-right:2.2rem;
+}
+.form-group select option{background:var(--card2);color:var(--text)}
+
+/* BOLETO */
+.barcode-box{
+  background:var(--card);border:1px solid var(--border);border-radius:14px;
+  padding:1.5rem;margin-bottom:1.5rem;text-align:center;
+}
+.barcode-strips{
+  height:64px;display:flex;gap:1.5px;align-items:stretch;
+  margin-bottom:.9rem;justify-content:center;overflow:hidden;border-radius:3px;
+}
+.barcode-num-txt{font-size:.72rem;color:var(--muted);letter-spacing:.04em;font-family:monospace;line-height:1.8}
+.boleto-meta{
+  display:grid;grid-template-columns:1fr 1fr;gap:.8rem;margin-bottom:1.5rem;
+}
+.boleto-field{
+  background:var(--card);border:1px solid var(--border);border-radius:10px;padding:.85rem 1rem;
+}
+.boleto-field .bf-lbl{font-size:.7rem;color:var(--muted);text-transform:uppercase;letter-spacing:.07em;margin-bottom:.3rem}
+.boleto-field .bf-val{font-weight:600;font-size:.92rem}
+.boleto-warn{
+  font-size:.79rem;color:rgba(244,197,106,.8);line-height:1.6;
+  padding:.85rem 1rem;background:rgba(244,197,106,.05);
+  border:1px solid rgba(244,197,106,.12);border-radius:9px;
+}
+.boleto-actions{display:flex;gap:.7rem;margin-top:1.2rem}
+
+/* PAY BUTTON */
+.pay-btn-wrap{margin-top:2rem;border-top:1px solid var(--border);padding-top:1.5rem}
+.btn-pay{
+  width:100%;padding:1rem;background:var(--accent);color:#fff;
+  border:none;border-radius:12px;font-family:'DM Sans',sans-serif;
+  font-size:1rem;font-weight:700;cursor:pointer;transition:all .2s;
+  display:flex;align-items:center;justify-content:center;gap:.6rem;
+  letter-spacing:.01em;
+}
+.btn-pay:hover{background:#d9733c;transform:translateY(-1px);box-shadow:0 6px 20px rgba(232,133,74,.3)}
+.btn-pay:active{transform:translateY(0)}
+.safe-note{
+  text-align:center;font-size:.75rem;color:var(--muted);
+  margin-top:.8rem;display:flex;align-items:center;justify-content:center;gap:.4rem;
+}
+
+/* PROCESSING OVERLAY */
+.processing-overlay{
+  position:fixed;inset:0;z-index:500;
+  background:rgba(13,13,13,.96);backdrop-filter:blur(14px);
+  display:flex;flex-direction:column;align-items:center;justify-content:center;gap:1.5rem;
+  opacity:0;pointer-events:none;transition:opacity .3s;
+}
+.processing-overlay.active{opacity:1;pointer-events:all}
+.spinner{
+  width:56px;height:56px;border-radius:50%;
+  border:3px solid var(--border);border-top-color:var(--accent);
+  animation:spin .75s linear infinite;
+}
+@keyframes spin{to{transform:rotate(360deg)}}
+.proc-title{font-family:'Fraunces',serif;font-size:1.5rem}
+.proc-sub{color:var(--muted);font-size:.9rem}
+.proc-dots span{animation:blink 1.2s infinite;opacity:0}
+.proc-dots span:nth-child(1){animation-delay:0s}
+.proc-dots span:nth-child(2){animation-delay:.2s}
+.proc-dots span:nth-child(3){animation-delay:.4s}
+@keyframes blink{0%,80%,100%{opacity:0}40%{opacity:1}}
+
+/* SUCCESS SCREEN */
+.success-screen{
+  position:fixed;inset:0;z-index:500;
+  background:var(--bg);
+  display:flex;flex-direction:column;align-items:center;justify-content:center;
+  gap:1.3rem;padding:2rem;text-align:center;
+  opacity:0;pointer-events:none;transition:opacity .4s;
+}
+.success-screen.active{opacity:1;pointer-events:all}
+.success-ring{
+  width:84px;height:84px;border-radius:50%;
+  background:rgba(93,207,160,.08);border:2px solid var(--green);
+  display:flex;align-items:center;justify-content:center;font-size:2.4rem;
+  animation:popIn .55s cubic-bezier(.34,1.56,.64,1) both;
+}
+@keyframes popIn{from{transform:scale(.2);opacity:0}to{transform:scale(1);opacity:1}}
+.success-title{font-family:'Fraunces',serif;font-size:2.2rem;color:var(--green);letter-spacing:-.02em}
+.success-txt{color:var(--muted);max-width:400px;line-height:1.7;font-size:.95rem}
+.order-chip{
+  background:var(--card);border:1px solid var(--border);border-radius:10px;
+  padding:.75rem 1.6rem;font-family:monospace;font-size:.9rem;letter-spacing:.12em;
+  color:var(--accent2);
+}
+.btn-back{
+  padding:.75rem 2.2rem;background:var(--accent);color:#fff;
+  border:none;border-radius:10px;font-family:'DM Sans',sans-serif;
+  font-size:.95rem;font-weight:700;cursor:pointer;transition:all .2s;
+  text-decoration:none;display:inline-block;margin-top:.5rem;
+}
+.btn-back:hover{background:#d9733c;transform:translateY(-1px)}
+.success-confetti{position:absolute;inset:0;pointer-events:none;overflow:hidden}
+.confetti-piece{
+  position:absolute;width:8px;height:8px;border-radius:50%;
+  animation:confettiFall 3s ease-in forwards;
+}
+@keyframes confettiFall{
+  0%{transform:translateY(-20px) rotate(0);opacity:1}
+  100%{transform:translateY(110vh) rotate(720deg);opacity:0}
+}
+/* TOAST */
+.toast{
+  position:fixed;bottom:2rem;right:2rem;z-index:600;
+  background:var(--card);border:1px solid var(--border);border-radius:10px;
+  padding:.75rem 1.2rem;font-size:.9rem;transform:translateY(20px);opacity:0;
+  transition:all .3s;pointer-events:none;
+}
+.toast.show{transform:translateY(0);opacity:1}
+.toast-success{border-color:rgba(93,207,160,.4);color:var(--green)}
+.toast-error{border-color:rgba(232,90,90,.4);color:var(--red)}
+
+@keyframes fadeUp{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:translateY(0)}}
+
+@media(max-width:900px){
+  .checkout-layout{grid-template-columns:1fr}
+  .summary-panel{border-right:none;border-bottom:1px solid var(--border)}
+}
+@media(max-width:640px){
+  nav{padding:.8rem 1rem}
+  .nav-steps{display:none}
+  .summary-panel,.payment-panel{padding:1.5rem 1rem}
+  .form-grid{grid-template-columns:1fr}
+  .boleto-meta{grid-template-columns:1fr}
+}
+</style>
+</head>
+<body>
+
+<nav>
+  <a href="marketplace.html" class="logo">mercado<span>local</span></a>
+  <div class="nav-steps">
+    <span class="step done">1 Carrinho</span>
+    <span class="step-sep">›</span>
+    <span class="step active">2 Pagamento</span>
+    <span class="step-sep">›</span>
+    <span class="step">3 Confirmação</span>
+  </div>
+  <div></div>
+</nav>
+
+<div class="checkout-layout" id="checkout-layout">
+  <!-- ORDER SUMMARY -->
+  <div class="summary-panel">
+    <div class="panel-label">Resumo do Pedido</div>
+    <div class="summary-items" id="summary-items"></div>
+    <div class="summary-rows">
+      <div class="summary-row"><span class="lbl">Subtotal</span><span id="subtotal-val">R$ 0,00</span></div>
+      <div class="summary-row"><span class="lbl">Frete</span><span class="free-tag">Grátis</span></div>
+      <div class="summary-row total">
+        <span>Total</span>
+        <span class="val" id="total-val">R$ 0,00</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- PAYMENT PANEL -->
+  <div class="payment-panel">
+    <h2>Pagamento</h2>
+    <p class="sub">Escolha como deseja pagar</p>
+
+    <div class="pay-tabs">
+      <button class="pay-tab active" onclick="switchPayTab('pix',this)">⚡ Pix</button>
+      <button class="pay-tab" onclick="switchPayTab('card',this)">💳 Cartão</button>
+      <button class="pay-tab" onclick="switchPayTab('boleto',this)">📄 Boleto</button>
+    </div>
+
+    <!-- PIX -->
+    <div class="pay-content active" id="pay-pix">
+      <div class="pix-wrap">
+        <div class="pix-timer" id="pix-timer">⏱ 15:00</div>
+        <div class="qr-box">
+          <div class="qr-inner" id="qr-inner"></div>
+        </div>
+        <div class="pix-key-row">
+          <span class="pix-key-txt" id="pix-key">00020126580014BR.GOV.BCB.PIX0136a3b9f2d4-e5f6-7890-a1b2-c3d4e5f67890520400005303986540512.005802BR5915Mercado Local6009Sao Paulo62070503***6304ABCD</span>
+          <button class="copy-btn" onclick="copyPix()">Copiar</button>
+        </div>
+        <p class="pix-note">Escaneie o QR Code no app do seu banco ou copie a chave. O pagamento é confirmado na hora.</p>
+      </div>
+      <div class="pay-btn-wrap">
+        <button class="btn-pay" onclick="processPayment()">✓ Já Realizei o Pagamento</button>
+        <p class="safe-note">🔒 Ambiente 100% seguro e criptografado</p>
+      </div>
+    </div>
+
+    <!-- CARTÃO -->
+    <div class="pay-content" id="pay-card">
+      <div class="card-visual">
+        <div class="card-chip"></div>
+        <div class="card-num-disp" id="card-num-disp">•••• &nbsp;•••• &nbsp;•••• &nbsp;••••</div>
+        <div class="card-btm">
+          <div>
+            <div class="card-lbl">Titular</div>
+            <div class="card-val" id="card-name-disp">NOME COMPLETO</div>
+          </div>
+          <div style="text-align:right">
+            <div class="card-lbl">Validade</div>
+            <div class="card-val" id="card-exp-disp">MM/AA</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="form-grid full">
+        <div class="form-group">
+          <label>Número do Cartão</label>
+          <input type="text" id="card-number" maxlength="19" placeholder="0000 0000 0000 0000" oninput="onCardNumberInput(this)"/>
+        </div>
+      </div>
+      <div class="form-grid full">
+        <div class="form-group">
+          <label>Nome no Cartão</label>
+          <input type="text" id="card-name" placeholder="Como aparece no cartão" oninput="onCardNameInput(this)"/>
+        </div>
+      </div>
+      <div class="form-grid">
+        <div class="form-group">
+          <label>Validade</label>
+          <input type="text" id="card-expiry" maxlength="5" placeholder="MM/AA" oninput="onCardExpiryInput(this)"/>
+        </div>
+        <div class="form-group">
+          <label>CVV</label>
+          <input type="text" id="card-cvv" maxlength="4" placeholder="•••" oninput="this.value=this.value.replace(/\D/g,'')"/>
+        </div>
+      </div>
+      <div class="form-group">
+        <label>Parcelas</label>
+        <select id="installments" onchange="updateInstallments()">
+          <option value="1">1× sem juros</option>
+          <option value="2">2× sem juros</option>
+          <option value="3">3× sem juros</option>
+          <option value="6">6× sem juros</option>
+          <option value="10">10× sem juros</option>
+          <option value="12">12× com juros (1,99%/mês)</option>
+        </select>
+      </div>
+      <div style="font-size:.8rem;color:var(--muted);text-align:right;margin-top:-.5rem" id="installment-note"></div>
+
+      <div class="pay-btn-wrap">
+        <button class="btn-pay" onclick="processPayment()">💳 Pagar Agora</button>
+        <p class="safe-note">🔒 Ambiente 100% seguro e criptografado</p>
+      </div>
+    </div>
+
+    <!-- BOLETO -->
+    <div class="pay-content" id="pay-boleto">
+      <div class="barcode-box">
+        <div class="barcode-strips" id="barcode-strips"></div>
+        <div class="barcode-num-txt" id="barcode-num">34191.09008 09209.190004 61980.150008 8 10010000018990</div>
+      </div>
+      <div class="boleto-meta">
+        <div class="boleto-field">
+          <div class="bf-lbl">Vencimento</div>
+          <div class="bf-val" id="boleto-due">–</div>
+        </div>
+        <div class="boleto-field">
+          <div class="bf-lbl">Valor total</div>
+          <div class="bf-val" id="boleto-val">R$ 0,00</div>
+        </div>
+      </div>
+      <div class="boleto-warn">⚠️ Após o pagamento, o prazo de confirmação é de até 3 dias úteis. Não pague em lotéricas após o vencimento.</div>
+      <div class="boleto-actions">
+        <button class="copy-btn" style="flex:1;padding:.6rem" onclick="copyBoleto()">📋 Copiar código</button>
+        <button class="copy-btn" style="flex:1;padding:.6rem;border-color:var(--muted);color:var(--muted)" onclick="toast('Boleto enviado para impressão!')">🖨 Imprimir</button>
+      </div>
+      <div class="pay-btn-wrap">
+        <button class="btn-pay" onclick="processPayment()">✓ Confirmar Boleto</button>
+        <p class="safe-note">🔒 Ambiente 100% seguro e criptografado</p>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- PROCESSING OVERLAY -->
+<div class="processing-overlay" id="processing-overlay">
+  <div class="spinner"></div>
+  <div class="proc-title">Processando<span class="proc-dots"><span>.</span><span>.</span><span>.</span></span></div>
+  <div class="proc-sub">Não feche esta janela</div>
+</div>
+
+<!-- SUCCESS SCREEN -->
+<div class="success-screen" id="success-screen">
+  <div class="success-confetti" id="success-confetti"></div>
+  <div class="success-ring">✓</div>
+  <div class="success-title">Pagamento Confirmado!</div>
+  <p class="success-txt">Seu pedido foi recebido e está sendo preparado. Você receberá atualizações por e-mail.</p>
+  <div class="order-chip" id="order-chip">PEDIDO #000000</div>
+  <a href="marketplace.html" class="btn-back" onclick="clearCart()">← Continuar Comprando</a>
+</div>
+
+<script src="app.js"></script>
+<script>
+function getCart(){
+  try{ return JSON.parse(localStorage.getItem('mp_cart')||'[]'); }catch{ return []; }
+}
+function clearCart(){ localStorage.removeItem('mp_cart'); }
+
+function catEmoji(cat){
+  const m={'Eletrônicos':'💻','Moda':'👗','Alimentos':'🍎','Casa & Decoração':'🏠','Esportes':'⚽','Beleza':'💄','Livros':'📚','Brinquedos':'🧸'};
+  return m[cat]||'📦';
+}
+
+// Render order summary
+function renderSummary(){
+  const items = getCart();
+  if(!items.length){ window.location.href='marketplace.html'; return; }
+
+  const container = document.getElementById('summary-items');
+  container.innerHTML = items.map(item=>`
+    <div class="summary-item">
+      <div class="summary-item-img">
+        ${item.imagem_url?`<img src="${item.imagem_url}" style="width:100%;height:100%;object-fit:cover;">`:catEmoji(item.categoria)}
+      </div>
+      <div class="summary-item-info">
+        <div class="summary-item-name">${item.nome}</div>
+        <div class="summary-item-qty">${item.qty||1}x · ${item.loja?.nome||'Loja'}</div>
+      </div>
+      <div class="summary-item-price">${formatPrice((item.preco||0)*(item.qty||1))}</div>
+    </div>
+  `).join('');
+
+  const total = items.reduce((s,i)=>s+(i.preco||0)*(i.qty||1),0);
+  document.getElementById('subtotal-val').textContent = formatPrice(total);
+  document.getElementById('total-val').textContent = formatPrice(total);
+  document.getElementById('boleto-val').textContent = formatPrice(total);
+  updateInstallments();
+}
+
+// Payment tab
+function switchPayTab(tab, el){
+  document.querySelectorAll('.pay-tab').forEach(t=>t.classList.remove('active'));
+  document.querySelectorAll('.pay-content').forEach(c=>c.classList.remove('active'));
+  el.classList.add('active');
+  document.getElementById('pay-'+tab).classList.add('active');
+  if(tab==='pix') startPixTimer();
+}
+
+// Card inputs
+function onCardNumberInput(input){
+  let v = input.value.replace(/\D/g,'').slice(0,16);
+  input.value = v.replace(/(.{4})/g,'$1 ').trim();
+  const disp = v.padEnd(16,'•');
+  document.getElementById('card-num-disp').innerHTML =
+    [disp.slice(0,4),disp.slice(4,8),disp.slice(8,12),disp.slice(12,16)].join(' &nbsp;');
+}
+function onCardNameInput(input){
+  const v = input.value.toUpperCase().slice(0,22)||'NOME COMPLETO';
+  document.getElementById('card-name-disp').textContent = v;
+}
+function onCardExpiryInput(input){
+  let v = input.value.replace(/\D/g,'');
+  if(v.length>=2) v=v.slice(0,2)+'/'+v.slice(2,4);
+  input.value = v;
+  document.getElementById('card-exp-disp').textContent = v||'MM/AA';
+}
+function updateInstallments(){
+  const sel = document.getElementById('installments');
+  const total = getCart().reduce((s,i)=>s+(i.preco||0)*(i.qty||1),0);
+  if(!sel||!total) return;
+  const n = parseInt(sel.value);
+  const hasInterest = n===12;
+  const amount = hasInterest ? (total*(1+0.0199*n))/n : total/n;
+  const note = document.getElementById('installment-note');
+  if(note) note.textContent = n>1 ? `${n}× de ${formatPrice(amount)}${hasInterest?' (total '+formatPrice(total*(1+0.0199*n))+')':''}` : '';
+}
+
+// Copy functions
+function copyPix(){
+  navigator.clipboard.writeText(document.getElementById('pix-key').textContent).catch(()=>{});
+  toast('Chave Pix copiada!');
+}
+function copyBoleto(){
+  navigator.clipboard.writeText(document.getElementById('barcode-num').textContent).catch(()=>{});
+  toast('Código de barras copiado!');
+}
+
+// Pix timer
+let timerInterval;
+function startPixTimer(){
+  clearInterval(timerInterval);
+  let secs = 15*60;
+  const el = document.getElementById('pix-timer');
+  timerInterval = setInterval(()=>{
+    secs--;
+    if(secs<=0){ clearInterval(timerInterval); el.textContent='⏱ Expirado'; return; }
+    const m=Math.floor(secs/60), s=secs%60;
+    el.textContent=`⏱ ${m}:${s.toString().padStart(2,'0')}`;
+  },1000);
+}
+
+// Generate fake QR code (21×21 grid with real corner pattern)
+function generateQR(){
+  const size = 21;
+  const corner = new Set();
+  // Top-left 7×7
+  for(let r=0;r<7;r++) for(let c=0;c<7;c++){
+    if(r===0||r===6||c===0||c===6||(r>=2&&r<=4&&c>=2&&c<=4)) corner.add(r*size+c);
+  }
+  // Top-right 7×7
+  for(let r=0;r<7;r++) for(let c=size-7;c<size;c++){
+    const cc=c-(size-7);
+    if(r===0||r===6||cc===0||cc===6||(r>=2&&r<=4&&cc>=2&&cc<=4)) corner.add(r*size+c);
+  }
+  // Bottom-left 7×7
+  for(let r=size-7;r<size;r++) for(let c=0;c<7;c++){
+    const rr=r-(size-7);
+    if(rr===0||rr===6||c===0||c===6||(rr>=2&&rr<=4&&c>=2&&c<=4)) corner.add(r*size+c);
+  }
+  const el = document.getElementById('qr-inner');
+  el.style.gridTemplateColumns=`repeat(${size},1fr)`;
+  el.style.gap='1px';
+  let html='';
+  for(let i=0;i<size*size;i++){
+    const dark = corner.has(i)||(Math.random()>.5);
+    html+=`<div style="background:${dark?'var(--text)':'transparent'};border-radius:1px"></div>`;
+  }
+  el.innerHTML=html;
+}
+
+// Generate fake barcode
+function generateBarcode(){
+  const el = document.getElementById('barcode-strips');
+  const pattern = [2,1,3,1,2,3,1,1,2,1,3,2,1,1,3,1,2,1,1,3,2,1,1,2,3,1,1,2,1,3,2,1,2,3,1];
+  let html='';
+  pattern.forEach((w,i)=>{
+    html+=`<span style="width:${w*2}px;background:${i%2===0?'var(--text)':'transparent'};flex-shrink:0"></span>`;
+  });
+  el.innerHTML=html;
+}
+
+// Set boleto due date
+function setBoletoDate(){
+  const d = new Date(); d.setDate(d.getDate()+3);
+  document.getElementById('boleto-due').textContent = d.toLocaleDateString('pt-BR');
+}
+
+// Process payment
+function processPayment(){
+  const overlay = document.getElementById('processing-overlay');
+  overlay.classList.add('active');
+  clearInterval(timerInterval);
+  setTimeout(()=>{
+    overlay.classList.remove('active');
+    showSuccess();
+  }, 2200);
+}
+
+function showSuccess(){
+  const orderNum = 'PEDIDO #' + Math.floor(100000+Math.random()*900000);
+  document.getElementById('order-chip').textContent = orderNum;
+  document.getElementById('success-screen').classList.add('active');
+  spawnConfetti();
+}
+
+function spawnConfetti(){
+  const container = document.getElementById('success-confetti');
+  const colors = ['#e8854a','#f4c56a','#5dcfa0','#e85a5a','#7b9ff4'];
+  for(let i=0;i<50;i++){
+    const el = document.createElement('div');
+    el.className = 'confetti-piece';
+    el.style.cssText = `
+      left:${Math.random()*100}%;
+      top:0;
+      background:${colors[i%colors.length]};
+      width:${6+Math.random()*6}px;
+      height:${6+Math.random()*6}px;
+      border-radius:${Math.random()>.5?'50%':'2px'};
+      animation-delay:${Math.random()*.8}s;
+      animation-duration:${2+Math.random()*1.5}s;
+    `;
+    container.appendChild(el);
+  }
+}
+
+document.addEventListener('DOMContentLoaded',()=>{
+  renderSummary();
+  generateQR();
+  generateBarcode();
+  setBoletoDate();
+  startPixTimer();
+});
+</script>
+</body>
+</html>
