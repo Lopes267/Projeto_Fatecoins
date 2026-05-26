@@ -4,352 +4,731 @@
 <meta charset="UTF-8"/>
 <meta name="viewport" content="width=device-width,initial-scale=1"/>
 <title>Mercado Local – Sua loja, seu jeito</title>
-<link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,300;0,9..144,700;1,9..144,400&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,300;0,9..144,700;1,9..144,400&family=DM+Sans:opsz,wght@9..40,300;9..40,400;9..40,500;9..40,600&display=swap" rel="stylesheet"/>
 <style>
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
 
 :root{
-  --bg:#0d0d0d;
-  --card:#161616;
-  --border:#2a2a2a;
+  --bg:#0a0a0a;
+  --card:#141414;
+  --card2:#1a1a1a;
+  --border:#252525;
+  --border2:#2e2e2e;
   --text:#f0ece3;
-  --muted:#888;
+  --muted:#787060;
   --accent:#e8854a;
   --accent2:#f4c56a;
   --green:#5dcfa0;
+  --nav-h:62px;
 }
 
 html{scroll-behavior:smooth}
 body{background:var(--bg);color:var(--text);font-family:'DM Sans',sans-serif;overflow-x:hidden}
 
-/* ---- NOISE OVERLAY ---- */
 body::before{
   content:'';position:fixed;inset:0;pointer-events:none;z-index:999;
   background-image:url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.04'/%3E%3C/svg%3E");
-  opacity:.4;
+  opacity:.35;
 }
 
-/* ---- NAV ---- */
+/* ── NAV ── */
 nav{
   position:fixed;top:0;left:0;right:0;z-index:100;
   display:flex;align-items:center;justify-content:space-between;
-  padding:1.2rem 4rem;
-  background:rgba(13,13,13,.8);backdrop-filter:blur(16px);
-  border-bottom:1px solid var(--border);
+  padding:1.1rem 3.5rem;height:var(--nav-h);
+  background:rgba(10,10,10,.7);backdrop-filter:blur(20px);
+  border-bottom:1px solid transparent;
+  transition:border-color .3s,background .3s;
 }
-.logo{font-family:'Fraunces',serif;font-size:1.6rem;color:var(--accent);letter-spacing:-.02em}
+nav.scrolled{border-bottom-color:var(--border);background:rgba(10,10,10,.92)}
+.logo{
+  font-family:'Fraunces',serif;font-size:1.5rem;color:var(--accent);
+  letter-spacing:-.02em;text-decoration:none;flex-shrink:0;
+}
 .logo span{color:var(--text)}
-.nav-links{display:flex;gap:1rem;align-items:center}
+.nav-links{display:flex;gap:.5rem;align-items:center}
 .nav-links a{
-  text-decoration:none;color:var(--muted);font-size:.9rem;font-weight:500;
-  padding:.5rem 1rem;border-radius:6px;transition:all .2s;
+  text-decoration:none;color:var(--muted);font-size:.875rem;font-weight:500;
+  padding:.45rem .85rem;border-radius:6px;transition:color .2s,background .2s;
 }
-.nav-links a:hover{color:var(--text);background:var(--card)}
+.nav-links a:hover{color:var(--text);background:rgba(255,255,255,.04)}
+.nav-ctas{display:flex;gap:.6rem;align-items:center}
 .btn{
-  display:inline-flex;align-items:center;gap:.5rem;
-  padding:.6rem 1.4rem;border-radius:8px;font-weight:600;
-  font-size:.9rem;text-decoration:none;cursor:pointer;border:none;
-  transition:all .2s;font-family:'DM Sans',sans-serif;
+  display:inline-flex;align-items:center;gap:.45rem;
+  padding:.58rem 1.3rem;border-radius:8px;font-weight:600;font-size:.875rem;
+  text-decoration:none;cursor:pointer;border:none;
+  transition:all .22s;font-family:'DM Sans',sans-serif;
 }
-.btn-primary{background:var(--accent);color:#fff}
-.btn-primary:hover{background:#d9733c;transform:translateY(-1px)}
-.btn-ghost{background:transparent;color:var(--text);border:1px solid var(--border)}
+.btn-primary{background:var(--accent);color:#fff;box-shadow:0 2px 14px rgba(232,133,74,.28)}
+.btn-primary:hover{background:#db7540;box-shadow:0 4px 22px rgba(232,133,74,.42);transform:translateY(-1px)}
+.btn-ghost{background:transparent;color:var(--text);border:1px solid var(--border2)}
 .btn-ghost:hover{border-color:var(--accent);color:var(--accent)}
+.btn-lg{font-size:.95rem;padding:.78rem 1.85rem}
 
-/* ---- HERO ---- */
+/* ── MARQUEE ── */
+.marquee-wrap{
+  overflow:hidden;background:var(--card);
+  border-bottom:1px solid var(--border);
+  padding:.6rem 0;
+  margin-top:var(--nav-h);
+}
+.marquee-track{display:flex;width:max-content;animation:marquee 28s linear infinite}
+.marquee-track:hover{animation-play-state:paused}
+.marquee-item{
+  display:inline-flex;align-items:center;gap:.55rem;
+  font-size:.78rem;font-weight:500;color:var(--muted);
+  padding:0 2.2rem;white-space:nowrap;
+}
+.marquee-item .dot{color:var(--accent);font-size:.9rem;flex-shrink:0}
+@keyframes marquee{from{transform:translateX(0)}to{transform:translateX(-50%)}}
+
+/* ── HERO ── */
 .hero{
-  min-height:100vh;display:flex;align-items:center;
-  padding:8rem 4rem 4rem;position:relative;overflow:hidden;
+  display:grid;grid-template-columns:1fr 1fr;align-items:center;gap:3.5rem;
+  padding:4rem 3.5rem 3.5rem;min-height:calc(100vh - var(--nav-h) - 38px);
+  position:relative;overflow:hidden;
 }
-.hero-bg{
-  position:absolute;inset:0;
-  background:radial-gradient(ellipse 60% 60% at 70% 50%, rgba(232,133,74,.12) 0%, transparent 70%),
-             radial-gradient(ellipse 40% 40% at 20% 80%, rgba(93,207,160,.08) 0%, transparent 60%);
+.hero-grid{
+  position:absolute;inset:0;pointer-events:none;
+  background-image:
+    linear-gradient(rgba(37,37,37,.6) 1px,transparent 1px),
+    linear-gradient(90deg,rgba(37,37,37,.6) 1px,transparent 1px);
+  background-size:56px 56px;
+  mask-image:radial-gradient(ellipse 75% 90% at 30% 50%,black 20%,transparent 80%);
+  opacity:.5;
 }
-.hero-content{position:relative;z-index:1;max-width:680px}
+.hero-orb{position:absolute;border-radius:50%;filter:blur(90px);pointer-events:none}
+.hero-orb-1{
+  width:520px;height:520px;top:-80px;left:-60px;
+  background:radial-gradient(circle,rgba(232,133,74,.14) 0%,transparent 70%);
+  animation:orbDrift 9s ease-in-out infinite;
+}
+.hero-orb-2{
+  width:380px;height:380px;bottom:-60px;right:25%;
+  background:radial-gradient(circle,rgba(93,207,160,.09) 0%,transparent 70%);
+  animation:orbDrift 12s ease-in-out infinite reverse;
+}
+@keyframes orbDrift{0%,100%{transform:translateY(0) scale(1)}50%{transform:translateY(-28px) scale(1.04)}}
+
+.hero-content{position:relative;z-index:1}
 .hero-badge{
-  display:inline-flex;align-items:center;gap:.5rem;
-  background:rgba(232,133,74,.12);border:1px solid rgba(232,133,74,.3);
-  color:var(--accent);padding:.4rem 1rem;border-radius:50px;
-  font-size:.8rem;font-weight:600;letter-spacing:.05em;text-transform:uppercase;
-  margin-bottom:2rem;animation:fadeUp .6s ease both;
+  display:inline-flex;align-items:center;gap:.45rem;
+  background:rgba(232,133,74,.1);border:1px solid rgba(232,133,74,.22);
+  color:var(--accent);padding:.32rem .85rem;border-radius:50px;
+  font-size:.73rem;font-weight:600;letter-spacing:.07em;text-transform:uppercase;
+  margin-bottom:1.7rem;animation:fadeUp .5s ease both;
 }
 .hero h1{
-  font-family:'Fraunces',serif;font-size:clamp(3rem,6vw,5rem);
-  line-height:1.05;font-weight:700;letter-spacing:-.03em;
-  animation:fadeUp .6s .1s ease both;
+  font-family:'Fraunces',serif;font-size:clamp(2.6rem,5.2vw,4.4rem);
+  line-height:1.06;font-weight:700;letter-spacing:-.03em;
+  animation:fadeUp .5s .07s ease both;
 }
 .hero h1 em{color:var(--accent);font-style:italic}
-.hero p{
-  margin-top:1.5rem;font-size:1.15rem;color:var(--muted);line-height:1.7;
-  max-width:520px;animation:fadeUp .6s .2s ease both;
+.hero-desc{
+  margin-top:1.3rem;font-size:1.05rem;color:var(--muted);line-height:1.78;
+  max-width:460px;animation:fadeUp .5s .14s ease both;
 }
 .hero-actions{
-  display:flex;gap:1rem;flex-wrap:wrap;margin-top:2.5rem;
-  animation:fadeUp .6s .3s ease both;
+  display:flex;gap:.8rem;flex-wrap:wrap;margin-top:2rem;
+  animation:fadeUp .5s .21s ease both;
 }
-.hero-stats{
-  display:flex;gap:3rem;margin-top:4rem;
-  animation:fadeUp .6s .4s ease both;
-  padding-top:2rem;border-top:1px solid var(--border);
+.hero-trust{
+  display:flex;align-items:center;gap:.85rem;flex-wrap:wrap;
+  margin-top:1.7rem;font-size:.8rem;color:var(--muted);
+  animation:fadeUp .5s .28s ease both;
 }
-.stat{display:flex;flex-direction:column;gap:.2rem}
-.stat-n{font-family:'Fraunces',serif;font-size:2.2rem;font-weight:700;color:var(--accent2)}
-.stat-l{font-size:.8rem;color:var(--muted);text-transform:uppercase;letter-spacing:.06em}
+.hero-trust strong{color:var(--text)}
+.hero-trust .stars{color:var(--accent2);letter-spacing:.05em}
+.trust-sep{width:1px;height:14px;background:var(--border2)}
 
-/* ---- FLOATING CARDS ---- */
-.hero-visual{
-  position:absolute;right:4rem;top:50%;transform:translateY(-50%);
-  display:flex;flex-direction:column;gap:1rem;
-  animation:floatIn .8s .4s ease both;
+/* ── DASHBOARD MOCK ── */
+.hero-visual{position:relative;z-index:1;animation:slideRight .75s .35s ease both}
+@keyframes slideRight{from{opacity:0;transform:translateX(36px)}to{opacity:1;transform:translateX(0)}}
+
+.dash-mock{
+  background:var(--card);border:1px solid var(--border2);border-radius:18px;
+  overflow:hidden;
+  box-shadow:0 32px 80px rgba(0,0,0,.55),0 0 0 1px rgba(255,255,255,.03),
+             inset 0 1px 0 rgba(255,255,255,.04);
 }
-.fcard{
-  background:var(--card);border:1px solid var(--border);
-  border-radius:14px;padding:1rem 1.4rem;min-width:220px;
-  position:relative;overflow:hidden;
-  transition:border-color .25s,box-shadow .25s,transform .25s;cursor:default;
+.dash-topbar{
+  display:flex;align-items:center;gap:.45rem;padding:.8rem 1.1rem;
+  background:var(--card2);border-bottom:1px solid var(--border);
 }
-.fcard:hover{
-  border-color:var(--accent);
-  box-shadow:0 0 0 1px var(--accent),0 8px 32px rgba(232,133,74,.18);
-  transform:translateY(-3px);
+.dash-dot{width:9px;height:9px;border-radius:50%}
+.dash-tab{margin-left:.6rem;font-size:.73rem;color:var(--muted);font-weight:500}
+.dash-body{padding:1.1rem;display:grid;grid-template-columns:1fr 1fr;gap:.75rem}
+
+.dcard{
+  background:var(--card2);border:1px solid var(--border);border-radius:11px;
+  padding:.9rem;transition:border-color .2s;
 }
-.fcard::after{
-  content:'';position:absolute;inset:0;
-  background:linear-gradient(135deg,rgba(255,255,255,.03),transparent);
-}
-.fcard-label{font-size:.75rem;color:var(--muted);margin-bottom:.4rem}
-.fcard-val{font-family:'Fraunces',serif;font-size:1.4rem;font-weight:700}
-.fcard-val.green{color:var(--green)}
-.fcard-val.orange{color:var(--accent)}
-.fcard .tag{
-  display:inline-block;background:rgba(93,207,160,.15);color:var(--green);
-  font-size:.72rem;padding:.2rem .6rem;border-radius:50px;margin-top:.4rem;
+.dcard:hover{border-color:rgba(232,133,74,.4)}
+.dcard-label{font-size:.68rem;color:var(--muted);margin-bottom:.28rem;text-transform:uppercase;letter-spacing:.05em}
+.dcard-val{font-family:'Fraunces',serif;font-size:1.3rem;font-weight:700;line-height:1.2}
+.dcard-val.accent{color:var(--accent)}
+.dcard-val.green{color:var(--green)}
+.dcard-badge{
+  display:inline-flex;align-items:center;gap:.25rem;
+  font-size:.67rem;background:rgba(93,207,160,.11);color:var(--green);
+  border-radius:50px;padding:.13rem .45rem;margin-top:.3rem;
 }
 
-/* ---- SECTIONS ---- */
-section{padding:5rem 4rem}
-.section-label{
-  font-size:.75rem;letter-spacing:.1em;text-transform:uppercase;
-  color:var(--accent);font-weight:600;margin-bottom:.8rem;
+.dash-chart{
+  grid-column:1/-1;
+  background:var(--card2);border:1px solid var(--border);border-radius:11px;
+  padding:.9rem;
 }
-.section-title{
-  font-family:'Fraunces',serif;font-size:clamp(2rem,4vw,3rem);
-  font-weight:700;letter-spacing:-.02em;line-height:1.1;
+.dash-chart-label{font-size:.7rem;color:var(--muted);margin-bottom:.65rem}
+.chart-bars{display:flex;align-items:flex-end;gap:.28rem;height:52px}
+.bar{flex:1;border-radius:3px 3px 0 0;background:var(--border2);transition:background .2s}
+.bar.hi{background:linear-gradient(to top,var(--accent),var(--accent2))}
+.bar.mid{background:rgba(232,133,74,.35)}
+
+.dash-items{grid-column:1/-1;display:flex;flex-direction:column;gap:.45rem}
+.dash-item{
+  display:flex;align-items:center;gap:.65rem;
+  background:var(--card2);border:1px solid var(--border);
+  border-radius:9px;padding:.58rem .8rem;
 }
+.dash-item-icon{
+  width:32px;height:32px;border-radius:7px;background:var(--border2);
+  display:flex;align-items:center;justify-content:center;font-size:1rem;flex-shrink:0;
+}
+.dash-item-name{font-size:.78rem;font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.dash-item-price{font-family:'Fraunces',serif;font-size:.72rem;color:var(--accent2);font-weight:700}
+.dash-item-stock{font-size:.67rem;color:var(--green);margin-left:auto;flex-shrink:0}
+
+/* ── STATS BAR ── */
+.stats-bar{
+  display:grid;grid-template-columns:repeat(3,1fr);
+  border-top:1px solid var(--border);border-bottom:1px solid var(--border);
+  background:var(--card);
+}
+.stat-cell{
+  display:flex;flex-direction:column;align-items:center;justify-content:center;
+  gap:.2rem;padding:2.4rem 1rem;text-align:center;
+  border-right:1px solid var(--border);
+}
+.stat-cell:last-child{border-right:none}
+.stat-n{font-family:'Fraunces',serif;font-size:2.7rem;font-weight:700;color:var(--accent2);line-height:1}
+.stat-l{font-size:.75rem;color:var(--muted);text-transform:uppercase;letter-spacing:.07em;margin-top:.15rem}
+
+/* ── SECTION LABELS ── */
+.section-label{font-size:.7rem;letter-spacing:.1em;text-transform:uppercase;color:var(--accent);font-weight:600;margin-bottom:.65rem}
+.section-title{font-family:'Fraunces',serif;font-size:clamp(1.9rem,3.8vw,2.8rem);font-weight:700;letter-spacing:-.025em;line-height:1.1}
 .section-title span{color:var(--accent)}
-.section-sub{color:var(--muted);font-size:1rem;line-height:1.7;margin-top:.8rem;max-width:500px}
+.section-sub{color:var(--muted);font-size:.93rem;line-height:1.72;margin-top:.7rem;max-width:500px}
 
-/* ---- FEATURES ---- */
-.features-grid{
-  display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));
-  gap:1.5rem;margin-top:3rem;
+/* ── FEATURES BENTO ── */
+.features-section{padding:5.5rem 3.5rem}
+.bento{
+  display:grid;grid-template-columns:1fr 1fr;
+  gap:.9rem;margin-top:2.8rem;
 }
-.feature{
-  background:var(--card);border:1px solid var(--border);border-radius:16px;
-  padding:2rem;transition:border-color .2s,transform .2s;
+.bcard{
+  background:var(--card);border:1px solid var(--border);border-radius:18px;
+  padding:1.9rem;position:relative;overflow:hidden;
+  transition:border-color .25s,transform .25s,box-shadow .25s;
 }
-.feature:hover{border-color:var(--accent);transform:translateY(-4px)}
-.feat-icon{
-  width:48px;height:48px;border-radius:12px;display:flex;align-items:center;
-  justify-content:center;font-size:1.4rem;margin-bottom:1.2rem;
+.bcard::after{
+  content:'';position:absolute;inset:0;
+  background:linear-gradient(135deg,rgba(255,255,255,.025),transparent 55%);
+  pointer-events:none;
 }
-.feat-icon.o{background:rgba(232,133,74,.15)}
-.feat-icon.g{background:rgba(93,207,160,.15)}
-.feat-icon.y{background:rgba(244,197,106,.15)}
-.feature h3{font-family:'Fraunces',serif;font-size:1.2rem;font-weight:700;margin-bottom:.5rem}
-.feature p{color:var(--muted);font-size:.9rem;line-height:1.6}
+.bcard:hover{border-color:rgba(232,133,74,.45);transform:translateY(-3px);box-shadow:0 12px 40px rgba(0,0,0,.4)}
+.bcard.full{grid-column:1/-1}
+.bicon{
+  width:44px;height:44px;border-radius:11px;
+  display:flex;align-items:center;justify-content:center;
+  font-size:1.25rem;margin-bottom:1.1rem;
+}
+.bicon.o{background:rgba(232,133,74,.12)}
+.bicon.g{background:rgba(93,207,160,.12)}
+.bicon.y{background:rgba(244,197,106,.12)}
+.bcard h3{font-family:'Fraunces',serif;font-size:1.1rem;font-weight:700;margin-bottom:.45rem}
+.bcard p{color:var(--muted);font-size:.86rem;line-height:1.67}
+.bcard-free{
+  font-family:'Fraunces',serif;font-size:3.2rem;font-weight:700;
+  color:var(--accent);line-height:1;margin-top:.55rem;
+}
+.bcard-free small{font-size:1.1rem;color:var(--muted)}
+.bcard-cta{
+  display:inline-flex;align-items:center;gap:.4rem;margin-top:1rem;
+  font-size:.82rem;font-weight:600;color:var(--accent);
+  text-decoration:none;transition:gap .2s;
+}
+.bcard-cta:hover{gap:.7rem}
+.security-badges{
+  display:flex;flex-wrap:wrap;gap:.5rem;margin-top:1rem;
+}
+.sec-badge{
+  font-size:.72rem;padding:.25rem .65rem;border-radius:50px;
+  background:rgba(93,207,160,.1);border:1px solid rgba(93,207,160,.2);color:var(--green);
+  font-weight:500;
+}
 
-/* ---- HOW IT WORKS ---- */
-.how{background:var(--card);border-top:1px solid var(--border);border-bottom:1px solid var(--border)}
-.steps{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:2rem;margin-top:3rem;position:relative}
-.steps::before{
-  content:'';position:absolute;top:2rem;left:10%;right:10%;height:1px;
-  background:linear-gradient(90deg,transparent,var(--border),transparent);
+/* ── HOW IT WORKS ── */
+.how-section{
+  padding:5.5rem 3.5rem;
+  background:var(--card);border-top:1px solid var(--border);border-bottom:1px solid var(--border);
 }
-.step{text-align:center}
+.steps-row{display:grid;grid-template-columns:repeat(3,1fr);gap:1.5rem;margin-top:3rem;position:relative}
+.steps-row::before{
+  content:'';position:absolute;
+  top:27px;left:calc(100%/6);right:calc(100%/6);
+  height:1px;
+  background:linear-gradient(90deg,transparent,var(--border2) 20%,var(--border2) 80%,transparent);
+}
+.step{text-align:center;padding:0 .5rem}
 .step-num{
-  width:56px;height:56px;border-radius:50%;
-  display:flex;align-items:center;justify-content:center;margin:0 auto 1rem;
-  font-family:'Fraunces',serif;font-size:1.4rem;font-weight:700;
-  background:var(--bg);border:2px solid var(--accent);color:var(--accent);
+  width:54px;height:54px;border-radius:50%;display:inline-flex;
+  align-items:center;justify-content:center;margin:0 auto 1.1rem;
+  font-family:'Fraunces',serif;font-size:1.25rem;font-weight:700;
+  background:var(--bg);border:2px solid var(--border2);color:var(--muted);
   position:relative;z-index:1;
+  transition:border-color .22s,color .22s,box-shadow .22s,background .22s;
 }
-.step h4{font-weight:600;margin-bottom:.4rem}
-.step p{color:var(--muted);font-size:.85rem;line-height:1.5}
+.step:hover .step-num{
+  border-color:var(--accent);color:var(--accent);
+  background:rgba(232,133,74,.07);
+  box-shadow:0 0 0 4px rgba(232,133,74,.1);
+}
+.step h4{font-weight:600;font-size:.96rem;margin-bottom:.4rem}
+.step p{color:var(--muted);font-size:.83rem;line-height:1.62}
 
-/* ---- CTA ---- */
+/* ── TESTIMONIALS ── */
+.testimonials-section{padding:5.5rem 3.5rem}
+.tgrid{display:grid;grid-template-columns:repeat(3,1fr);gap:.9rem;margin-top:2.8rem}
+.tcard{
+  background:var(--card);border:1px solid var(--border);border-radius:18px;
+  padding:1.7rem;transition:border-color .22s,transform .22s;
+}
+.tcard:hover{border-color:var(--border2);transform:translateY(-2px)}
+.tcard-stars{color:var(--accent2);font-size:.8rem;letter-spacing:.06em;margin-bottom:.85rem}
+.tcard-quote{
+  font-family:'Fraunces',serif;font-size:.92rem;line-height:1.72;
+  color:var(--text);font-style:italic;margin-bottom:1.3rem;
+}
+.tcard-author{display:flex;align-items:center;gap:.7rem}
+.tcard-avatar{
+  width:36px;height:36px;border-radius:50%;
+  display:flex;align-items:center;justify-content:center;
+  font-size:.88rem;font-weight:700;color:#fff;flex-shrink:0;
+}
+.tcard-name{font-weight:600;font-size:.84rem}
+.tcard-role{font-size:.75rem;color:var(--muted);margin-top:.1rem}
+
+/* ── CTA ── */
 .cta-section{
-  text-align:center;
-  background:radial-gradient(ellipse 80% 80% at 50% 50%, rgba(232,133,74,.1) 0%, transparent 70%);
+  padding:6.5rem 3.5rem;text-align:center;position:relative;overflow:hidden;
 }
-.cta-section .section-title{font-size:clamp(2rem,5vw,3.5rem)}
-.cta-section p{color:var(--muted);font-size:1.1rem;margin:1rem auto 2.5rem;max-width:460px}
-.cta-btns{display:flex;gap:1rem;justify-content:center;flex-wrap:wrap}
-
-/* ---- FOOTER ---- */
-footer{
-  padding:2rem 4rem;border-top:1px solid var(--border);
-  display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:1rem;
+.cta-section::before{
+  content:'';position:absolute;inset:0;
+  background:radial-gradient(ellipse 70% 70% at 50% 100%,rgba(232,133,74,.09) 0%,transparent 70%);
 }
-footer .logo{font-size:1.2rem}
-footer p{color:var(--muted);font-size:.8rem}
+.cta-section::after{
+  content:'';position:absolute;inset:0;
+  background-image:linear-gradient(var(--border) 1px,transparent 1px),
+                   linear-gradient(90deg,var(--border) 1px,transparent 1px);
+  background-size:56px 56px;
+  mask-image:radial-gradient(ellipse 55% 55% at 50% 50%,black,transparent);
+  opacity:.18;
+}
+.cta-section>*{position:relative;z-index:1}
+.cta-section .section-title{font-size:clamp(2rem,5vw,3.4rem)}
+.cta-section p{color:var(--muted);font-size:1.05rem;margin:1rem auto 2.4rem;max-width:430px;line-height:1.75}
+.cta-btns{display:flex;gap:.9rem;justify-content:center;flex-wrap:wrap}
 
-/* ---- ANIMATIONS ---- */
-@keyframes fadeUp{from{opacity:0;transform:translateY(24px)}to{opacity:1;transform:translateY(0)}}
-@keyframes floatIn{from{opacity:0;transform:translateY(-50%) translateX(40px)}to{opacity:1;transform:translateY(-50%) translateX(0)}}
+/* ── FOOTER ── */
+footer{border-top:1px solid var(--border);padding:3rem 3.5rem 2rem}
+.footer-grid{display:grid;grid-template-columns:2fr 1fr 1fr;gap:3rem;margin-bottom:2.5rem}
+.footer-brand .flogo{font-family:'Fraunces',serif;font-size:1.4rem;color:var(--accent);text-decoration:none}
+.footer-brand .flogo span{color:var(--text)}
+.footer-brand p{color:var(--muted);font-size:.83rem;line-height:1.72;margin-top:.65rem;max-width:270px}
+.footer-col h5{font-weight:600;font-size:.78rem;margin-bottom:.9rem;text-transform:uppercase;letter-spacing:.07em;color:var(--muted)}
+.footer-col a{display:block;color:var(--muted);font-size:.83rem;text-decoration:none;margin-bottom:.55rem;transition:color .2s}
+.footer-col a:hover{color:var(--text)}
+.footer-bottom{
+  display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:.8rem;
+  padding-top:1.5rem;border-top:1px solid var(--border);
+  color:var(--muted);font-size:.76rem;
+}
 
-/* ---- RESPONSIVE ---- */
-@media(max-width:900px){
-  nav{padding:1rem 1.5rem}
-  .hero{padding:7rem 1.5rem 4rem;min-height:auto}
+/* ── SCROLL REVEAL ── */
+.reveal{opacity:0;transform:translateY(22px);transition:opacity .6s ease,transform .6s ease}
+.reveal.visible{opacity:1;transform:translateY(0)}
+.d1{transition-delay:.1s}.d2{transition-delay:.2s}.d3{transition-delay:.3s}
+
+/* ── KEYFRAMES ── */
+@keyframes fadeUp{from{opacity:0;transform:translateY(20px)}to{opacity:1;transform:translateY(0)}}
+
+/* ── RESPONSIVE ── */
+@media(max-width:1060px){
+  nav{padding:1rem 1.8rem}
+  .nav-links{display:none}
+  .hero{grid-template-columns:1fr;padding:3.5rem 1.8rem 3rem;gap:2.5rem}
   .hero-visual{display:none}
-  section{padding:3.5rem 1.5rem}
-  footer{padding:1.5rem}
-  .hero-stats{gap:2rem}
+  .features-section,.how-section,.testimonials-section,.cta-section{padding:4rem 1.8rem}
+  .bento{grid-template-columns:1fr}
+  .bcard.full{grid-column:unset}
+  .steps-row{grid-template-columns:1fr;gap:1rem}
+  .steps-row::before{display:none}
+  .step{text-align:left;display:flex;gap:1rem;align-items:flex-start}
+  .step-num{margin:0;flex-shrink:0}
+  .tgrid{grid-template-columns:1fr 1fr}
+  .footer-grid{grid-template-columns:1fr 1fr;gap:2rem}
+}
+@media(max-width:640px){
+  .hero{padding:3rem 1.2rem 2.5rem}
+  .stats-bar{grid-template-columns:1fr 1fr}
+  .stat-cell:last-child{grid-column:1/-1;border-top:1px solid var(--border);border-right:none}
+  .tgrid{grid-template-columns:1fr}
+  footer{padding:2rem 1.2rem 1.5rem}
+  .footer-grid{grid-template-columns:1fr}
+  .footer-bottom{flex-direction:column;text-align:center}
 }
 </style>
 </head>
 <body>
 
-<nav>
-  <div class="logo">mercado<span>local</span></div>
+<!-- NAV -->
+<nav id="main-nav">
+  <a href="index.html" class="logo">mercado<span>local</span></a>
   <div class="nav-links">
-    <a href="marketplace.html">Ver Lojas</a>
+    <a href="marketplace.html">Ver lojas</a>
+    <a href="#features">Funcionalidades</a>
+    <a href="#como-funciona">Como funciona</a>
+  </div>
+  <div class="nav-ctas">
     <a href="login.html" class="btn btn-ghost">Entrar</a>
     <a href="login.html?modo=cadastro" class="btn btn-primary">Criar conta</a>
   </div>
 </nav>
 
+<!-- MARQUEE -->
+<div class="marquee-wrap">
+  <div class="marquee-track">
+    <span class="marquee-item"><span class="dot">✦</span>100% Gratuito</span>
+    <span class="marquee-item"><span class="dot">✦</span>Cadastro em menos de 1 minuto</span>
+    <span class="marquee-item"><span class="dot">✦</span>Zero taxa de venda</span>
+    <span class="marquee-item"><span class="dot">✦</span>Funciona em qualquer dispositivo</span>
+    <span class="marquee-item"><span class="dot">✦</span>Gestão de estoque em tempo real</span>
+    <span class="marquee-item"><span class="dot">✦</span>Upload de fotos com Cloudinary</span>
+    <span class="marquee-item"><span class="dot">✦</span>Seguro com Firebase Auth</span>
+    <span class="marquee-item"><span class="dot">✦</span>Lojistas e clientes em uma plataforma</span>
+    <!-- duplicado para loop contínuo -->
+    <span class="marquee-item"><span class="dot">✦</span>100% Gratuito</span>
+    <span class="marquee-item"><span class="dot">✦</span>Cadastro em menos de 1 minuto</span>
+    <span class="marquee-item"><span class="dot">✦</span>Zero taxa de venda</span>
+    <span class="marquee-item"><span class="dot">✦</span>Funciona em qualquer dispositivo</span>
+    <span class="marquee-item"><span class="dot">✦</span>Gestão de estoque em tempo real</span>
+    <span class="marquee-item"><span class="dot">✦</span>Upload de fotos com Cloudinary</span>
+    <span class="marquee-item"><span class="dot">✦</span>Seguro com Firebase Auth</span>
+    <span class="marquee-item"><span class="dot">✦</span>Lojistas e clientes em uma plataforma</span>
+  </div>
+</div>
+
+<!-- HERO -->
 <section class="hero">
-  <div class="hero-bg"></div>
+  <div class="hero-grid"></div>
+  <div class="hero-orb hero-orb-1"></div>
+  <div class="hero-orb hero-orb-2"></div>
+
   <div class="hero-content">
-    <div class="hero-badge">✦ Plataforma gratuita</div>
-    <h1>Sua loja online,<br/><em>do seu jeito</em></h1>
-    <p>Crie sua loja em minutos, gerencie produtos e alcance clientes em todo o Brasil. Simples, rápido e sem complicação.</p>
+    <div class="hero-badge">✦ Plataforma gratuita para lojistas</div>
+    <h1>Sua loja online,<br/><em>do seu jeito.</em></h1>
+    <p class="hero-desc">Crie sua loja em minutos, gerencie produtos com fotos e alcance clientes em todo o Brasil. Simples, rápido, sem burocracia.</p>
     <div class="hero-actions">
-      <a href="login.html?modo=cadastro" class="btn btn-primary" style="font-size:1rem;padding:.8rem 2rem">Abrir minha loja →</a>
-      <a href="marketplace.html" class="btn btn-ghost" style="font-size:1rem;padding:.8rem 2rem">Explorar lojas</a>
+      <a href="login.html?modo=cadastro" class="btn btn-primary btn-lg">Abrir minha loja →</a>
+      <a href="marketplace.html" class="btn btn-ghost btn-lg">Explorar lojas</a>
     </div>
-    <div class="hero-stats">
-      <div class="stat"><span class="stat-n" id="stat-clientes">…</span><span class="stat-l">Clientes</span></div>
-      <div class="stat"><span class="stat-n" id="stat-produtos">…</span><span class="stat-l">Produtos</span></div>
-      <div class="stat"><span class="stat-n">4.9★</span><span class="stat-l">Avaliação</span></div>
+    <div class="hero-trust">
+      <span class="stars">★★★★★</span>
+      <span>4.9 de avaliação</span>
+      <span class="trust-sep"></span>
+      <span><strong id="hero-user-count">…</strong> usuários</span>
+      <span class="trust-sep"></span>
+      <span>Gratuito para sempre</span>
     </div>
   </div>
 
   <div class="hero-visual">
-    <div class="fcard">
-      <div class="fcard-label">Venda hoje</div>
-      <div class="fcard-val orange">R$ 1.240,00</div>
-      <span class="tag">↑ +18% esta semana</span>
-    </div>
-    <div class="fcard">
-      <div class="fcard-label">Clientes</div>
-      <div class="fcard-val green" id="fcard-clientes">…</div>
-    </div>
-    <div class="fcard">
-      <div class="fcard-label">Contagem total</div>
-      <div class="fcard-val" style="color:var(--accent2)" id="fcard-total">…</div>
+    <div class="dash-mock">
+      <div class="dash-topbar">
+        <span class="dash-dot" style="background:#ff5f57"></span>
+        <span class="dash-dot" style="background:#ffbd2e"></span>
+        <span class="dash-dot" style="background:#28c840"></span>
+        <span class="dash-tab">Painel — Mercado Local</span>
+      </div>
+      <div class="dash-body">
+        <div class="dcard">
+          <div class="dcard-label">Vendas hoje</div>
+          <div class="dcard-val accent">R$ 1.240</div>
+          <div class="dcard-badge">↑ +18% esta semana</div>
+        </div>
+        <div class="dcard">
+          <div class="dcard-label">Clientes ativos</div>
+          <div class="dcard-val green" id="fcard-clientes">…</div>
+        </div>
+        <div class="dash-chart">
+          <div class="dash-chart-label">Visitas — últimos 7 dias</div>
+          <div class="chart-bars">
+            <div class="bar" style="height:38%"></div>
+            <div class="bar mid" style="height:55%"></div>
+            <div class="bar" style="height:44%"></div>
+            <div class="bar mid" style="height:72%"></div>
+            <div class="bar mid" style="height:58%"></div>
+            <div class="bar hi" style="height:92%"></div>
+            <div class="bar hi" style="height:78%"></div>
+          </div>
+        </div>
+        <div class="dash-items">
+          <div class="dash-item">
+            <div class="dash-item-icon">👟</div>
+            <div style="flex:1;min-width:0">
+              <div class="dash-item-name">Tênis Esportivo Pro</div>
+              <div class="dash-item-price">R$ 199,90</div>
+            </div>
+            <div class="dash-item-stock">12 und.</div>
+          </div>
+          <div class="dash-item">
+            <div class="dash-item-icon">📱</div>
+            <div style="flex:1;min-width:0">
+              <div class="dash-item-name">Fone Bluetooth Max</div>
+              <div class="dash-item-price">R$ 89,90</div>
+            </div>
+            <div class="dash-item-stock">5 und.</div>
+          </div>
+          <div class="dash-item">
+            <div class="dash-item-icon">🎸</div>
+            <div style="flex:1;min-width:0">
+              <div class="dash-item-name">Violão Acústico Folk</div>
+              <div class="dash-item-price">R$ 450,00</div>
+            </div>
+            <div class="dash-item-stock">2 und.</div>
+          </div>
+        </div>
+      </div>
     </div>
   </div>
 </section>
 
-<section class="features">
-  <div class="section-label">Por que usar</div>
-  <div class="section-title">Tudo que você precisa<br/><span>em um só lugar</span></div>
-  <p class="section-sub">Ferramentas pensadas para quem quer vender mais sem perder tempo com tecnologia.</p>
-  <div class="features-grid">
-    <div class="feature">
-      <div class="feat-icon o">🏪</div>
-      <h3>Loja personalizada</h3>
-      <p>Monte o perfil da sua loja com nome, descrição, categoria e contato. Tudo em poucos cliques.</p>
+<!-- STATS BAR -->
+<div class="stats-bar">
+  <div class="stat-cell reveal">
+    <span class="stat-n" id="stat-produtos">…</span>
+    <span class="stat-l">Produtos cadastrados</span>
+  </div>
+  <div class="stat-cell reveal d1">
+    <span class="stat-n" id="stat-clientes">…</span>
+    <span class="stat-l">Usuários na plataforma</span>
+  </div>
+  <div class="stat-cell reveal d2">
+    <span class="stat-n">4.9★</span>
+    <span class="stat-l">Avaliação média</span>
+  </div>
+</div>
+
+<!-- FEATURES BENTO -->
+<section class="features-section" id="features">
+  <div class="reveal">
+    <div class="section-label">Por que usar</div>
+    <div class="section-title">Tudo que você precisa<br/><span>em um só lugar</span></div>
+    <p class="section-sub">Ferramentas pensadas para quem quer vender mais sem perder tempo com tecnologia.</p>
+  </div>
+
+  <div class="bento">
+    <!-- full width top -->
+    <div class="bcard full reveal" style="background:linear-gradient(120deg,var(--card) 60%,rgba(232,133,74,.06))">
+      <div class="bicon o">🏪</div>
+      <h3>Loja personalizada, do seu jeito</h3>
+      <p>Monte o perfil completo da sua loja com nome, descrição, categoria, localização e contato. Faça upload do logo e transforme sua vitrine online em minutos — sem precisar de programador.</p>
+      <a href="login.html?modo=cadastro" class="bcard-cta">Abrir minha loja →</a>
     </div>
-    <div class="feature">
-      <div class="feat-icon g">📦</div>
+
+    <!-- row 2 -->
+    <div class="bcard reveal">
+      <div class="bicon g">📦</div>
       <h3>Gestão de produtos</h3>
-      <p>Adicione, edite e remova produtos com fotos, preços e controle de estoque em tempo real.</p>
+      <p>Adicione, edite e remova produtos com fotos em alta qualidade, preços e controle de estoque em tempo real.</p>
     </div>
-    <div class="feature">
-      <div class="feat-icon y">🔍</div>
+    <div class="bcard reveal d1" style="background:linear-gradient(135deg,var(--card),rgba(232,133,74,.05))">
+      <div class="bicon y">🎁</div>
+      <h3>Sem taxa de venda</h3>
+      <p>Abra sua loja grátis. Sem mensalidade, sem comissão.</p>
+      <div class="bcard-free">R$ 0<small> /mês</small></div>
+    </div>
+
+    <!-- row 3 -->
+    <div class="bcard reveal">
+      <div class="bicon o">🔍</div>
       <h3>Encontre qualquer produto</h3>
-      <p>Os clientes encontram o que precisam buscando por nome, categoria ou cidade da loja.</p>
+      <p>Clientes encontram o que precisam buscando por nome, categoria ou cidade da loja. Visibilidade máxima para seu negócio.</p>
     </div>
-    <div class="feature">
-      <div class="feat-icon o">🚀</div>
-      <h3>Sem taxa de cadastro</h3>
-      <p>Abra sua loja gratuitamente. Você só paga quando vende — e olha que ainda nem cobramos isso!</p>
-    </div>
-    <div class="feature">
-      <div class="feat-icon g">📱</div>
+    <div class="bcard reveal d1">
+      <div class="bicon g">📱</div>
       <h3>Funciona em tudo</h3>
-      <p>Interface responsiva para desktop, tablet e celular. Venda de onde estiver.</p>
+      <p>Interface totalmente responsiva para desktop, tablet e celular. Venda de onde você estiver, a qualquer hora.</p>
     </div>
-    <div class="feature">
-      <div class="feat-icon y">🔒</div>
+
+    <!-- full width bottom -->
+    <div class="bcard full reveal" style="background:linear-gradient(120deg,var(--card) 60%,rgba(93,207,160,.05))">
+      <div class="bicon g">🔒</div>
       <h3>Seguro e confiável</h3>
-      <p>Seus dados ficam protegidos. Autenticação segura para lojistas e clientes.</p>
+      <p>Seus dados ficam protegidos com infraestrutura de nível empresarial. Autenticação segura para lojistas e clientes sem custo extra.</p>
+      <div class="security-badges">
+        <span class="sec-badge">✓ SSL Criptografado</span>
+        <span class="sec-badge">✓ Firebase Auth</span>
+        <span class="sec-badge">✓ Proteção LGPD</span>
+        <span class="sec-badge">✓ Dados em nuvem</span>
+      </div>
     </div>
   </div>
 </section>
 
-<section class="how">
-  <div class="section-label"></div>
-  <div class="section-title">Como Funciona<span></span></div>
-  <div class="steps">
-    <div class="step">
+<!-- HOW IT WORKS -->
+<section class="how-section" id="como-funciona">
+  <div class="reveal">
+    <div class="section-label">Passo a passo</div>
+    <div class="section-title">Como <span>funciona</span></div>
+    <p class="section-sub">Em menos de 5 minutos sua loja já está no ar para milhares de clientes.</p>
+  </div>
+  <div class="steps-row">
+    <div class="step reveal">
       <div class="step-num">1</div>
-      <h4>Crie sua conta</h4>
-      <p>Cadastre-se como lojista em menos de 1 minuto, sem necessidade de cartão.</p>
+      <div>
+        <h4>Crie sua conta</h4>
+        <p>Cadastre-se como lojista em menos de 1 minuto. Sem cartão de crédito, sem burocracia.</p>
+      </div>
     </div>
-    <div class="step">
+    <div class="step reveal d1">
       <div class="step-num">2</div>
-      <h4>Monte sua loja</h4>
-      <p>Adicione o nome, descrição e produtos da sua loja no painel de controle.</p>
+      <div>
+        <h4>Monte sua loja</h4>
+        <p>Adicione nome, descrição, logo e produtos no painel de controle intuitivo.</p>
+      </div>
     </div>
-    <div class="step">
+    <div class="step reveal d2">
       <div class="step-num">3</div>
-      <h4>Comece a vender</h4>
-      <p>Sua loja aparece para milhares de clientes pesquisando seus produtos agora.</p>
+      <div>
+        <h4>Comece a vender</h4>
+        <p>Sua loja aparece para clientes pesquisando seus produtos agora mesmo.</p>
+      </div>
     </div>
   </div>
 </section>
 
-<section class="cta-section">
-  <div class="section-label">Comece agora</div>
-  <div class="section-title">Pronto para <span>vender mais?</span></div>
-  <p>Junte-se a milhares de lojistas que já cresceram com o Mercado Local.</p>
-  <div class="cta-btns">
-    <a href="login.html?modo=cadastro" class="btn btn-primary" style="font-size:1.05rem;padding:.9rem 2.2rem">Criar loja grátis →</a>
-    <a href="marketplace.html" class="btn btn-ghost" style="font-size:1.05rem;padding:.9rem 2.2rem">Ver marketplace</a>
+<!-- TESTIMONIALS -->
+<section class="testimonials-section">
+  <div class="reveal">
+    <div class="section-label">Depoimentos</div>
+    <div class="section-title">O que dizem os <span>lojistas</span></div>
+  </div>
+  <div class="tgrid">
+    <div class="tcard reveal">
+      <div class="tcard-stars">★★★★★</div>
+      <p class="tcard-quote">"Abri minha loja de eletrônicos em menos de 5 minutos. Nunca foi tão fácil ter presença online sem gastar nada."</p>
+      <div class="tcard-author">
+        <div class="tcard-avatar" style="background:var(--accent)">R</div>
+        <div>
+          <div class="tcard-name">Ricardo S.</div>
+          <div class="tcard-role">Loja de Eletrônicos · SP</div>
+        </div>
+      </div>
+    </div>
+    <div class="tcard reveal d1">
+      <div class="tcard-stars">★★★★★</div>
+      <p class="tcard-quote">"Minhas clientes me encontram pelo Mercado Local toda semana. A plataforma é super intuitiva e as fotos ficam lindas."</p>
+      <div class="tcard-author">
+        <div class="tcard-avatar" style="background:var(--green)">A</div>
+        <div>
+          <div class="tcard-name">Ana Paula</div>
+          <div class="tcard-role">Boutique de Moda · RJ</div>
+        </div>
+      </div>
+    </div>
+    <div class="tcard reveal d2">
+      <div class="tcard-stars">★★★★★</div>
+      <p class="tcard-quote">"3 minutos para montar minha loja de artesanato. Zero taxa, zero complicação. Já indiquei para todos os meus amigos!"</p>
+      <div class="tcard-author">
+        <div class="tcard-avatar" style="background:var(--accent2);color:#1a1a1a">C</div>
+        <div>
+          <div class="tcard-name">Carlos M.</div>
+          <div class="tcard-role">Artesanato & Decoração · MG</div>
+        </div>
+      </div>
+    </div>
   </div>
 </section>
 
+<!-- CTA -->
+<section class="cta-section">
+  <div class="section-label reveal">Comece agora</div>
+  <div class="section-title reveal" style="margin-bottom:.5rem">Pronto para <span>vender mais?</span></div>
+  <p class="reveal">Junte-se a lojistas que já cresceram com o Mercado Local.<br/>Gratuito para sempre, sem pegadinhas.</p>
+  <div class="cta-btns reveal">
+    <a href="login.html?modo=cadastro" class="btn btn-primary btn-lg">Criar loja grátis →</a>
+    <a href="marketplace.html" class="btn btn-ghost btn-lg">Ver marketplace</a>
+  </div>
+</section>
+
+<!-- FOOTER -->
 <footer>
-  <div class="logo">mercado<span>local</span></div>
-  <p>© 2025 Mercado Local. Feito com ♥ no Brasil.</p>
-  <div style="display:flex;gap:1rem">
-    <a href="login.html" style="color:var(--muted);font-size:.85rem;text-decoration:none">Login</a>
-    <a href="marketplace.html" style="color:var(--muted);font-size:.85rem;text-decoration:none">Explorar</a>
+  <div class="footer-grid">
+    <div class="footer-brand">
+      <a href="index.html" class="flogo">mercado<span>local</span></a>
+      <p>A plataforma gratuita para lojistas locais que querem vender mais sem burocracia. Feito com ♥ no Brasil.</p>
+    </div>
+    <div class="footer-col">
+      <h5>Plataforma</h5>
+      <a href="marketplace.html">Ver marketplace</a>
+      <a href="login.html">Entrar</a>
+      <a href="login.html?modo=cadastro">Criar conta grátis</a>
+      <a href="dashboard.html">Painel de vendas</a>
+    </div>
+    <div class="footer-col">
+      <h5>Conta</h5>
+      <a href="profile.html">Perfil lojista</a>
+      <a href="client-profile.html">Perfil cliente</a>
+      <a href="login.html?modo=cadastro">Cadastrar loja</a>
+    </div>
+  </div>
+  <div class="footer-bottom">
+    <span>© 2025 Mercado Local. Todos os direitos reservados.</span>
+    <span>Feito com ♥ no Brasil</span>
   </div>
 </footer>
 
 <script>
+/* Nav scroll border */
+window.addEventListener('scroll', () => {
+  document.getElementById('main-nav').classList.toggle('scrolled', window.scrollY > 8);
+}, {passive: true});
+
+/* Scroll reveal via IntersectionObserver */
+const revealObserver = new IntersectionObserver((entries) => {
+  entries.forEach(e => { if (e.isIntersecting) e.target.classList.add('visible'); });
+}, {threshold: 0.12});
+document.querySelectorAll('.reveal').forEach(el => revealObserver.observe(el));
+
+/* Stats from API */
 async function loadStats() {
   try {
     const res = await fetch('http://localhost:4000/api/stats');
     const data = await res.json();
     if (data.ok) {
-      document.getElementById('stat-clientes').textContent = data.clientes;
-      document.getElementById('stat-produtos').textContent = data.produtos;
-      document.getElementById('fcard-clientes').textContent = data.clientes + ' clientes';
-      document.getElementById('fcard-total').textContent = (data.clientes + data.produtos) + ' registros';
+      document.getElementById('stat-produtos').textContent = data.produtos ?? '–';
+      document.getElementById('stat-clientes').textContent = data.clientes ?? '–';
+      document.getElementById('hero-user-count').textContent = data.clientes ?? '–';
+      document.getElementById('fcard-clientes').textContent = (data.clientes ?? '–') + ' usuários';
     }
   } catch {
-    document.getElementById('stat-clientes').textContent = '–';
-    document.getElementById('stat-produtos').textContent = '–';
+    ['stat-produtos','stat-clientes'].forEach(id => {
+      document.getElementById(id).textContent = '–';
+    });
+    document.getElementById('hero-user-count').textContent = '–';
     document.getElementById('fcard-clientes').textContent = '–';
-    document.getElementById('fcard-total').textContent = '–';
   }
 }
 document.addEventListener('DOMContentLoaded', loadStats);
