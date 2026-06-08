@@ -111,9 +111,13 @@ nav{
 }
 .product-card:hover{transform:translateY(-4px);border-color:var(--accent)}
 .prod-img{
-  height:160px;background:var(--card2);display:flex;align-items:center;
+  height:200px;background:#fff;display:flex;align-items:center;
   justify-content:center;font-size:3.5rem;border-bottom:1px solid var(--border);
-  overflow:hidden;
+  overflow:hidden;padding:14px;
+}
+.prod-img img{
+  max-width:100%;max-height:100%;width:auto;height:auto;
+  object-fit:contain;display:block;mix-blend-mode:multiply;
 }
 .prod-body{padding:1rem}
 .prod-cat{font-size:.72rem;color:var(--muted);text-transform:uppercase;letter-spacing:.05em;margin-bottom:.3rem}
@@ -187,6 +191,28 @@ nav{
 .toast-success{border-color:rgba(93,207,160,.4);color:var(--green)}
 
 @keyframes fadeUp{from{opacity:0;transform:translateY(12px)}to{opacity:1;transform:translateY(0)}}
+
+/* SKELETON LOADING */
+@keyframes shimmer{0%{background-position:-450px 0}100%{background-position:450px 0}}
+.skeleton-card{
+  background:var(--card);border:1px solid var(--border);border-radius:16px;
+  overflow:hidden;pointer-events:none;
+}
+.sk{
+  background:linear-gradient(90deg,var(--card2) 0%,#272727 50%,var(--card2) 100%);
+  background-size:900px 100%;animation:shimmer 1.4s linear infinite;border-radius:6px;
+}
+.sk-img{height:160px;border-radius:0;border-bottom:1px solid var(--border)}
+.sk-body{padding:1rem;display:flex;flex-direction:column;gap:.55rem}
+.sk-line{height:11px}
+.sk-line.cat{width:40%;height:8px}
+.sk-line.title{width:80%;height:14px}
+.sk-line.desc{width:100%}
+.sk-line.desc2{width:65%}
+.sk-footer{display:flex;justify-content:space-between;align-items:center;margin-top:.4rem}
+.sk-price{width:35%;height:16px}
+.sk-btn{width:30%;height:24px;border-radius:6px}
+.sk-store{width:55%;height:9px;margin-top:.5rem}
 
 /* CART BUTTON */
 .cart-btn{
@@ -461,7 +487,32 @@ async function render(){
   else await renderStores();
 }
 
+// ---- SKELETON LOADING ----
+function skeletonCards(n=8){
+  const card = `
+    <div class="skeleton-card">
+      <div class="sk sk-img"></div>
+      <div class="sk-body">
+        <div class="sk sk-line cat"></div>
+        <div class="sk sk-line title"></div>
+        <div class="sk sk-line desc"></div>
+        <div class="sk sk-line desc2"></div>
+        <div class="sk-footer">
+          <div class="sk sk-price"></div>
+          <div class="sk sk-btn"></div>
+        </div>
+        <div class="sk sk-store"></div>
+      </div>
+    </div>`;
+  return card.repeat(n);
+}
+function showProductSkeletons(){
+  document.getElementById('product-grid').innerHTML = skeletonCards(8);
+  document.getElementById('results-info').innerHTML = 'Carregando produtos…';
+}
+
 async function renderProducts(){
+  showProductSkeletons();
   const prods = await DB.searchProducts(searchQuery, currentCategoria);
   const grid = document.getElementById('product-grid');
   document.getElementById('results-info').innerHTML = `<strong>${prods.length} produto${prods.length!==1?'s':''}</strong> encontrado${prods.length!==1?'s':''}`;
@@ -473,7 +524,7 @@ async function renderProducts(){
   prods.forEach(p=>{ window._productsMap[p.id]=p; });
   grid.innerHTML = prods.map(p=>`
     <div class="product-card" onclick="openStore('${p.loja.id}')">
-      <div class="prod-img">${p.imagem_url ? `<img src="${p.imagem_url}" style="width:100%;height:100%;object-fit:cover;display:block;">` : catEmoji(p.categoria)}</div>
+      <div class="prod-img">${p.imagem_url ? `<img src="${p.imagem_url}" alt="${p.nome}">` : catEmoji(p.categoria)}</div>
       <div class="prod-body">
         <div class="prod-cat">${p.categoria||'Produto'}</div>
         <div class="prod-name">${p.nome}</div>
@@ -489,6 +540,8 @@ async function renderProducts(){
 }
 
 async function renderStores(){
+  document.getElementById('store-grid').innerHTML = skeletonCards(6);
+  document.getElementById('results-info').innerHTML = 'Carregando lojas…';
   const stores = await DB.getPublicStores(searchQuery);
   const grid = document.getElementById('store-grid');
   document.getElementById('results-info').innerHTML = `<strong>${stores.length} loja${stores.length!==1?'s':''}</strong> encontrada${stores.length!==1?'s':''}`;
@@ -513,15 +566,18 @@ async function renderStores(){
 
 // ---- STORE PANEL ----
 async function openStore(storeId){
-  const stores = await DB.getPublicStores();
-  const store = stores.find(s=>s.id===storeId);
-  if(!store) return;
-  const prods = await DB.getStoreProducts(storeId);
-
+  // Abre o painel e mostra skeletons imediatamente, antes de buscar os dados
   document.getElementById('view-products').style.display='none';
   document.getElementById('view-stores').style.display='none';
   const panel = document.getElementById('store-panel');
   panel.classList.add('open');
+  document.getElementById('panel-products').innerHTML = skeletonCards(6);
+  document.getElementById('results-info').innerHTML = 'Carregando…';
+
+  const stores = await DB.getPublicStores();
+  const store = stores.find(s=>s.id===storeId);
+  if(!store){ closeStorePanel(); return; }
+  const prods = await DB.getStoreProducts(storeId);
 
   const panelAvatar = document.getElementById('panel-avatar');
   if(store.logo_url){
@@ -544,10 +600,14 @@ async function openStore(storeId){
       <div class="icon">📦</div><p>Esta loja ainda não tem produtos.</p>
     </div>`; return;
   }
-  prods.forEach(p=>{ window._productsMap[p.id]=p; });
+  // Anexa os dados da loja a cada produto (para agrupar o frete por loja no checkout)
+  prods.forEach(p=>{
+    p.loja = { id: store.id, nome: store.nome, cidade: store.cidade, estado: store.estado };
+    window._productsMap[p.id]=p;
+  });
   grid.innerHTML = prods.map(p=>`
     <div class="product-card">
-      <div class="prod-img">${p.imagem_url ? `<img src="${p.imagem_url}" style="width:100%;height:100%;object-fit:cover;display:block;">` : catEmoji(p.categoria)}</div>
+      <div class="prod-img">${p.imagem_url ? `<img src="${p.imagem_url}" alt="${p.nome}">` : catEmoji(p.categoria)}</div>
       <div class="prod-body">
         <div class="prod-cat">${p.categoria||'Produto'}</div>
         <div class="prod-name">${p.nome}</div>

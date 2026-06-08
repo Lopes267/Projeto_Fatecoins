@@ -8,7 +8,12 @@
       "PowerShell(Get-ChildItem -Path \"c:\\\\Users\\\\Enzo\\\\Desktop\\\\SIte de Mercado Local\" -Recurse -File | Where-Object { $_.FullName -notmatch \"node_modules\" } | Select-Object -ExpandProperty FullName)",
       "Bash(node -e \"require\\('dotenv'\\)\")",
       "Bash(Get-ChildItem -Recurse -File)",
-      "Bash(Select-Object -ExpandProperty FullName)"
+      "Bash(Select-Object -ExpandProperty FullName)",
+      "PowerShell(node --version)",
+      "PowerShell(node --check server.js)",
+      "PowerShell(if \\($?\\) { \"server.js OK\" })",
+      "Bash(node -e \"fetch\\('https://viacep.com.br/ws/01001000/json/'\\).then\\(r=>r.json\\(\\)\\).then\\(d=>console.log\\('ViaCEP OK:',d.localidade,d.uf\\)\\).catch\\(e=>console.log\\('ERRO:',e.message\\)\\)\")",
+      "Bash(node -e ' *)"
     ]
   }
 }

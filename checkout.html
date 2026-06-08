@@ -77,6 +77,93 @@ nav{
 .summary-row.total .val{font-family:'Fraunces',serif;font-size:1.4rem;color:var(--accent2)}
 .free-tag{color:var(--green);font-weight:600;font-size:.82rem}
 
+/* FRETE / CEP */
+.ship-box{
+  margin-top:1.5rem;padding:1.1rem;background:var(--card);
+  border:1px solid var(--border);border-radius:12px;
+}
+.ship-label{font-size:.82rem;font-weight:600;margin-bottom:.7rem;display:flex;align-items:center;gap:.4rem}
+.ship-input-row{display:flex;gap:.5rem}
+.ship-input-row input{
+  flex:1;padding:.6rem .8rem;background:var(--card2);border:1px solid var(--border);
+  border-radius:8px;color:var(--text);font-family:'DM Sans',sans-serif;font-size:.9rem;
+  outline:none;transition:border-color .2s;letter-spacing:.04em;
+}
+.ship-input-row input:focus{border-color:var(--accent)}
+.ship-input-row input::placeholder{color:rgba(136,136,136,.6)}
+.ship-btn{
+  padding:.6rem 1.1rem;background:var(--accent);border:none;color:#fff;
+  border-radius:8px;font-family:'DM Sans',sans-serif;font-size:.85rem;font-weight:600;
+  cursor:pointer;transition:all .2s;flex-shrink:0;
+}
+.ship-btn:hover{background:#d9733c}
+.ship-btn:disabled{opacity:.6;cursor:wait}
+.ship-cep-link{
+  display:inline-block;margin-top:.5rem;font-size:.74rem;color:var(--muted);
+  text-decoration:underline;text-underline-offset:2px;
+}
+.ship-cep-link:hover{color:var(--accent)}
+.ship-result{margin-top:.85rem;font-size:.82rem;line-height:1.6;display:none}
+.ship-result.show{display:block;animation:fadeUp .25s ease}
+.ship-result .ship-addr{color:var(--text);font-weight:600}
+.ship-result .ship-region{color:var(--muted)}
+.ship-result .ship-free{color:var(--green);font-weight:600}
+.ship-result .ship-eta{color:var(--muted);font-size:.78rem;margin-top:.2rem}
+.ship-progress{
+  margin-top:.6rem;height:6px;border-radius:50px;background:var(--card2);
+  border:1px solid var(--border);overflow:hidden;
+}
+.ship-progress > div{height:100%;background:linear-gradient(90deg,var(--accent),var(--accent2));transition:width .4s ease}
+.ship-hint{font-size:.76rem;color:var(--accent2);margin-top:.4rem}
+.ship-err{color:var(--red);font-size:.8rem}
+
+/* BOTÃO "POR LOJA" + POPUP DE FRETE */
+.frete-detail-btn{
+  margin-left:.4rem;padding:.12rem .5rem;background:transparent;
+  border:1px solid var(--accent);color:var(--accent);border-radius:50px;
+  font-family:'DM Sans',sans-serif;font-size:.7rem;font-weight:600;cursor:pointer;
+  transition:all .15s;vertical-align:middle;
+}
+.frete-detail-btn:hover{background:var(--accent);color:#fff}
+.frete-modal-overlay{
+  position:fixed;inset:0;z-index:550;background:rgba(0,0,0,.7);backdrop-filter:blur(6px);
+  display:flex;align-items:center;justify-content:center;padding:1.5rem;
+  opacity:0;pointer-events:none;transition:opacity .25s;
+}
+.frete-modal-overlay.open{opacity:1;pointer-events:all}
+.frete-modal{
+  width:100%;max-width:420px;background:var(--card);border:1px solid var(--border);
+  border-radius:16px;overflow:hidden;box-shadow:0 24px 64px rgba(0,0,0,.6);
+  transform:translateY(12px);transition:transform .25s;
+}
+.frete-modal-overlay.open .frete-modal{transform:translateY(0)}
+.frete-modal-head{
+  display:flex;align-items:center;justify-content:space-between;
+  padding:1.2rem 1.4rem;border-bottom:1px solid var(--border);
+}
+.frete-modal-head h3{font-family:'Fraunces',serif;font-size:1.2rem;font-weight:700}
+.frete-modal-close{
+  background:var(--card2);border:1px solid var(--border);color:var(--muted);cursor:pointer;
+  width:30px;height:30px;border-radius:8px;font-size:.9rem;line-height:1;transition:all .2s;
+}
+.frete-modal-close:hover{color:var(--text);border-color:var(--muted)}
+.frete-modal-body{padding:.6rem 1.4rem;max-height:50vh;overflow-y:auto}
+.frete-loja-row{
+  display:flex;align-items:flex-start;justify-content:space-between;gap:1rem;
+  padding:.9rem 0;border-bottom:1px solid var(--border);
+}
+.frete-loja-row:last-child{border-bottom:none}
+.frete-loja-nome{font-weight:600;font-size:.92rem}
+.frete-loja-sub{font-size:.76rem;color:var(--muted);margin-top:.2rem}
+.frete-loja-hint{font-size:.74rem;color:var(--accent2);margin-top:.25rem}
+.frete-loja-val{font-family:'Fraunces',serif;color:var(--accent2);font-size:1.05rem;white-space:nowrap;flex-shrink:0}
+.frete-modal-total{
+  display:flex;align-items:center;justify-content:space-between;
+  padding:1.1rem 1.4rem;border-top:1px solid var(--border);background:var(--card2);
+  font-weight:700;
+}
+.frete-modal-total span:last-child{font-family:'Fraunces',serif;font-size:1.25rem;color:var(--text)}
+
 /* PAYMENT PANEL */
 .payment-panel{padding:2.5rem 3rem}
 .payment-panel h2{font-family:'Fraunces',serif;font-size:1.9rem;font-weight:700;letter-spacing:-.02em;margin-bottom:.3rem}
@@ -325,9 +412,22 @@ nav{
   <div class="summary-panel">
     <div class="panel-label">Resumo do Pedido</div>
     <div class="summary-items" id="summary-items"></div>
+    <!-- FRETE / CEP -->
+    <div class="ship-box">
+      <div class="ship-label">📍 Calcular frete e prazo de entrega</div>
+      <div class="ship-input-row">
+        <input id="cep-input" inputmode="numeric" maxlength="9" placeholder="00000-000"
+               oninput="onCepInput(this)" onkeydown="if(event.key==='Enter')calcularFrete()"/>
+        <button class="ship-btn" id="ship-btn" onclick="calcularFrete()">Calcular</button>
+      </div>
+      <a class="ship-cep-link" href="https://buscacepinter.correios.com.br/app/endereco/index.php"
+         target="_blank" rel="noopener">Não sei meu CEP</a>
+      <div class="ship-result" id="ship-result"></div>
+    </div>
+
     <div class="summary-rows">
       <div class="summary-row"><span class="lbl">Subtotal</span><span id="subtotal-val">R$ 0,00</span></div>
-      <div class="summary-row"><span class="lbl">Frete</span><span class="free-tag">Grátis</span></div>
+      <div class="summary-row"><span class="lbl">Frete</span><span id="frete-val">—</span></div>
       <div class="summary-row total">
         <span>Total</span>
         <span class="val" id="total-val">R$ 0,00</span>
@@ -452,6 +552,21 @@ nav{
   </div>
 </div>
 
+<!-- POPUP: FRETE POR LOJA -->
+<div class="frete-modal-overlay" id="frete-modal" onclick="closeFreteBreakdown(event)">
+  <div class="frete-modal">
+    <div class="frete-modal-head">
+      <h3>🚚 Frete por loja</h3>
+      <button class="frete-modal-close" onclick="closeFreteBreakdown()">✕</button>
+    </div>
+    <div class="frete-modal-body" id="frete-modal-body"></div>
+    <div class="frete-modal-total">
+      <span>Frete total</span>
+      <span id="frete-modal-total-val">R$ 0,00</span>
+    </div>
+  </div>
+</div>
+
 <!-- PROCESSING OVERLAY -->
 <div class="processing-overlay" id="processing-overlay">
   <div class="spinner"></div>
@@ -500,11 +615,148 @@ function renderSummary(){
     </div>
   `).join('');
 
-  const total = items.reduce((s,i)=>s+(i.preco||0)*(i.qty||1),0);
-  document.getElementById('subtotal-val').textContent = formatPrice(total);
+  updateTotals();
+}
+
+// ---- FRETE ----
+let freteAtual = null;       // null = ainda não calculado; número = valor (0 = grátis)
+let freteBreakdown = null;   // detalhamento por loja (para o popup)
+
+function getSubtotal(){
+  return getCart().reduce((s,i)=>s+(i.preco||0)*(i.qty||1),0);
+}
+function getCartCount(){
+  return getCart().reduce((s,i)=>s+(i.qty||1),0);
+}
+function getTotal(){
+  return getSubtotal() + (freteAtual||0);
+}
+
+// Agrupa os itens do carrinho por loja (id, nome, subtotal, peso, qtd)
+function agruparPorLoja(){
+  const map = {};
+  getCart().forEach(i=>{
+    const id = i.loja?.id || 'sem-loja';
+    if(!map[id]) map[id] = { id, nome: i.loja?.nome || 'Loja', subtotal:0, peso:0, itens:0 };
+    const qty = i.qty||1;
+    map[id].subtotal += (i.preco||0)*qty;
+    map[id].peso     += (parseFloat(i.peso)||0)*qty;
+    map[id].itens    += qty;
+  });
+  return Object.values(map);
+}
+
+function updateTotals(){
+  const subtotal = getSubtotal();
+  document.getElementById('subtotal-val').textContent = formatPrice(subtotal);
+
+  const freteEl = document.getElementById('frete-val');
+  if(freteAtual === null){
+    freteEl.innerHTML = '<span style="color:var(--muted);font-size:.82rem">Calcule com seu CEP</span>';
+  } else {
+    const valTxt = freteAtual === 0 ? '<span class="free-tag">Grátis</span>' : formatPrice(freteAtual);
+    // botão de detalhamento aparece quando há mais de uma loja no pedido
+    const btn = (freteBreakdown && freteBreakdown.length > 1)
+      ? ` <button class="frete-detail-btn" onclick="openFreteBreakdown()" title="Ver frete por loja">ⓘ por loja</button>`
+      : '';
+    freteEl.innerHTML = valTxt + btn;
+  }
+
+  const total = getTotal();
   document.getElementById('total-val').textContent = formatPrice(total);
   document.getElementById('boleto-val').textContent = formatPrice(total);
   updateInstallments();
+}
+
+// ---- POPUP: FRETE POR LOJA ----
+function openFreteBreakdown(){
+  if(!freteBreakdown) return;
+  const body = document.getElementById('frete-modal-body');
+  body.innerHTML = freteBreakdown.map(l=>`
+    <div class="frete-loja-row">
+      <div class="frete-loja-info">
+        <div class="frete-loja-nome">🏪 ${l.nome}</div>
+        ${l.origem ? `<div class="frete-loja-sub">Envia de ${l.origem}</div>` : ''}
+        <div class="frete-loja-sub">Produtos: ${formatPrice(l.subtotal)}</div>
+        ${(!l.gratis && l.faltam>0) ? `<div class="frete-loja-hint">Faltam ${formatPrice(l.faltam)} p/ frete grátis</div>` : ''}
+      </div>
+      <div class="frete-loja-val">${l.gratis ? '<span class="free-tag">Grátis</span>' : formatPrice(l.frete)}</div>
+    </div>
+  `).join('');
+  document.getElementById('frete-modal-total-val').textContent =
+    (freteAtual === 0) ? 'Grátis' : formatPrice(freteAtual||0);
+  document.getElementById('frete-modal').classList.add('open');
+}
+function closeFreteBreakdown(e){
+  if(e && e.target !== document.getElementById('frete-modal')) return;
+  document.getElementById('frete-modal').classList.remove('open');
+}
+
+// Máscara de CEP: 00000-000
+function onCepInput(input){
+  let v = input.value.replace(/\D/g,'').slice(0,8);
+  if(v.length>5) v = v.slice(0,5)+'-'+v.slice(5);
+  input.value = v;
+}
+
+async function calcularFrete(){
+  const cep = document.getElementById('cep-input').value.replace(/\D/g,'');
+  const resultEl = document.getElementById('ship-result');
+  const btn = document.getElementById('ship-btn');
+
+  if(cep.length !== 8){
+    resultEl.className = 'ship-result show';
+    resultEl.innerHTML = '<span class="ship-err">Digite um CEP válido com 8 dígitos.</span>';
+    return;
+  }
+
+  btn.disabled = true; btn.textContent = '...';
+  resultEl.className = 'ship-result show';
+  resultEl.innerHTML = '<span class="ship-region">Calculando frete…</span>';
+
+  try{
+    const lojas = agruparPorLoja();
+    const res = await fetch(`${API_URL}/api/shipping/quote`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ cep, lojas })
+    });
+    const data = await res.json();
+
+    if(!data.ok){
+      freteAtual = null; freteBreakdown = null;
+      resultEl.innerHTML = `<span class="ship-err">${data.msg||'Erro ao calcular o frete.'}</span>`;
+      updateTotals();
+      return;
+    }
+
+    freteAtual = data.gratisTotal ? 0 : data.freteTotal;
+    freteBreakdown = data.lojas || [];
+
+    let html = `<div class="ship-addr">${data.cidade||''} – ${data.uf}</div>
+                <div class="ship-region">Região ${data.regiao}</div>`;
+
+    if(data.gratisTotal){
+      html += `<div class="ship-free" style="margin-top:.35rem">🎉 Frete grátis em todas as lojas!</div>`;
+    } else {
+      html += `<div style="margin-top:.35rem">Frete total: <strong>${formatPrice(data.freteTotal)}</strong></div>`;
+      if(freteBreakdown.length > 1){
+        html += `<div class="ship-hint" style="color:var(--muted)">${freteBreakdown.length} lojas neste pedido — clique em <strong>ⓘ por loja</strong> (ao lado do frete) para ver o valor de cada uma.</div>`;
+      }
+    }
+    if(data.prazo){
+      html += `<div class="ship-eta">🚚 Prazo estimado: ${data.prazo}</div>`;
+    }
+    resultEl.innerHTML = html;
+    updateTotals();
+  }catch(err){
+    console.error(err);
+    freteAtual = null; freteBreakdown = null;
+    resultEl.innerHTML = '<span class="ship-err">Servidor indisponível. Tente novamente.</span>';
+    updateTotals();
+  }finally{
+    btn.disabled = false; btn.textContent = 'Calcular';
+  }
 }
 
 // Payment tab
@@ -536,7 +788,7 @@ function onCardExpiryInput(input){
 }
 function updateInstallments(){
   const sel = document.getElementById('installments');
-  const total = getCart().reduce((s,i)=>s+(i.preco||0)*(i.qty||1),0);
+  const total = getTotal();
   if(!sel||!total) return;
   const n = parseInt(sel.value);
   const hasInterest = n===12;

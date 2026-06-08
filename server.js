@@ -502,21 +502,23 @@ app.put('/api/products/:id/image', authenticateToken, upload.single('image'), as
 // ============================================================
 
 app.post('/api/stores', authenticateToken, async (req, res) => {
-  const { nome, descricao, categoria, cidade, estado, telefone } = req.body;
+  const { nome, descricao, categoria, cidade, estado, telefone, cep } = req.body;
   if (!nome) return res.status(400).json({ ok: false, msg: 'Nome da loja é obrigatório.' });
+
+  const cepLimpo = cep ? String(cep).replace(/\D/g, '') : null;
 
   try {
     const existing = await db.collection('lojas').where('usuario_id', '==', req.user.uid).limit(1).get();
 
     if (!existing.empty) {
       const ref = existing.docs[0].ref;
-      await ref.update({ nome, descricao, categoria, cidade, estado, telefone });
+      await ref.update({ nome, descricao, categoria, cidade, estado, telefone, cep: cepLimpo });
       const updated = await ref.get();
       return res.json({ ok: true, store: { id: ref.id, ...updated.data() } });
     }
 
     const ref = await db.collection('lojas').add({
-      usuario_id: req.user.uid, nome, descricao, categoria, cidade, estado, telefone,
+      usuario_id: req.user.uid, nome, descricao, categoria, cidade, estado, telefone, cep: cepLimpo,
       logo_url: null, banner_url: null, ativa: true,
       criado_em: admin.firestore.FieldValue.serverTimestamp()
     });
@@ -578,7 +580,7 @@ app.get('/api/stores-public', async (req, res) => {
 // ============================================================
 
 app.post('/api/products', authenticateToken, async (req, res) => {
-  const { storeId, nome, preco, descricao, categoria, estoque } = req.body;
+  const { storeId, nome, preco, descricao, categoria, estoque, peso } = req.body;
   if (!storeId || !nome || !preco) return res.status(400).json({ ok: false, msg: 'Campos obrigatórios faltando.' });
 
   try {
@@ -589,7 +591,7 @@ app.post('/api/products', authenticateToken, async (req, res) => {
 
     const ref = await db.collection('produtos').add({
       loja_id: storeId, nome, preco, descricao, categoria: categoria || null,
-      estoque: estoque || 0, ativo: true, imagem_url: null,
+      estoque: estoque || 0, peso: peso || 0, ativo: true, imagem_url: null,
       criado_em: admin.firestore.FieldValue.serverTimestamp()
     });
     const productDoc = await ref.get();
@@ -631,7 +633,7 @@ app.put('/api/products/:id', authenticateToken, async (req, res) => {
       return res.status(403).json({ ok: false, msg: 'Acesso negado.' });
     }
 
-    const campos = ['nome', 'preco', 'descricao', 'categoria', 'estoque', 'ativo'];
+    const campos = ['nome', 'preco', 'descricao', 'categoria', 'estoque', 'peso', 'ativo'];
     const updates = {};
     for (const campo of campos) {
       if (req.body[campo] !== undefined) updates[campo] = req.body[campo];
@@ -691,6 +693,7 @@ app.get('/api/products', async (req, res) => {
         imagem_url: data.imagem_url,
         categoria:  data.categoria,
         estoque:    data.estoque,
+        peso:       data.peso || 0,   // oculto no front; usado só no cálculo de frete
         loja: {
           id:     data.loja_id,
           nome:   storeDoc.data().nome,
@@ -703,19 +706,154 @@ app.get('/api/products', async (req, res) => {
     if (query) {
       const q = query.toLowerCase();
       products = products.filter(p =>
-        p.produto_nome?.toLowerCase().includes(q) ||
+        p.nome?.toLowerCase().includes(q) ||
         p.descricao?.toLowerCase().includes(q)
       );
     }
 
     if (categoria && categoria !== 'todas') {
-      products = products.filter(p => p.categoria_nome === categoria);
+      products = products.filter(p => p.categoria === categoria);
     }
 
     res.json({ ok: true, products });
   } catch (err) {
     console.error('Erro ao buscar produtos:', err);
     res.status(500).json({ ok: false, msg: 'Erro interno do servidor.' });
+  }
+});
+
+// ============================================================
+//  FRETE / SHIPPING  (100% ViaCEP — sem conta em outros serviços)
+//  - ViaCEP (grátis, sem cadastro) → descobre a região pelo CEP
+//  - Frete grátis automático pela compra mínima da região
+//  - Abaixo do mínimo → cálculo interno por região + peso dos itens
+// ============================================================
+
+// UF → Região
+const UF_REGIAO = {
+  AC:'Norte', AP:'Norte', AM:'Norte', PA:'Norte', RO:'Norte', RR:'Norte', TO:'Norte',
+  AL:'Nordeste', BA:'Nordeste', CE:'Nordeste', MA:'Nordeste', PB:'Nordeste',
+  PE:'Nordeste', PI:'Nordeste', RN:'Nordeste', SE:'Nordeste',
+  DF:'Centro-Oeste', GO:'Centro-Oeste', MT:'Centro-Oeste', MS:'Centro-Oeste',
+  ES:'Sudeste', MG:'Sudeste', RJ:'Sudeste', SP:'Sudeste',
+  PR:'Sul', RS:'Sul', SC:'Sul'
+};
+
+// Compra mínima (R$) para frete grátis por região
+const FRETE_GRATIS_MIN = {
+  'Sudeste': 199, 'Sul': 249, 'Centro-Oeste': 299, 'Nordeste': 349, 'Norte': 399
+};
+
+// Frete base (R$) por região — usado quando a compra fica abaixo do mínimo
+const FRETE_BASE = {
+  'Sudeste': 19.90, 'Sul': 24.90, 'Centro-Oeste': 29.90, 'Nordeste': 34.90, 'Norte': 39.90
+};
+const PRAZO_BASE = {
+  'Sudeste': '3 a 6 dias úteis', 'Sul': '4 a 8 dias úteis',
+  'Centro-Oeste': '5 a 9 dias úteis', 'Nordeste': '6 a 12 dias úteis',
+  'Norte': '8 a 15 dias úteis'
+};
+
+// Resolve um CEP em { uf, regiao, cidade }. Usa cache para não repetir chamadas.
+async function resolverCep(cep, cache) {
+  const limpo = String(cep || '').replace(/\D/g, '');
+  if (limpo.length !== 8) return null;
+  if (cache && cache.has(limpo)) return cache.get(limpo);
+  try {
+    const r = await fetch(`https://viacep.com.br/ws/${limpo}/json/`);
+    if (!r.ok) throw new Error('ViaCEP indisponível');
+    const data = await r.json();
+    if (data.erro) throw new Error('CEP não encontrado');
+    const out = { uf: data.uf, regiao: UF_REGIAO[data.uf], cidade: data.localidade };
+    if (cache) cache.set(limpo, out);
+    return out;
+  } catch (e) {
+    return null;
+  }
+}
+
+// Frete de UMA loja: leva em conta a distância entre a origem (loja) e o destino (cliente).
+// Mesmo estado = mais barato; mesma região = intermediário; outra região = cheio. + peso.
+function freteEntreCeps(origem, destino, pesoKg) {
+  const base = FRETE_BASE[destino.regiao] || FRETE_BASE['Sudeste'];
+  let mult = 1.0;
+  if (origem && origem.uf && origem.uf === destino.uf) mult = 0.6;
+  else if (origem && origem.regiao && origem.regiao === destino.regiao) mult = 0.8;
+  const peso  = Math.max(0.3, pesoKg || 0.5);
+  const frete = base * mult + Math.max(0, peso - 1) * 3;
+  return Math.round(frete * 100) / 100;
+}
+
+// Cálculo de frete por loja. Body: { cep, lojas: [{ id, nome, subtotal, peso, itens }] }
+app.post('/api/shipping/quote', async (req, res) => {
+  try {
+    const cep   = String(req.body.cep || '').replace(/\D/g, '');
+    const lojas = Array.isArray(req.body.lojas) ? req.body.lojas : [];
+
+    if (cep.length !== 8) {
+      return res.status(400).json({ ok: false, msg: 'CEP inválido. Digite os 8 dígitos.' });
+    }
+    if (!lojas.length) {
+      return res.status(400).json({ ok: false, msg: 'Carrinho vazio.' });
+    }
+
+    const cache   = new Map();
+    const destino = await resolverCep(cep, cache);
+    if (!destino || !destino.regiao) {
+      return res.status(400).json({ ok: false, msg: 'Não foi possível identificar a região do CEP.' });
+    }
+
+    const threshold = FRETE_GRATIS_MIN[destino.regiao];
+    const detalhe   = [];
+    let freteTotal  = 0;
+
+    for (const loja of lojas) {
+      const subtotal = parseFloat(loja.subtotal) || 0;
+      const itens    = parseInt(loja.itens) || 1;
+      const peso     = parseFloat(loja.peso) || (itens * 0.5);
+
+      // Origem: CEP cadastrado na loja (fallback para o estado da loja)
+      let origem = null;
+      try {
+        const storeDoc = await db.collection('lojas').doc(String(loja.id)).get();
+        if (storeDoc.exists) {
+          const sd = storeDoc.data();
+          if (sd.cep) origem = await resolverCep(sd.cep, cache);
+          if (!origem && sd.estado) origem = { uf: sd.estado, regiao: UF_REGIAO[sd.estado], cidade: sd.cidade };
+        }
+      } catch (_) { /* segue com origem nula → frete cheio */ }
+
+      // Frete grátis por loja quando atinge a compra mínima da região do cliente
+      let frete = 0, gratis = true;
+      if (subtotal < threshold) {
+        frete  = freteEntreCeps(origem, destino, peso);
+        gratis = false;
+      }
+      freteTotal += frete;
+
+      detalhe.push({
+        id: loja.id, nome: loja.nome || 'Loja',
+        subtotal, frete, gratis,
+        faltam: gratis ? 0 : Math.round((threshold - subtotal) * 100) / 100,
+        prazo: PRAZO_BASE[destino.regiao],
+        origem: origem ? `${origem.cidade || ''} - ${origem.uf}`.trim() : null
+      });
+    }
+
+    freteTotal = Math.round(freteTotal * 100) / 100;
+
+    res.json({
+      ok: true,
+      cep, uf: destino.uf, regiao: destino.regiao, cidade: destino.cidade,
+      threshold,
+      freteTotal,
+      gratisTotal: freteTotal === 0,
+      prazo: PRAZO_BASE[destino.regiao],
+      lojas: detalhe
+    });
+  } catch (err) {
+    console.error('Erro no cálculo de frete:', err.message);
+    res.status(500).json({ ok: false, msg: 'Não foi possível calcular o frete. Verifique o CEP e tente novamente.' });
   }
 });
 
