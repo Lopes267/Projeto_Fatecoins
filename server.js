@@ -27,6 +27,8 @@ admin.initializeApp({
 });
 
 const db = admin.firestore();
+// Permite gravar objetos de produto que tenham campos undefined (ex.: peso/imagem)
+db.settings({ ignoreUndefinedProperties: true });
 
 // ============================================================
 //  CLOUDINARY – CONFIGURAÇÃO (imagens)
@@ -48,7 +50,12 @@ const app = express();
 app.use(cors({ origin: true, credentials: true }));
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true }));
-app.use(express.static(path.join(__dirname)));
+app.use(express.static(path.join(__dirname), {
+  // Evita que o navegador rode HTML/JS antigos em cache (correções passam a valer na hora)
+  setHeaders: (res, filePath) => {
+    if (/\.(html|js)$/.test(filePath)) res.setHeader('Cache-Control', 'no-store');
+  }
+}));
 app.use((req, res, next) => {
   res.setHeader('X-Content-Type-Options', 'nosniff');
   res.setHeader('X-Frame-Options', 'DENY');
@@ -718,6 +725,81 @@ app.get('/api/products', async (req, res) => {
     res.json({ ok: true, products });
   } catch (err) {
     console.error('Erro ao buscar produtos:', err);
+    res.status(500).json({ ok: false, msg: 'Erro interno do servidor.' });
+  }
+});
+
+// ============================================================
+//  CARRINHO – vinculado ao usuário logado (cliente OU lojista)
+//  Estrutura no Firestore:
+//    carrinho (coleção)
+//      └─ {uid} (documento do dono — guarda cliente_id e atualizado_em)
+//           └─ produtos (subcoleção)
+//                └─ {produtoId} (um documento por produto, com qty)
+//  Como a chave é o uid do token, cada usuário só vê o próprio carrinho.
+// ============================================================
+
+// Referência da subcoleção de produtos do carrinho de um usuário
+function cartProdutosRef(uid) {
+  return db.collection('carrinho').doc(uid).collection('produtos');
+}
+
+// Buscar o carrinho do usuário autenticado (consulta no Firestore)
+app.get('/api/cart', authenticateToken, async (req, res) => {
+  try {
+    const snap = await cartProdutosRef(req.user.uid).get();
+    const items = snap.docs.map(d => d.data());
+    res.json({ ok: true, items });
+  } catch (err) {
+    console.error('Erro ao buscar carrinho:', err);
+    res.status(500).json({ ok: false, msg: 'Erro interno do servidor.' });
+  }
+});
+
+// Salvar/substituir o carrinho do usuário autenticado
+// Cada item vira um documento na subcoleção "produtos" (id do doc = id do produto)
+app.put('/api/cart', authenticateToken, async (req, res) => {
+  const items = Array.isArray(req.body.items) ? req.body.items : [];
+  try {
+    const col   = cartProdutosRef(req.user.uid);
+    const batch = db.batch();
+
+    // 1) limpa os produtos atuais
+    const existing = await col.get();
+    existing.docs.forEach(d => batch.delete(d.ref));
+
+    // 2) grava os produtos enviados (um doc por produto)
+    items.forEach(item => {
+      const docId = String(item.id || col.doc().id);
+      batch.set(col.doc(docId), item);
+    });
+
+    // 3) marca o dono no documento pai (para o carrinho aparecer ligado ao cliente)
+    batch.set(db.collection('carrinho').doc(req.user.uid), {
+      cliente_id: req.user.uid,
+      atualizado_em: admin.firestore.FieldValue.serverTimestamp()
+    }, { merge: true });
+
+    await batch.commit();
+    res.json({ ok: true, items });
+  } catch (err) {
+    console.error('Erro ao salvar carrinho:', err);
+    res.status(500).json({ ok: false, msg: 'Erro interno do servidor.' });
+  }
+});
+
+// Esvaziar o carrinho do usuário autenticado
+app.delete('/api/cart', authenticateToken, async (req, res) => {
+  try {
+    const col   = cartProdutosRef(req.user.uid);
+    const batch = db.batch();
+    const existing = await col.get();
+    existing.docs.forEach(d => batch.delete(d.ref));
+    await batch.commit();
+    await db.collection('carrinho').doc(req.user.uid).delete().catch(() => {});
+    res.json({ ok: true });
+  } catch (err) {
+    console.error('Erro ao limpar carrinho:', err);
     res.status(500).json({ ok: false, msg: 'Erro interno do servidor.' });
   }
 });

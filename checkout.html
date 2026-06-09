@@ -586,10 +586,23 @@ nav{
 
 <script src="app.js"></script>
 <script>
-function getCart(){
-  try{ return JSON.parse(localStorage.getItem('mp_cart')||'[]'); }catch{ return []; }
+let _cartItems = [];                  // cache em memória (espelho do Firebase)
+function getCart(){ return _cartItems; }
+
+// Carrega o carrinho consultando o Firebase. Exige login (sem localStorage).
+async function loadCart(){
+  if(!DB.currentUser()){
+    window.location.href = 'login.html';   // precisa estar logado p/ ver o carrinho
+    return [];
+  }
+  try{ _cartItems = await DB.getCart(); }catch{ _cartItems = []; }
+  return _cartItems;
 }
-function clearCart(){ localStorage.removeItem('mp_cart'); }
+
+function clearCart(){
+  _cartItems = [];
+  if(DB.currentUser()){ DB.clearCart().catch(()=>{}); }
+}
 
 function catEmoji(cat){
   const m={'Eletrônicos':'💻','Moda':'👗','Alimentos':'🍎','Casa & Decoração':'🏠','Esportes':'⚽','Beleza':'💄','Livros':'📚','Brinquedos':'🧸'};
@@ -882,6 +895,7 @@ function showSuccess(){
   const orderNum = 'PEDIDO #' + Math.floor(100000+Math.random()*900000);
   document.getElementById('order-chip').textContent = orderNum;
   document.getElementById('success-screen').classList.add('active');
+  clearCart();   // pedido concluído → esvazia o carrinho do cliente no servidor
   spawnConfetti();
 }
 
@@ -905,7 +919,9 @@ function spawnConfetti(){
   }
 }
 
-document.addEventListener('DOMContentLoaded',()=>{
+document.addEventListener('DOMContentLoaded', async ()=>{
+  if(!DB.currentUser()){ window.location.href = 'login.html'; return; }
+  await loadCart();
   renderSummary();
   generateQR();
   generateBarcode();
@@ -913,5 +929,6 @@ document.addEventListener('DOMContentLoaded',()=>{
   startPixTimer();
 });
 </script>
+<script src="accessibility.js"></script>
 </body>
 </html>

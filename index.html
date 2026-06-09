@@ -236,7 +236,16 @@ nav.scrolled{border-bottom-color:var(--border);background:rgba(10,10,10,.92)}
   background:linear-gradient(135deg,rgba(255,255,255,.025),transparent 55%);
   pointer-events:none;
 }
-.bcard:hover{border-color:rgba(232,133,74,.45);transform:translateY(-3px);box-shadow:0 12px 40px rgba(0,0,0,.4)}
+/* Hover: brilho ao redor da BORDA do card (o texto não brilha) */
+.bcard:hover{
+  border-color:rgba(232,133,74,.75);
+  transform:translateY(-3px);
+  box-shadow:
+    0 0 0 1px rgba(232,133,74,.55),      /* aro nítido na borda */
+    0 0 16px 1px rgba(232,133,74,.5),    /* brilho interno */
+    0 0 40px 6px rgba(232,133,74,.3),    /* halo externo suave */
+    0 12px 40px rgba(0,0,0,.45);         /* profundidade */
+}
 .bcard.full{grid-column:1/-1}
 .bicon{
   width:44px;height:44px;border-radius:11px;
@@ -733,5 +742,6 @@ async function loadStats() {
 }
 document.addEventListener('DOMContentLoaded', loadStats);
 </script>
+<script src="accessibility.js"></script>
 </body>
 </html>

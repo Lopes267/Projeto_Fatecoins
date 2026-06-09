@@ -13,7 +13,12 @@
       "PowerShell(node --check server.js)",
       "PowerShell(if \\($?\\) { \"server.js OK\" })",
       "Bash(node -e \"fetch\\('https://viacep.com.br/ws/01001000/json/'\\).then\\(r=>r.json\\(\\)\\).then\\(d=>console.log\\('ViaCEP OK:',d.localidade,d.uf\\)\\).catch\\(e=>console.log\\('ERRO:',e.message\\)\\)\")",
-      "Bash(node -e ' *)"
+      "Bash(node -e ' *)",
+      "Bash(node --check server.js)",
+      "Bash(node --check app.js)",
+      "PowerShell(node --check app.js)",
+      "PowerShell(if \\($?\\) { \"app.js OK\" })",
+      "PowerShell($p = @\\(\"$env:ProgramFiles\\\\nodejs\\\\node.exe\",\"$env:LOCALAPPDATA\\\\Programs\\\\nodejs\\\\node.exe\",\"$env:APPDATA\\\\npm\\\\node.exe\",\"$env:ProgramFiles\\(x86\\)\\\\nodejs\\\\node.exe\"\\); $p | Where-Object { Test-Path $_ }; \\(Get-Command node.exe -ErrorAction SilentlyContinue\\).Source)"
     ]
   }
 }

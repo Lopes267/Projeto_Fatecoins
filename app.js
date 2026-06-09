@@ -21,6 +21,10 @@ async function initAPI() {
 // Inicializar API na carga da página
 initAPI();
 
+// Remove QUALQUER carrinho legado em localStorage (de versões antigas do site).
+// O carrinho hoje vive 100% online no Firebase, vinculado ao cliente.
+try { localStorage.removeItem('mp_cart'); } catch {}
+
 const DB = {
   // ---------- helpers ----------
   _get: (key) => JSON.parse(localStorage.getItem(key) || '[]'),
@@ -80,7 +84,10 @@ const DB = {
     return data;
   },
 
-  logout() { localStorage.removeItem('mp_session'); },
+  logout() {
+    localStorage.removeItem('mp_session');
+    localStorage.removeItem('mp_cart');   // remove qualquer carrinho legado deixado no navegador
+  },
 
   currentUser() {
     const s = localStorage.getItem('mp_session');
@@ -285,6 +292,32 @@ const DB = {
 
     const data = await res.json();
     return data;
+  },
+
+  // ---------- cart (carrinho no Firestore, por cliente) ----------
+  async getCart() {
+    const res = await fetch(`${API_URL}/api/cart`, {
+      headers: { ...this._authHeaders() }
+    });
+    const data = await res.json();
+    return data.ok ? (data.items || []) : [];
+  },
+
+  async saveCart(items) {
+    const res = await fetch(`${API_URL}/api/cart`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json', ...this._authHeaders() },
+      body: JSON.stringify({ items })
+    });
+    return await res.json();
+  },
+
+  async clearCart() {
+    const res = await fetch(`${API_URL}/api/cart`, {
+      method: 'DELETE',
+      headers: { ...this._authHeaders() }
+    });
+    return await res.json();
   }
 };
 
