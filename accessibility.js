@@ -10,6 +10,9 @@
   if (window.__a11yLoaded) return;        // evita carregar duas vezes
   window.__a11yLoaded = true;
 
+  // Aplica o tema salvo o quanto antes (mantém o modo claro entre páginas, sem piscar)
+  try { if (localStorage.getItem('a11y_theme') === 'light' && document.body) document.body.classList.add('a11y-light'); } catch (e) {}
+
   // ---------- ESTILOS ----------
   const css = `
   .a11y-root{position:fixed;right:26px;bottom:26px;z-index:99999;font-family:'DM Sans',system-ui,sans-serif}
@@ -53,6 +56,13 @@
     box-shadow:0 10px 40px rgba(0,0,0,.55),0 0 0 4px rgba(37,99,235,.15);
   }
   body.a11y-mag-on{cursor:zoom-in}
+
+  /* Modo claro do site — sobrescreve as variáveis de tema para todos os descendentes do body */
+  body{transition:background-color .3s ease,color .3s ease}
+  body.a11y-light{
+    --bg:#f4f1ea; --card:#ffffff; --card2:#ece7dd;
+    --border:#dcd5c8; --text:#1f1b16; --muted:#6f6658;
+  }
   `;
   const style = document.createElement('style');
   style.textContent = css;
@@ -67,10 +77,20 @@
   const icoLupa = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
     <circle cx="11" cy="11" r="7"></circle><path d="M21 21l-4.3-4.3"></path>
     <path d="M11 8v6M8 11h6"></path></svg>`;
+  const icoSol = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+    <circle cx="12" cy="12" r="4"></circle>
+    <path d="M12 2v2M12 20v2M4.9 4.9l1.4 1.4M17.7 17.7l1.4 1.4M2 12h2M20 12h2M4.9 19.1l1.4-1.4M17.7 6.3l1.4-1.4"></path></svg>`;
+  const icoLua = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"></path></svg>`;
 
   // ---------- AÇÕES (fácil adicionar novas no futuro) ----------
   const actions = [
     { id: 'lupa', label: 'Lupa', icon: icoLupa, toggle: true, onToggle: setMagnifier },
+    { id: 'tema', label: 'Modo claro', toggle: true,
+      // No escuro mostra o SOL (clique p/ clarear); no claro mostra a LUA (clique p/ escurecer)
+      iconFor: (light) => (light ? icoLua : icoSol),
+      isActive: () => document.body.classList.contains('a11y-light'),
+      onToggle: setLightMode },
   ];
 
   // ---------- MONTAGEM ----------
@@ -92,13 +112,28 @@
     btn.className = 'a11y-action';
     btn.type = 'button';
     btn.setAttribute('aria-label', a.label);
-    btn.innerHTML = a.icon + `<span class="a11y-tip">${a.label}</span>`;
+
+    // Define o ícone do botão conforme o estado (usa iconFor quando existir, senão o ícone fixo)
+    const setIcon = (active) => {
+      const svg = a.iconFor ? a.iconFor(active) : a.icon;
+      btn.innerHTML = svg + `<span class="a11y-tip">${a.label}</span>`;
+    };
+
+    // Estado inicial (ex.: se o modo claro já está salvo, o botão de tema já mostra a lua e fica ativo)
+    const startActive = a.isActive ? a.isActive() : false;
+    setIcon(startActive);
+    if (a.toggle) {
+      btn.classList.toggle('active', startActive);
+      btn.setAttribute('aria-pressed', String(startActive));
+    }
+
     btn.addEventListener('click', (e) => {
       e.stopPropagation();
       if (a.toggle) {
         const nowActive = !btn.classList.contains('active');
         btn.classList.toggle('active', nowActive);
         btn.setAttribute('aria-pressed', String(nowActive));
+        setIcon(nowActive);
         a.onToggle(nowActive);
       } else if (a.onClick) {
         a.onClick();
@@ -140,6 +175,13 @@
     magOn = on;
     document.body.classList.toggle('a11y-mag-on', on);
     if (!on) lens.style.display = 'none';
+  }
+
+  // ---------- TEMA (modo claro/escuro) ----------
+  // Ativa/desativa o modo claro e salva a escolha — mantém entre páginas e recarregamentos
+  function setLightMode(on) {
+    document.body.classList.toggle('a11y-light', on);
+    try { localStorage.setItem('a11y_theme', on ? 'light' : 'dark'); } catch (e) {}
   }
 
   // Pega o texto exatamente sob o cursor (nó de texto), sem pegar o container inteiro
