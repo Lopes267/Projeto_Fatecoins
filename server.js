@@ -830,18 +830,74 @@ app.post('/api/orders', authenticateToken, async (req, res) => {
     if (!normalizados.length) return res.status(400).json({ ok: false, msg: 'Itens inválidos.' });
 
     const produto_ids = [...new Set(normalizados.map(i => i.produto_id))];
+    const loja_ids    = [...new Set(normalizados.map(i => i.loja_id).filter(Boolean))];
     const total = normalizados.reduce((s, i) => s + i.preco * i.qty, 0);
+
+    // Dados do comprador (para o lojista ver quem comprou)
+    const userDoc = await db.collection('usuarios').doc(req.user.uid).get();
+    const usuario_nome  = userDoc.exists ? userDoc.data().nome  : 'Cliente';
+    const usuario_email = userDoc.exists ? userDoc.data().email : null;
+
+    // Baixa o estoque conforme a quantidade comprada de cada produto
+    const qtyPorProduto = {};
+    normalizados.forEach(i => { qtyPorProduto[i.produto_id] = (qtyPorProduto[i.produto_id] || 0) + i.qty; });
+    for (const [pid, qty] of Object.entries(qtyPorProduto)) {
+      const pref = db.collection('produtos').doc(pid);
+      const pdoc = await pref.get();
+      if (pdoc.exists) {
+        const atual = Number(pdoc.data().estoque) || 0;
+        await pref.update({ estoque: Math.max(0, atual - qty) });
+      }
+    }
 
     const ref = await db.collection('pedidos').add({
       usuario_id: req.user.uid,
+      usuario_nome, usuario_email,
       itens: normalizados,
       produto_ids,                               // facilita checar "comprou este produto?"
+      loja_ids,                                  // facilita listar vendas por loja
       total: Math.round(total * 100) / 100,
       criado_em: admin.firestore.FieldValue.serverTimestamp()
     });
     res.json({ ok: true, pedido: { id: ref.id } });
   } catch (err) {
     console.error('Erro ao registrar pedido:', err);
+    res.status(500).json({ ok: false, msg: 'Erro interno do servidor.' });
+  }
+});
+
+// Vendas da(s) loja(s) do lojista autenticado — quem comprou cada produto
+app.get('/api/sales', authenticateToken, async (req, res) => {
+  try {
+    const lojasSnap = await db.collection('lojas').where('usuario_id', '==', req.user.uid).get();
+    const myLojaIds = lojasSnap.docs.map(d => d.id);
+    if (!myLojaIds.length) return res.json({ ok: true, vendas: [], total: 0 });
+
+    const pedidosSnap = await db.collection('pedidos').get();   // escala de demo: filtra em memória
+    const vendas = [];
+    pedidosSnap.docs.forEach(d => {
+      const ped = d.data();
+      (ped.itens || []).forEach(it => {
+        if (myLojaIds.includes(it.loja_id)) {
+          const data = ped.criado_em && ped.criado_em.toDate ? ped.criado_em.toDate().toISOString() : null;
+          vendas.push({
+            pedido_id: d.id,
+            produto_nome: it.nome,
+            qty: it.qty || 1,
+            preco: it.preco || 0,
+            subtotal: Math.round((it.preco || 0) * (it.qty || 1) * 100) / 100,
+            comprador: ped.usuario_nome || 'Cliente',
+            comprador_email: ped.usuario_email || null,
+            data
+          });
+        }
+      });
+    });
+    vendas.sort((a, b) => (b.data || '').localeCompare(a.data || ''));   // mais recentes primeiro
+    const total = vendas.reduce((s, v) => s + v.subtotal, 0);
+    res.json({ ok: true, vendas, total: Math.round(total * 100) / 100 });
+  } catch (err) {
+    console.error('Erro ao listar vendas:', err);
     res.status(500).json({ ok: false, msg: 'Erro interno do servidor.' });
   }
 });

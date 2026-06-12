@@ -710,6 +710,13 @@ function onCepInput(input){
   let v = input.value.replace(/\D/g,'').slice(0,8);
   if(v.length>5) v = v.slice(0,5)+'-'+v.slice(5);
   input.value = v;
+  // Mudou o CEP → invalida o frete já calculado (obriga a recalcular para o novo CEP)
+  if(freteAtual !== null){
+    freteAtual = null; freteBreakdown = null;
+    updateTotals();
+    const resultEl = document.getElementById('ship-result');
+    if(resultEl){ resultEl.className = 'ship-result'; resultEl.innerHTML = ''; }
+  }
 }
 
 async function calcularFrete(){
@@ -882,6 +889,17 @@ function setBoletoDate(){
 
 // Process payment
 function processPayment(){
+  // Trava: exige CEP válido e frete calculado antes de finalizar a compra
+  const cep = document.getElementById('cep-input').value.replace(/\D/g,'');
+  if(cep.length !== 8 || freteAtual === null){
+    const resultEl = document.getElementById('ship-result');
+    resultEl.className = 'ship-result show';
+    resultEl.innerHTML = '<span class="ship-err">Informe seu CEP e clique em <strong>Calcular</strong> para ver o frete antes de finalizar a compra.</span>';
+    document.getElementById('cep-input').focus();
+    document.getElementById('cep-input').scrollIntoView({ behavior:'smooth', block:'center' });
+    toast('Calcule o frete com seu CEP antes de finalizar a compra.', 'error');
+    return;
+  }
   const overlay = document.getElementById('processing-overlay');
   overlay.classList.add('active');
   clearInterval(timerInterval);

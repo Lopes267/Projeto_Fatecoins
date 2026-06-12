@@ -336,6 +336,13 @@ const DB = {
     return data.ok ? (data.produtos || []) : [];
   },
 
+  // Vendas da loja do lojista (quem comprou cada produto)
+  async getSales() {
+    const res = await fetch(`${API_URL}/api/sales`, { headers: { ...this._authHeaders() } });
+    const data = await res.json();
+    return data.ok ? data : { vendas: [], total: 0 };
+  },
+
   // ---------- avaliações ----------
   async getProductReviews(productId) {
     const res = await fetch(`${API_URL}/api/products/${productId}/reviews`);

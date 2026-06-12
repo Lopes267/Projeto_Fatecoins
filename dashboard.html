@@ -187,6 +187,7 @@ select option{background:var(--bg)}
   <div class="nav-item active" onclick="showPage('dashboard')"><span class="icon">📊</span> Visão Geral</div>
   <div class="nav-item" onclick="showPage('loja')"><span class="icon">🏪</span> Dados da Loja</div>
   <div class="nav-item" onclick="showPage('produtos')"><span class="icon">📦</span> Produtos</div>
+  <div class="nav-item" onclick="showPage('vendas')"><span class="icon">🧾</span> Vendas</div>
   <div class="nav-section">Explorar</div>
   <div class="nav-item" onclick="window.location.href='marketplace.html'"><span class="icon">🔍</span> Marketplace</div>
   <div class="sidebar-footer">
@@ -332,6 +333,33 @@ select option{background:var(--bg)}
     <div class="product-list" id="full-product-list"></div>
   </div>
 
+  <!-- VENDAS PAGE -->
+  <style>
+    .sale-item{display:flex;justify-content:space-between;align-items:center;gap:1rem;padding:1rem 0;border-bottom:1px solid var(--border)}
+    .sale-item:last-child{border-bottom:none}
+    .sale-prod{font-weight:600}
+    .sale-qty{color:var(--accent);font-size:.85rem;margin-left:.3rem}
+    .sale-buyer{color:var(--muted);font-size:.85rem;margin-top:.25rem}
+    .sale-date{color:var(--muted);font-size:.75rem;margin-top:.2rem}
+    .sale-value{color:var(--accent2);font-size:1.1rem;font-weight:700;white-space:nowrap}
+  </style>
+  <div class="page" id="page-vendas">
+    <div class="topbar">
+      <div>
+        <div class="page-title">Vendas</div>
+        <div class="page-sub">Quem comprou os produtos da sua loja</div>
+      </div>
+    </div>
+    <div class="stats-row">
+      <div class="stat-card"><div class="label">Total vendido</div><div class="value g" id="sales-total">R$0,00</div></div>
+      <div class="stat-card"><div class="label">Itens vendidos</div><div class="value o" id="sales-count">0</div></div>
+    </div>
+    <div class="form-card">
+      <h3>🧾 Compras recebidas</h3>
+      <div id="sales-list"><p style="color:var(--muted)">Carregando…</p></div>
+    </div>
+  </div>
+
 </main>
 
 <!-- ADD/EDIT MODAL -->
@@ -431,7 +459,31 @@ async function showPage(name){
   document.getElementById('page-'+name).classList.add('active');
   event?.currentTarget?.classList.add('active');
   if(name==='produtos') await renderProductList('full-product-list', false);
+  if(name==='vendas') await renderSales();
   if(name==='dashboard'){ await loadStats(); await renderProductList('dash-product-list', true); }
+}
+
+// ---- VENDAS (quem comprou os produtos da loja) ----
+async function renderSales(){
+  const el = document.getElementById('sales-list');
+  el.innerHTML = '<p style="color:var(--muted)">Carregando…</p>';
+  const data = await DB.getSales();
+  const vendas = data.vendas || [];
+  document.getElementById('sales-total').textContent = formatPrice(data.total || 0);
+  document.getElementById('sales-count').textContent = vendas.reduce((s,v)=>s+(v.qty||0),0);
+  if(!vendas.length){
+    el.innerHTML = `<p style="color:var(--muted);text-align:center;padding:2rem">Nenhuma venda ainda.<br/>Quando alguém comprar um produto da sua loja, aparece aqui com o nome de quem comprou.</p>`;
+    return;
+  }
+  el.innerHTML = vendas.map(v=>`
+    <div class="sale-item">
+      <div>
+        <div class="sale-prod">${v.produto_nome}<span class="sale-qty">×${v.qty}</span></div>
+        <div class="sale-buyer">👤 ${v.comprador}${v.comprador_email?` · ${v.comprador_email}`:''}</div>
+        ${v.data?`<div class="sale-date">${new Date(v.data).toLocaleString('pt-BR')}</div>`:''}
+      </div>
+      <div class="sale-value">${formatPrice(v.subtotal)}</div>
+    </div>`).join('');
 }
 
 // ---- STORE ----
