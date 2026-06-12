@@ -145,6 +145,38 @@
     </div>
   </div>
 
+  <style>
+    .tabs{display:flex;gap:.4rem;margin-bottom:1.6rem;border-bottom:1px solid var(--border);flex-wrap:wrap}
+    .tab{background:none;border:none;color:var(--muted);font-family:'DM Sans',sans-serif;font-size:.9rem;font-weight:600;padding:.7rem 1rem;cursor:pointer;border-bottom:2px solid transparent;transition:all .2s}
+    .tab:hover{color:var(--text)}
+    .tab.active{color:var(--accent);border-bottom-color:var(--accent)}
+    .tab-panel[hidden]{display:none}
+    .rev-item{background:var(--card);border:1px solid var(--border);border-radius:14px;padding:1.1rem 1.3rem;margin-bottom:1rem}
+    .rev-top{display:flex;justify-content:space-between;align-items:center;gap:1rem;flex-wrap:wrap}
+    .rev-name{font-weight:600}
+    .rev-stars{color:var(--accent2);font-size:.95rem}
+    .rev-comment{color:var(--muted);font-size:.88rem;margin-top:.5rem;white-space:pre-wrap}
+    .rev-actions{display:flex;gap:.5rem;margin-top:.7rem;flex-wrap:wrap}
+    .rev-btn{font-size:.8rem;padding:.4rem .8rem;border-radius:8px;border:1px solid var(--border);background:var(--card2);color:var(--text);cursor:pointer;font-family:'DM Sans',sans-serif;transition:all .2s}
+    .rev-btn:hover{border-color:var(--accent);color:var(--accent)}
+    .rev-btn.danger:hover{border-color:var(--red);color:var(--red)}
+    .rev-empty{color:var(--muted);text-align:center;padding:2.5rem}
+    .star-row{margin:.6rem 0 .4rem;font-size:1.7rem;line-height:1}
+    .star-pick{color:var(--border);cursor:pointer;user-select:none;transition:color .15s}
+    .star-pick.on{color:var(--accent2)}
+    textarea.rev-input{width:100%;background:var(--card2);border:1px solid var(--border);border-radius:8px;color:var(--text);font-family:'DM Sans',sans-serif;padding:.6rem;font-size:.9rem;resize:vertical;min-height:60px;outline:none}
+    textarea.rev-input:focus{border-color:var(--accent)}
+  </style>
+
+  <!-- ABAS -->
+  <div class="tabs" id="profile-tabs">
+    <button class="tab active" data-tab="perfil" onclick="switchTab('perfil')">📋 Meu Perfil</button>
+    <button class="tab" data-tab="compras" onclick="switchTab('compras')">🛒 Minhas Compras</button>
+    <button class="tab" data-tab="avaliacoes" onclick="switchTab('avaliacoes')">⭐ Minhas Avaliações</button>
+  </div>
+
+  <div id="tab-perfil" class="tab-panel">
+
   <!-- INFORMAÇÕES PESSOAIS -->
   <div class="form-card">
     <h3>📋 Informações Pessoais</h3>
@@ -228,6 +260,26 @@
     <p style="color:var(--muted);font-size:.92rem;margin-bottom:1.5rem">Esta ação não pode ser desfeita. Sua conta e todos os dados associados serão permanentemente deletados.</p>
     <div class="action-btns">
       <button class="btn btn-danger" onclick="deleteAccount()">Deletar minha conta</button>
+    </div>
+  </div>
+
+  </div><!-- /tab-perfil -->
+
+  <!-- ABA: MINHAS COMPRAS -->
+  <div id="tab-compras" class="tab-panel" hidden>
+    <div class="form-card">
+      <h3>🛒 Minhas Compras</h3>
+      <p style="color:var(--muted);font-size:.9rem;margin-bottom:1.2rem">Avalie os produtos que você comprou. Dê uma nota de 1 a 5 estrelas e, se quiser, deixe um comentário.</p>
+      <div id="compras-list"><p style="color:var(--muted)">Carregando…</p></div>
+    </div>
+  </div>
+
+  <!-- ABA: MINHAS AVALIAÇÕES -->
+  <div id="tab-avaliacoes" class="tab-panel" hidden>
+    <div class="form-card">
+      <h3>⭐ Minhas Avaliações</h3>
+      <p style="color:var(--muted);font-size:.9rem;margin-bottom:1.2rem">Todas as avaliações que você já fez.</p>
+      <div id="avaliacoes-list"><p style="color:var(--muted)">Carregando…</p></div>
     </div>
   </div>
 
@@ -405,6 +457,100 @@ async function deleteAccount(){
   } catch(e) {
     toast('Erro na conexão: ' + e.message, 'error');
   }
+}
+
+// ---- ABAS: COMPRAS E AVALIAÇÕES ----
+let comprasLoaded = false, avaliacoesLoaded = false;
+const pickedStars = {};
+
+function switchTab(name){
+  document.querySelectorAll('#profile-tabs .tab').forEach(t => t.classList.toggle('active', t.dataset.tab === name));
+  document.querySelectorAll('.tab-panel').forEach(p => p.hidden = (p.id !== 'tab-' + name));
+  if(name === 'compras'    && !comprasLoaded)    loadCompras();
+  if(name === 'avaliacoes' && !avaliacoesLoaded) loadAvaliacoes();
+}
+
+function starRow(pid, val){
+  return `<div class="star-row" id="stars-${pid}">` +
+    [1,2,3,4,5].map(n => `<span class="star-pick ${n<=val?'on':''}" data-n="${n}" onclick="pickStar('${pid}',${n})">★</span>`).join('') +
+    `</div>`;
+}
+function pickStar(pid, n){
+  pickedStars[pid] = n;
+  document.querySelectorAll(`#stars-${pid} .star-pick`).forEach(s => s.classList.toggle('on', Number(s.dataset.n) <= n));
+}
+function starsText(nota){
+  const full = Math.round(nota||0);
+  return '★★★★★'.slice(0, full) + '☆☆☆☆☆'.slice(0, 5-full);
+}
+
+// Lista os produtos comprados, cada um com um formulário de avaliação
+async function loadCompras(){
+  const el = document.getElementById('compras-list');
+  const [produtos, myReviews] = await Promise.all([ DB.getMyOrders(), DB.getMyReviews(currentUser.id) ]);
+  const byProd = {}; myReviews.forEach(r => byProd[r.produto_id] = r);
+  if(!produtos.length){
+    el.innerHTML = `<div class="rev-empty">Você ainda não comprou nenhum produto.<br/>Compre algo no marketplace para poder avaliar.</div>`;
+    comprasLoaded = true; return;
+  }
+  el.innerHTML = produtos.map(p => {
+    const pid = p.produto_id, ex = byProd[pid];
+    pickedStars[pid] = ex ? ex.nota : 0;
+    return `<div class="rev-item">
+      <div class="rev-top">
+        <div class="rev-name">${p.nome}</div>
+        <div class="rev-stars">${ex ? 'Sua nota: ' + starsText(ex.nota) : ''}</div>
+      </div>
+      ${starRow(pid, pickedStars[pid])}
+      <textarea class="rev-input" id="cmt-${pid}" placeholder="Comentário (opcional)">${ex ? (ex.comentario || '') : ''}</textarea>
+      <div class="rev-actions">
+        <button class="rev-btn" onclick="submitReview('${pid}')">${ex ? 'Atualizar' : 'Enviar'} avaliação</button>
+        ${ex ? `<button class="rev-btn danger" onclick="removeReview('${pid}')">Remover</button>` : ''}
+      </div>
+    </div>`;
+  }).join('');
+  comprasLoaded = true;
+}
+
+// Lista todas as avaliações feitas pelo usuário
+async function loadAvaliacoes(){
+  const el = document.getElementById('avaliacoes-list');
+  const reviews = await DB.getMyReviews(currentUser.id);
+  if(!reviews.length){
+    el.innerHTML = `<div class="rev-empty">Você ainda não fez nenhuma avaliação.</div>`;
+    avaliacoesLoaded = true; return;
+  }
+  el.innerHTML = reviews.map(r => `
+    <div class="rev-item">
+      <div class="rev-top">
+        <div class="rev-name">${r.produto_nome || 'Produto'}</div>
+        <div class="rev-stars">${starsText(r.nota)} <span style="color:var(--muted);font-size:.8rem">${(r.nota||0).toFixed(1)}</span></div>
+      </div>
+      ${r.comentario ? `<div class="rev-comment">${r.comentario}</div>` : ''}
+      <div class="rev-actions"><button class="rev-btn danger" onclick="removeReview('${r.produto_id}')">Remover</button></div>
+    </div>`).join('');
+  avaliacoesLoaded = true;
+}
+
+async function submitReview(pid){
+  const nota = pickedStars[pid] || 0;
+  if(!nota){ toast('Escolha de 1 a 5 estrelas.', 'error'); return; }
+  const comentario = (document.getElementById(`cmt-${pid}`)?.value || '').trim();
+  const r = await DB.addProductReview(pid, nota, comentario);
+  if(r.ok){ toast('Avaliação enviada!'); comprasLoaded = false; avaliacoesLoaded = false; loadCompras(); }
+  else toast(r.msg || 'Erro ao avaliar.', 'error');
+}
+
+async function removeReview(pid){
+  if(!confirm('Remover esta avaliação?')) return;
+  const r = await DB.deleteProductReview(pid);
+  if(r.ok){
+    toast('Avaliação removida.');
+    comprasLoaded = false; avaliacoesLoaded = false;
+    // recarrega a aba visível
+    if(!document.getElementById('tab-compras').hidden) loadCompras();
+    if(!document.getElementById('tab-avaliacoes').hidden) loadAvaliacoes();
+  } else toast(r.msg || 'Erro ao remover.', 'error');
 }
 
 // ---- TOAST ----

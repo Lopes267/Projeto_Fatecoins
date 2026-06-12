@@ -328,6 +328,17 @@ nav.scrolled{border-bottom-color:var(--border);background:rgba(10,10,10,.92)}
 .tcard-name{font-weight:600;font-size:.84rem}
 .tcard-role{font-size:.75rem;color:var(--muted);margin-top:.1rem}
 
+/* Rotador de depoimentos (avaliações rotativas) */
+.trotator{max-width:640px;margin:2.8rem auto 0}
+.trotator .tcard{transition:opacity .38s ease,transform .38s ease}
+.trotator .tcard:hover{transform:none}
+.trotator .tcard.anim-out{opacity:0;transform:translateY(16px)}
+.trotator .tcard-quote{font-size:1.05rem}
+.tdots{display:flex;gap:.5rem;justify-content:center;margin-top:1.6rem}
+.tdot{width:8px;height:8px;padding:0;border:none;border-radius:50%;background:var(--border2);cursor:pointer;transition:all .28s ease}
+.tdot:hover{background:var(--muted)}
+.tdot.active{background:var(--accent);width:22px;border-radius:5px}
+
 /* ── CTA ── */
 .cta-section{
   padding:6.5rem 3.5rem;text-align:center;position:relative;overflow:hidden;
@@ -634,40 +645,9 @@ footer{border-top:1px solid var(--border);padding:3rem 3.5rem 2rem}
     <div class="section-label">Depoimentos</div>
     <div class="section-title">O que dizem os <span>lojistas</span></div>
   </div>
-  <div class="tgrid">
-    <div class="tcard reveal">
-      <div class="tcard-stars">★★★★★</div>
-      <p class="tcard-quote">"Abri minha loja de eletrônicos em menos de 5 minutos. Nunca foi tão fácil ter presença online sem gastar nada."</p>
-      <div class="tcard-author">
-        <div class="tcard-avatar" style="background:var(--accent)">R</div>
-        <div>
-          <div class="tcard-name">Ricardo S.</div>
-          <div class="tcard-role">Loja de Eletrônicos · SP</div>
-        </div>
-      </div>
-    </div>
-    <div class="tcard reveal d1">
-      <div class="tcard-stars">★★★★★</div>
-      <p class="tcard-quote">"Minhas clientes me encontram pelo Mercado Local toda semana. A plataforma é super intuitiva e as fotos ficam lindas."</p>
-      <div class="tcard-author">
-        <div class="tcard-avatar" style="background:var(--green)">A</div>
-        <div>
-          <div class="tcard-name">Ana Paula</div>
-          <div class="tcard-role">Boutique de Moda · RJ</div>
-        </div>
-      </div>
-    </div>
-    <div class="tcard reveal d2">
-      <div class="tcard-stars">★★★★★</div>
-      <p class="tcard-quote">"3 minutos para montar minha loja de artesanato. Zero taxa, zero complicação. Já indiquei para todos os meus amigos!"</p>
-      <div class="tcard-author">
-        <div class="tcard-avatar" style="background:var(--accent2);color:#1a1a1a">C</div>
-        <div>
-          <div class="tcard-name">Carlos M.</div>
-          <div class="tcard-role">Artesanato & Decoração · MG</div>
-        </div>
-      </div>
-    </div>
+  <div class="trotator reveal">
+    <div class="tcard" id="t-card"></div>
+    <div class="tdots" id="t-dots"></div>
   </div>
 </section>
 
@@ -741,6 +721,56 @@ async function loadStats() {
   }
 }
 document.addEventListener('DOMContentLoaded', loadStats);
+
+/* ── Depoimentos rotativos ── */
+const TDEPOIMENTOS = [
+  { quote:"Abri minha loja de eletrônicos em menos de 5 minutos. Nunca foi tão fácil ter presença online sem gastar nada.", name:"Ricardo S.", role:"Loja de Eletrônicos · SP", bg:"var(--accent)", initial:"R" },
+  { quote:"Minhas clientes me encontram pelo Mercado Local toda semana. A plataforma é super intuitiva e as fotos ficam lindas.", name:"Ana Paula", role:"Boutique de Moda · RJ", bg:"var(--green)", initial:"A" },
+  { quote:"3 minutos para montar minha loja de artesanato. Zero taxa, zero complicação. Já indiquei para todos os meus amigos!", name:"Carlos M.", role:"Artesanato & Decoração · MG", bg:"var(--accent2)", color:"#1a1a1a", initial:"C" },
+  { quote:"Minhas vendas de cosméticos cresceram muito depois que entrei. O cadastro de produtos com foto é rápido demais.", name:"Juliana R.", role:"Cosméticos & Beleza · BA", bg:"var(--accent)", initial:"J" },
+  { quote:"Como mercearia de bairro, consegui alcançar clientes que nem sabiam que eu existia. Recomendo de olhos fechados.", name:"Pedro H.", role:"Mercearia · PR", bg:"var(--green)", initial:"P" },
+  { quote:"A vitrine da minha papelaria ficou linda e profissional, sem precisar de programador nem pagar mensalidade.", name:"Fernanda L.", role:"Papelaria & Presentes · SP", bg:"var(--accent2)", color:"#1a1a1a", initial:"F" }
+];
+let tIdx = 0, tTimer = null;
+
+function tHTML(t){
+  return `<div class="tcard-stars">★★★★★</div>
+    <p class="tcard-quote">"${t.quote}"</p>
+    <div class="tcard-author">
+      <div class="tcard-avatar" style="background:${t.bg};${t.color ? 'color:'+t.color : ''}">${t.initial}</div>
+      <div>
+        <div class="tcard-name">${t.name}</div>
+        <div class="tcard-role">${t.role}</div>
+      </div>
+    </div>`;
+}
+function tRender(i, animate){
+  const card = document.getElementById('t-card');
+  if(!card) return;
+  const paint = () => {
+    card.innerHTML = tHTML(TDEPOIMENTOS[i]);
+    card.classList.remove('anim-out');
+    document.querySelectorAll('#t-dots .tdot').forEach((d, k) => d.classList.toggle('active', k === i));
+  };
+  if(animate){ card.classList.add('anim-out'); setTimeout(paint, 360); }  // espera o fade-out
+  else paint();
+}
+function tGo(i){ tIdx = (i + TDEPOIMENTOS.length) % TDEPOIMENTOS.length; tRender(tIdx, true); tReset(); }
+function tReset(){ clearInterval(tTimer); tTimer = setInterval(() => tGo(tIdx + 1), 5000); }
+
+function initTestimonials(){
+  const dots = document.getElementById('t-dots');
+  if(!dots) return;
+  dots.innerHTML = TDEPOIMENTOS.map((_, k) => `<button class="tdot" aria-label="Depoimento ${k+1}" onclick="tGo(${k})"></button>`).join('');
+  tRender(0, false);
+  tReset();
+  const rot = document.querySelector('.trotator');   // pausa ao passar o mouse
+  if(rot){
+    rot.addEventListener('mouseenter', () => clearInterval(tTimer));
+    rot.addEventListener('mouseleave', tReset);
+  }
+}
+document.addEventListener('DOMContentLoaded', initTestimonials);
 </script>
 <script src="accessibility.js"></script>
 </body>

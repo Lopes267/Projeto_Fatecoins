@@ -1,0 +1,12 @@
+{
+  "permissions": {
+    "allow": [
+      "PowerShell(& \"C:\\\\Program Files\\\\nodejs\\\\node.exe\" --check accessibility.js)",
+      "PowerShell(if \\($?\\) { \"accessibility.js OK\" })",
+      "PowerShell(& \"C:\\\\Program Files\\\\nodejs\\\\node.exe\" --check server.js)",
+      "PowerShell(if \\($?\\) { \"server.js OK\" })",
+      "PowerShell(& \"C:\\\\Program Files\\\\nodejs\\\\node.exe\" --check app.js)",
+      "PowerShell(if \\($?\\) { \"app.js OK\" })"
+    ]
+  }
+}

@@ -318,6 +318,51 @@ const DB = {
       headers: { ...this._authHeaders() }
     });
     return await res.json();
+  },
+
+  // ---------- pedidos (compras) ----------
+  async createOrder(itens) {
+    const res = await fetch(`${API_URL}/api/orders`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', ...this._authHeaders() },
+      body: JSON.stringify({ itens })
+    });
+    return await res.json();
+  },
+
+  async getMyOrders() {
+    const res = await fetch(`${API_URL}/api/orders`, { headers: { ...this._authHeaders() } });
+    const data = await res.json();
+    return data.ok ? (data.produtos || []) : [];
+  },
+
+  // ---------- avaliações ----------
+  async getProductReviews(productId) {
+    const res = await fetch(`${API_URL}/api/products/${productId}/reviews`);
+    return await res.json();   // { ok, reviews, media, count }
+  },
+
+  async addProductReview(productId, nota, comentario) {
+    const res = await fetch(`${API_URL}/api/products/${productId}/reviews`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', ...this._authHeaders() },
+      body: JSON.stringify({ nota, comentario })
+    });
+    return await res.json();
+  },
+
+  async deleteProductReview(productId) {
+    const res = await fetch(`${API_URL}/api/products/${productId}/reviews`, {
+      method: 'DELETE',
+      headers: { ...this._authHeaders() }
+    });
+    return await res.json();
+  },
+
+  async getMyReviews(userId) {
+    const res = await fetch(`${API_URL}/api/users/${userId}/reviews`, { headers: { ...this._authHeaders() } });
+    const data = await res.json();
+    return data.ok ? (data.reviews || []) : [];
   }
 };
 

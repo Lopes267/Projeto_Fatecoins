@@ -701,6 +701,8 @@ app.get('/api/products', async (req, res) => {
         categoria:  data.categoria,
         estoque:    data.estoque,
         peso:       data.peso || 0,   // oculto no front; usado só no cálculo de frete
+        nota_media: data.nota_media || 0,
+        nota_count: data.nota_count || 0,
         loja: {
           id:     data.loja_id,
           nome:   storeDoc.data().nome,
@@ -800,6 +802,165 @@ app.delete('/api/cart', authenticateToken, async (req, res) => {
     res.json({ ok: true });
   } catch (err) {
     console.error('Erro ao limpar carrinho:', err);
+    res.status(500).json({ ok: false, msg: 'Erro interno do servidor.' });
+  }
+});
+
+// ============================================================
+//  PEDIDOS – registra o que cada cliente comprou (coleção "pedidos")
+//  Necessário para liberar avaliação só de produtos comprados.
+// ============================================================
+
+// Registrar uma compra (chamado ao concluir o checkout)
+app.post('/api/orders', authenticateToken, async (req, res) => {
+  const itens = Array.isArray(req.body.itens) ? req.body.itens : [];
+  if (!itens.length) return res.status(400).json({ ok: false, msg: 'Pedido vazio.' });
+  try {
+    const normalizados = itens.map(i => ({
+      produto_id: String(i.id || i.produto_id || ''),
+      nome:       i.nome || 'Produto',
+      preco:      Number(i.preco) || 0,
+      qty:        Number(i.qty) || 1,
+      imagem_url: i.imagem_url || null,
+      categoria:  i.categoria || null,
+      loja_id:    (i.loja && i.loja.id)   || i.loja_id   || null,
+      loja_nome:  (i.loja && i.loja.nome) || i.loja_nome || null
+    })).filter(i => i.produto_id);
+
+    if (!normalizados.length) return res.status(400).json({ ok: false, msg: 'Itens inválidos.' });
+
+    const produto_ids = [...new Set(normalizados.map(i => i.produto_id))];
+    const total = normalizados.reduce((s, i) => s + i.preco * i.qty, 0);
+
+    const ref = await db.collection('pedidos').add({
+      usuario_id: req.user.uid,
+      itens: normalizados,
+      produto_ids,                               // facilita checar "comprou este produto?"
+      total: Math.round(total * 100) / 100,
+      criado_em: admin.firestore.FieldValue.serverTimestamp()
+    });
+    res.json({ ok: true, pedido: { id: ref.id } });
+  } catch (err) {
+    console.error('Erro ao registrar pedido:', err);
+    res.status(500).json({ ok: false, msg: 'Erro interno do servidor.' });
+  }
+});
+
+// Listar os produtos comprados pelo usuário (para a aba "Minhas Compras")
+app.get('/api/orders', authenticateToken, async (req, res) => {
+  try {
+    const snap = await db.collection('pedidos').where('usuario_id', '==', req.user.uid).get();
+    const porProduto = {};                       // agrupa por produto (última compra vence)
+    snap.docs.forEach(d => {
+      (d.data().itens || []).forEach(it => {
+        if (it.produto_id) porProduto[it.produto_id] = { ...it, pedido_id: d.id };
+      });
+    });
+    res.json({ ok: true, produtos: Object.values(porProduto) });
+  } catch (err) {
+    console.error('Erro ao listar pedidos:', err);
+    res.status(500).json({ ok: false, msg: 'Erro interno do servidor.' });
+  }
+});
+
+// ============================================================
+//  AVALIAÇÕES – notas e comentários (coleção "avaliacoes")
+//  Regras: só quem comprou pode avaliar; ninguém avalia produto da própria loja.
+//  Uma avaliação por usuário por produto (id = "<produtoId>_<uid>").
+// ============================================================
+
+// Recalcula nota_media e nota_count no documento do produto
+async function recomputeProductRating(produtoId) {
+  const snap = await db.collection('avaliacoes').where('produto_id', '==', produtoId).get();
+  const count = snap.size;
+  const soma  = snap.docs.reduce((s, d) => s + (Number(d.data().nota) || 0), 0);
+  const media = count ? Math.round((soma / count) * 10) / 10 : 0;
+  await db.collection('produtos').doc(produtoId).update({ nota_media: media, nota_count: count }).catch(() => {});
+  return { media, count };
+}
+
+// Criar/atualizar a avaliação do usuário para um produto
+app.post('/api/products/:id/reviews', authenticateToken, async (req, res) => {
+  const produtoId  = req.params.id;
+  const nota       = parseInt(req.body.nota, 10);
+  const comentario = (req.body.comentario || '').toString().trim().slice(0, 1000);
+
+  if (!(nota >= 1 && nota <= 5)) return res.status(400).json({ ok: false, msg: 'A nota deve ser de 1 a 5.' });
+
+  try {
+    const prodDoc = await db.collection('produtos').doc(produtoId).get();
+    if (!prodDoc.exists) return res.status(404).json({ ok: false, msg: 'Produto não encontrado.' });
+    const prod = prodDoc.data();
+
+    // Não pode avaliar produto da própria loja (cobre a regra do lojista)
+    if (prod.loja_id) {
+      const lojaDoc = await db.collection('lojas').doc(prod.loja_id).get();
+      if (lojaDoc.exists && lojaDoc.data().usuario_id === req.user.uid) {
+        return res.status(403).json({ ok: false, msg: 'Você não pode avaliar um produto da sua própria loja.' });
+      }
+    }
+
+    // Precisa ter comprado o produto (checagem em memória — evita índice composto)
+    const compras  = await db.collection('pedidos').where('usuario_id', '==', req.user.uid).get();
+    const comprou  = compras.docs.some(d => (d.data().produto_ids || []).includes(produtoId));
+    if (!comprou) return res.status(403).json({ ok: false, msg: 'Você só pode avaliar produtos que comprou.' });
+
+    const userDoc = await db.collection('usuarios').doc(req.user.uid).get();
+    const usuario_nome = userDoc.exists ? userDoc.data().nome : 'Usuário';
+
+    const reviewId = `${produtoId}_${req.user.uid}`;  // uma avaliação por usuário/produto
+    await db.collection('avaliacoes').doc(reviewId).set({
+      produto_id: produtoId,
+      produto_nome: prod.nome,
+      loja_id: prod.loja_id || null,
+      usuario_id: req.user.uid,
+      usuario_nome,
+      nota, comentario,
+      criado_em: admin.firestore.FieldValue.serverTimestamp()
+    });
+
+    const rating = await recomputeProductRating(produtoId);
+    res.json({ ok: true, review: { id: reviewId, nota, comentario }, rating });
+  } catch (err) {
+    console.error('Erro ao avaliar produto:', err);
+    res.status(500).json({ ok: false, msg: 'Erro interno do servidor.' });
+  }
+});
+
+// Listar avaliações de um produto (público)
+app.get('/api/products/:id/reviews', async (req, res) => {
+  try {
+    const snap = await db.collection('avaliacoes').where('produto_id', '==', req.params.id).get();
+    const reviews = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+    const count = reviews.length;
+    const media = count ? Math.round((reviews.reduce((s, r) => s + (r.nota || 0), 0) / count) * 10) / 10 : 0;
+    res.json({ ok: true, reviews, media, count });
+  } catch (err) {
+    console.error('Erro ao buscar avaliações:', err);
+    res.status(500).json({ ok: false, msg: 'Erro interno do servidor.' });
+  }
+});
+
+// Remover a avaliação do usuário para um produto
+app.delete('/api/products/:id/reviews', authenticateToken, async (req, res) => {
+  try {
+    await db.collection('avaliacoes').doc(`${req.params.id}_${req.user.uid}`).delete();
+    const rating = await recomputeProductRating(req.params.id);
+    res.json({ ok: true, rating });
+  } catch (err) {
+    console.error('Erro ao remover avaliação:', err);
+    res.status(500).json({ ok: false, msg: 'Erro interno do servidor.' });
+  }
+});
+
+// Todas as avaliações feitas por um usuário (aba "Minhas Avaliações")
+app.get('/api/users/:id/reviews', authenticateToken, async (req, res) => {
+  if (req.user.uid !== req.params.id) return res.status(403).json({ ok: false, msg: 'Acesso negado.' });
+  try {
+    const snap = await db.collection('avaliacoes').where('usuario_id', '==', req.params.id).get();
+    res.json({ ok: true, reviews: snap.docs.map(d => ({ id: d.id, ...d.data() })) });
+  } catch (err) {
+    console.error('Erro ao buscar avaliações do usuário:', err);
     res.status(500).json({ ok: false, msg: 'Erro interno do servidor.' });
   }
 });

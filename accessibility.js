@@ -87,8 +87,9 @@
   const actions = [
     { id: 'lupa', label: 'Lupa', icon: icoLupa, toggle: true, onToggle: setMagnifier },
     { id: 'tema', label: 'Modo claro', toggle: true,
-      // No escuro mostra o SOL (clique p/ clarear); no claro mostra a LUA (clique p/ escurecer)
+      // No escuro mostra o SOL + "Modo claro"; no claro mostra a LUA + "Modo escuro"
       iconFor: (light) => (light ? icoLua : icoSol),
+      labelFor: (light) => (light ? 'Modo escuro' : 'Modo claro'),
       isActive: () => document.body.classList.contains('a11y-light'),
       onToggle: setLightMode },
   ];
@@ -113,10 +114,12 @@
     btn.type = 'button';
     btn.setAttribute('aria-label', a.label);
 
-    // Define o ícone do botão conforme o estado (usa iconFor quando existir, senão o ícone fixo)
+    // Define o ícone e o texto do botão conforme o estado (usa iconFor/labelFor quando existirem)
     const setIcon = (active) => {
       const svg = a.iconFor ? a.iconFor(active) : a.icon;
-      btn.innerHTML = svg + `<span class="a11y-tip">${a.label}</span>`;
+      const lbl = a.labelFor ? a.labelFor(active) : a.label;
+      btn.innerHTML = svg + `<span class="a11y-tip">${lbl}</span>`;
+      btn.setAttribute('aria-label', lbl);
     };
 
     // Estado inicial (ex.: se o modo claro já está salvo, o botão de tema já mostra a lua e fica ativo)

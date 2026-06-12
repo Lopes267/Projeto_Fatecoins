@@ -895,6 +895,11 @@ function showSuccess(){
   const orderNum = 'PEDIDO #' + Math.floor(100000+Math.random()*900000);
   document.getElementById('order-chip').textContent = orderNum;
   document.getElementById('success-screen').classList.add('active');
+  // Registra a compra (libera a avaliação desses produtos) e então esvazia o carrinho
+  const itensComprados = getCart();
+  if (DB.currentUser() && itensComprados.length) {
+    DB.createOrder(itensComprados).catch(()=>{});
+  }
   clearCart();   // pedido concluído → esvazia o carrinho do cliente no servidor
   spawnConfetti();
 }

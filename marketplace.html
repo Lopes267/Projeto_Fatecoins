@@ -511,6 +511,16 @@ function showProductSkeletons(){
   document.getElementById('results-info').innerHTML = 'Carregando produtos…';
 }
 
+// Estrelas da nota média do produto (★ cheia / ☆ vazia)
+function ratingStars(media, count){
+  media = Number(media)||0; count = Number(count)||0;
+  if(!count) return `<div style="font-size:.72rem;color:var(--muted);margin-top:.3rem">☆ Sem avaliações</div>`;
+  const full = Math.round(media);
+  const stars = '★★★★★'.slice(0, full) + '☆☆☆☆☆'.slice(0, 5-full);
+  return `<div style="font-size:.82rem;margin-top:.3rem;color:var(--accent2)">${stars}
+    <span style="color:var(--muted);font-size:.74rem">${media.toFixed(1)} (${count})</span></div>`;
+}
+
 async function renderProducts(){
   showProductSkeletons();
   const prods = await DB.searchProducts(searchQuery, currentCategoria);
@@ -528,6 +538,7 @@ async function renderProducts(){
       <div class="prod-body">
         <div class="prod-cat">${p.categoria||'Produto'}</div>
         <div class="prod-name">${p.nome}</div>
+        ${ratingStars(p.nota_media, p.nota_count)}
         <div class="prod-desc">${p.descricao||'Sem descrição'}</div>
         <div class="prod-footer">
           <div class="prod-price">${formatPrice(p.preco)}</div>
@@ -611,6 +622,7 @@ async function openStore(storeId){
       <div class="prod-body">
         <div class="prod-cat">${p.categoria||'Produto'}</div>
         <div class="prod-name">${p.nome}</div>
+        ${ratingStars(p.nota_media, p.nota_count)}
         <div class="prod-desc">${p.descricao||''}</div>
         <div class="prod-footer">
           <div class="prod-price">${formatPrice(p.preco)}</div>
