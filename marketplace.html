@@ -440,6 +440,7 @@ function renderNav(){
         <span>${user.nome.split(' ')[0]}</span>
       </div>
       ${user.tipo==='lojista'?`<a href="dashboard.html" class="btn btn-ghost">Minha loja</a>`:''}
+      ${user.tipo==='entregador'?`<a href="entregas.html" class="btn btn-ghost">Minhas entregas</a>`:''}
       <button class="btn btn-ghost" onclick="doLogout()">Sair</button>
     `;
   } else {
@@ -455,6 +456,8 @@ function goToProfile(){
   if(!user) return;
   if(user.tipo === 'lojista'){
     window.location.href = 'profile.html';
+  } else if(user.tipo === 'entregador'){
+    window.location.href = 'entregas.html';
   } else {
     window.location.href = 'client-profile.html';
   }

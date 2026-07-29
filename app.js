@@ -321,11 +321,13 @@ const DB = {
   },
 
   // ---------- pedidos (compras) ----------
-  async createOrder(itens) {
+  // entrega: { cep, numero, complemento, referencia, lat, lng } — endereço onde o
+  // entregador vai levar a compra. O servidor completa o que faltar pelo CEP/cadastro.
+  async createOrder(itens, entrega = null) {
     const res = await fetch(`${API_URL}/api/orders`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', ...this._authHeaders() },
-      body: JSON.stringify({ itens })
+      body: JSON.stringify({ itens, entrega })
     });
     return await res.json();
   },
@@ -370,8 +372,119 @@ const DB = {
     const res = await fetch(`${API_URL}/api/users/${userId}/reviews`, { headers: { ...this._authHeaders() } });
     const data = await res.json();
     return data.ok ? (data.reviews || []) : [];
+  },
+
+  // ---------- entregas ----------
+  // Pedidos comprados por outras pessoas que ainda esperam um entregador.
+  // Passando a posição atual, a lista vem ordenada do mais perto para o mais longe.
+  async getAvailableDeliveries(pos = null) {
+    const qs = pos ? `?lat=${pos.lat}&lng=${pos.lng}` : '';
+    const res = await fetch(`${API_URL}/api/deliveries/available${qs}`, { headers: { ...this._authHeaders() } });
+    return await res.json();
+  },
+
+  async acceptDelivery(pedidoId) {
+    const res = await fetch(`${API_URL}/api/deliveries/${pedidoId}/accept`, {
+      method: 'POST', headers: { ...this._authHeaders() }
+    });
+    return await res.json();
+  },
+
+  async releaseDelivery(pedidoId) {
+    const res = await fetch(`${API_URL}/api/deliveries/${pedidoId}/release`, {
+      method: 'POST', headers: { ...this._authHeaders() }
+    });
+    return await res.json();
+  },
+
+  async getMyDeliveries() {
+    const res = await fetch(`${API_URL}/api/deliveries/mine`, { headers: { ...this._authHeaders() } });
+    return await res.json();
+  },
+
+  // Envia a posição do entregador — é isto que o comprador vê se mexendo no mapa
+  async sendDeliveryLocation(pedidoId, lat, lng, precisao = null) {
+    const res = await fetch(`${API_URL}/api/deliveries/${pedidoId}/location`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', ...this._authHeaders() },
+      body: JSON.stringify({ lat, lng, precisao })
+    });
+    return await res.json();
+  },
+
+  async setDeliveryStatus(pedidoId, status) {
+    const res = await fetch(`${API_URL}/api/deliveries/${pedidoId}/status`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', ...this._authHeaders() },
+      body: JSON.stringify({ status })
+    });
+    return await res.json();
+  },
+
+  // Rastreio do lado do comprador
+  async getMyTracking() {
+    const res = await fetch(`${API_URL}/api/deliveries/tracking`, { headers: { ...this._authHeaders() } });
+    const data = await res.json();
+    return data.ok ? (data.pedidos || []) : [];
+  },
+
+  async getOrderTracking(pedidoId) {
+    const res = await fetch(`${API_URL}/api/deliveries/${pedidoId}/tracking`, { headers: { ...this._authHeaders() } });
+    return await res.json();
   }
 };
+
+// ============================================================
+//  ENTREGAS – helpers de exibição (usados pelo entregador e pelo comprador)
+// ============================================================
+
+const ENTREGA_LABEL = {
+  aguardando: { texto: 'Aguardando entregador', icone: '🕓', cor: '#f4c56a' },
+  aceito:     { texto: 'Entregador a caminho da loja', icone: '📦', cor: '#7b9ff4' },
+  a_caminho:  { texto: 'Saiu para entrega', icone: '🛵', cor: '#e8854a' },
+  entregue:   { texto: 'Entregue', icone: '✅', cor: '#5dcfa0' }
+};
+
+function entregaLabel(status) {
+  return ENTREGA_LABEL[status] || ENTREGA_LABEL.aguardando;
+}
+
+// Quão confiável é o pino do cliente no mapa. Só o GPS do próprio cliente (ou o
+// endereço achado com número) aponta a porta; CEP e cidade caem no meio da região.
+const PRECISAO_ENTREGA = {
+  gps:    { exato: true,  texto: 'Ponto confirmado pelo GPS do cliente' },
+  exata:  { exato: true,  texto: 'Endereço localizado com número' },
+  rua:    { exato: false, texto: 'Ponto aproximado: rua encontrada, sem o número' },
+  bairro: { exato: false, texto: 'Ponto aproximado: centro do bairro' },
+  cep:    { exato: false, texto: 'Ponto aproximado: centro do CEP' },
+  cidade: { exato: false, texto: 'Ponto MUITO impreciso: centro da cidade — guie-se pelo endereço escrito' }
+};
+
+function precisaoEntrega(entrega) {
+  if (!entrega || entrega.lat == null) {
+    return { exato: false, texto: 'Sem ponto no mapa — use o endereço escrito', semMapa: true };
+  }
+  return PRECISAO_ENTREGA[entrega.precisao] ||
+         { exato: false, texto: 'Ponto aproximado' };
+}
+
+function formatEndereco(e) {
+  if (!e) return 'Endereço não informado';
+  const linha1 = [e.logradouro, e.numero].filter(Boolean).join(', ');
+  const linha2 = [e.bairro, e.cidade, e.uf].filter(Boolean).join(' · ');
+  const cep    = e.cep ? `CEP ${String(e.cep).replace(/(\d{5})(\d{3})/, '$1-$2')}` : '';
+  return [linha1, e.complemento, linha2, cep].filter(Boolean).join(' — ') || 'Endereço não informado';
+}
+
+// "há 12s" / "há 3 min" — mostra se a posição do entregador está fresca
+function tempoRelativo(iso) {
+  if (!iso) return '—';
+  const seg = Math.floor((Date.now() - new Date(iso).getTime()) / 1000);
+  if (seg < 60)   return `há ${Math.max(0, seg)}s`;
+  if (seg < 3600) return `há ${Math.floor(seg / 60)} min`;
+  if (seg < 86400) return `há ${Math.floor(seg / 3600)}h`;
+  return new Date(iso).toLocaleDateString('pt-BR');
+}
 
 // ============================================================
 //  AUTH HELPERS

@@ -4,15 +4,36 @@
 <meta charset="UTF-8"/>
 <meta name="viewport" content="width=device-width,initial-scale=1"/>
 <title>Painel da Loja – Mercado Local</title>
-<link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,700&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet"/>
+<meta name="theme-color" content="#0d0d0d"/>
+<link rel="preconnect" href="https://fonts.googleapis.com"/>
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin/>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,700;1,9..144,400;1,9..144,700&family=DM+Sans:wght@300;400;500;600;700&display=swap" rel="stylesheet"/>
 <style>
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
 :root{
+  color-scheme:dark;
   --bg:#0d0d0d;--card:#161616;--card2:#1c1c1c;--border:#2a2a2a;
   --text:#f0ece3;--muted:#888;--accent:#e8854a;--accent2:#f4c56a;
   --green:#5dcfa0;--red:#e85a5a;
+
+  /* --- Vidro fosco (painel de vendas) --- */
+  --glass-fill:linear-gradient(158deg,rgba(255,255,255,.055),rgba(255,255,255,.016));
+  --glass-edge:rgba(255,255,255,.09);
+  --glass-rim:rgba(255,255,255,.14);
+  --glass-shadow:0 24px 48px -28px rgba(0,0,0,.85);
+
+  /* --- Marca de dados: UMA matiz, validada p/ superfície escura ---
+     #d9733c = laranja da marca dentro da banda OKLCH L .48–.67.
+     O par laranja+dourado da marca reprova em daltonismo (ΔE 4,1), por isso
+     todo dado usa a mesma matiz e a diferença vem de posição, não de cor. */
+  --data:#d9733c;
+  --data-soft:rgba(217,115,60,.14);
+  --data-dim:rgba(240,236,227,.16);
+  --grid:rgba(255,255,255,.06);
+  --axis:rgba(240,236,227,.42);
 }
-body{background:var(--bg);color:var(--text);font-family:'DM Sans',sans-serif;display:flex;min-height:100vh}
+body{background:var(--bg);color:var(--text);font-family:'DM Sans',sans-serif;display:flex;min-height:100vh;
+  -webkit-tap-highlight-color:rgba(232,133,74,.2);overflow-x:hidden}
 
 /* SIDEBAR */
 .sidebar{
@@ -24,14 +45,20 @@ body{background:var(--bg);color:var(--text);font-family:'DM Sans',sans-serif;dis
 .nav-section{font-size:.7rem;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);font-weight:600;margin-bottom:.5rem;margin-top:1rem}
 .nav-item{
   display:flex;align-items:center;gap:.7rem;padding:.7rem .9rem;border-radius:9px;
-  cursor:pointer;color:var(--muted);font-size:.9rem;font-weight:500;transition:all .2s;
+  cursor:pointer;color:var(--muted);font-size:.9rem;font-weight:500;
+  transition:background-color .2s,color .2s;
   margin-bottom:.2rem;
+  width:100%;text-align:left;background:transparent;border:none;
+  font-family:'DM Sans',sans-serif;touch-action:manipulation;
 }
 .nav-item:hover{background:var(--card2);color:var(--text)}
 .nav-item.active{background:rgba(232,133,74,.12);color:var(--accent)}
+.nav-item:focus-visible,.user-chip:focus-visible{outline:2px solid var(--accent2);outline-offset:2px}
+a.nav-item{text-decoration:none}
 .nav-item .icon{font-size:1.1rem;width:20px;text-align:center}
 .sidebar-footer{margin-top:auto;padding-top:1.5rem;border-top:1px solid var(--border)}
-.user-chip{display:flex;align-items:center;gap:.7rem;margin-bottom:1rem}
+.user-chip{display:flex;align-items:center;gap:.7rem;margin-bottom:1rem;
+  text-decoration:none;color:inherit}
 .avatar{
   width:34px;height:34px;border-radius:50%;background:var(--accent);
   display:flex;align-items:center;justify-content:center;font-size:.85rem;font-weight:700;color:#fff;
@@ -43,9 +70,10 @@ body{background:var(--bg);color:var(--text);font-family:'DM Sans',sans-serif;dis
 .logout-btn{
   width:100%;padding:.6rem;border-radius:8px;background:transparent;
   border:1px solid var(--border);color:var(--muted);cursor:pointer;font-size:.85rem;
-  font-family:'DM Sans',sans-serif;transition:all .2s;
+  font-family:'DM Sans',sans-serif;transition:border-color .2s,color .2s;
 }
 .logout-btn:hover{border-color:var(--red);color:var(--red)}
+.logout-btn:focus-visible{outline:2px solid var(--accent2);outline-offset:2px}
 
     /* USER CHIP HOVER */
     .user-chip {
@@ -97,8 +125,10 @@ select option{background:var(--bg)}
 .btn{
   display:inline-flex;align-items:center;gap:.5rem;
   padding:.65rem 1.4rem;border-radius:9px;font-weight:600;font-size:.9rem;
-  cursor:pointer;border:none;font-family:'DM Sans',sans-serif;transition:all .2s;
+  cursor:pointer;border:none;font-family:'DM Sans',sans-serif;
+  transition:background-color .2s,border-color .2s,color .2s;touch-action:manipulation;
 }
+.btn:focus-visible{outline:2px solid var(--accent2);outline-offset:2px}
 .btn-primary{background:var(--accent);color:#fff}
 .btn-primary:hover{background:#d9733c}
 .btn-ghost{background:transparent;border:1px solid var(--border);color:var(--text)}
@@ -161,7 +191,7 @@ select option{background:var(--bg)}
   position:fixed;bottom:2rem;right:2rem;z-index:300;
   background:var(--card);border:1px solid var(--border);border-radius:10px;
   padding:.75rem 1.2rem;font-size:.9rem;transform:translateY(20px);opacity:0;
-  transition:all .3s;pointer-events:none;
+  transition:transform .3s,opacity .3s;pointer-events:none;
 }
 .toast.show{transform:translateY(0);opacity:1}
 .toast-success{border-color:rgba(93,207,160,.4);color:var(--green)}
@@ -169,41 +199,195 @@ select option{background:var(--bg)}
 
 @keyframes fadeUp{from{opacity:0;transform:translateY(16px)}to{opacity:1;transform:translateY(0)}}
 
+/* ============================================================
+   PAINEL DE VENDAS — vidro fosco
+   ============================================================ */
+#page-vendas{position:relative;isolation:isolate}
+.v-ambient{
+  position:absolute;inset:-160px -80px auto -80px;height:640px;z-index:0;
+  pointer-events:none;filter:blur(90px);opacity:.42;
+  background:
+    radial-gradient(46% 60% at 18% 30%,rgba(217,115,60,.55),transparent 70%),
+    radial-gradient(40% 55% at 78% 12%,rgba(244,197,106,.28),transparent 72%);
+}
+.v-stack{position:relative;z-index:1;display:flex;flex-direction:column;gap:1.1rem}
+
+.glass{
+  position:relative;border-radius:18px;background:var(--glass-fill);
+  border:1px solid var(--glass-edge);box-shadow:var(--glass-shadow);
+  -webkit-backdrop-filter:blur(22px) saturate(1.35);backdrop-filter:blur(22px) saturate(1.35);
+  overflow:hidden;
+}
+/* Fio de luz na aresta superior — o vidro pegando luz */
+.glass::before{
+  content:"";position:absolute;top:0;left:12%;right:12%;height:1px;z-index:2;
+  background:linear-gradient(90deg,transparent,var(--glass-rim),transparent);
+}
+@supports not ((backdrop-filter:blur(1px)) or (-webkit-backdrop-filter:blur(1px))){
+  .glass{background:rgba(28,28,28,.92)}
+}
+
+/* Rótulo serifado itálico — a assinatura tipográfica dos painéis */
+.eyebrow{
+  font-family:'Fraunces',serif;font-style:italic;font-weight:400;
+  font-size:.95rem;color:var(--muted);letter-spacing:.01em;
+}
+
+/* --- Barra de filtro: uma linha, acima de tudo que ela filtra --- */
+.v-filters{display:flex;align-items:center;justify-content:space-between;gap:1rem;flex-wrap:wrap}
+.seg{display:inline-flex;gap:.15rem;padding:.25rem;border-radius:11px;
+  background:rgba(255,255,255,.04);border:1px solid var(--glass-edge)}
+.seg button{
+  padding:.45rem .85rem;border-radius:8px;border:none;background:transparent;
+  color:var(--muted);font:500 .84rem 'DM Sans',sans-serif;cursor:pointer;
+  transition:background-color .18s,color .18s;touch-action:manipulation;
+}
+.seg button:hover{color:var(--text);background:rgba(255,255,255,.05)}
+.seg button[aria-pressed="true"]{background:rgba(217,115,60,.18);color:var(--accent2)}
+.v-note{font-size:.78rem;color:var(--muted)}
+
+/* --- Painel herói --- */
+.hero-panel{padding:1.7rem 1.7rem 1rem}
+.hero-head{display:flex;align-items:flex-start;justify-content:space-between;gap:1rem;flex-wrap:wrap}
+.hero-figure{
+  font-family:'DM Sans',sans-serif;font-size:clamp(2.6rem,6vw,3.5rem);font-weight:600;
+  line-height:1.02;letter-spacing:-.025em;margin-top:.35rem;
+}
+.delta{
+  display:inline-flex;align-items:center;gap:.4rem;padding:.32rem .7rem;border-radius:50px;
+  font-size:.82rem;font-weight:600;white-space:nowrap;
+}
+.delta-up{background:rgba(93,207,160,.13);color:var(--green)}
+.delta-down{background:rgba(232,90,90,.13);color:var(--red)}
+.delta-flat{background:rgba(255,255,255,.06);color:var(--muted)}
+.delta small{font-weight:400;opacity:.75}
+
+/* --- Tiles de indicador --- */
+.kpi-row{display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:1.1rem}
+.kpi{padding:1.15rem 1.25rem;display:flex;flex-direction:column;gap:.5rem;min-width:0}
+.kpi-label{font-size:.8rem;color:var(--muted)}
+.kpi-value{font-size:1.85rem;font-weight:600;letter-spacing:-.02em;line-height:1.1;
+  overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.kpi-foot{display:flex;align-items:center;justify-content:space-between;gap:.6rem;margin-top:auto}
+
+/* --- Cartões de gráfico --- */
+.chart-grid{display:grid;grid-template-columns:1.35fr 1fr;gap:1.1rem;align-items:start}
+.chart-card{padding:1.35rem 1.4rem 1.1rem;display:flex;flex-direction:column;gap:.2rem}
+.chart-head{display:flex;align-items:flex-start;justify-content:space-between;gap:1rem;margin-bottom:.9rem}
+.chart-title{font-family:'Fraunces',serif;font-size:1.08rem;font-weight:700;text-wrap:balance}
+.chart-sub{font-size:.79rem;color:var(--muted);margin-top:.15rem}
+.chart-body{position:relative;width:100%}
+.chart-body svg{display:block;width:100%;height:auto;overflow:visible}
+/* O brilho segue o pico da série — a luz mais forte onde a loja mais vendeu */
+.peak-glow{
+  position:absolute;top:8%;width:230px;height:150px;margin-left:-115px;z-index:0;
+  pointer-events:none;filter:blur(46px);opacity:.5;
+  background:radial-gradient(circle,rgba(217,115,60,.75),transparent 68%);
+  transition:left .45s cubic-bezier(.22,1,.36,1);
+}
+
+.link-btn{
+  background:none;border:1px solid transparent;border-radius:7px;color:var(--muted);
+  font:500 .78rem 'DM Sans',sans-serif;cursor:pointer;padding:.3rem .6rem;white-space:nowrap;
+  transition:color .18s,border-color .18s;touch-action:manipulation;
+}
+.link-btn:hover{color:var(--accent2);border-color:var(--glass-edge)}
+.link-btn[aria-pressed="true"]{color:var(--accent2);border-color:var(--glass-edge)}
+
+/* --- Dica flutuante --- */
+.vtip{
+  position:absolute;z-index:6;pointer-events:none;opacity:0;
+  transform:translate(-50%,-112%);
+  background:rgba(18,18,18,.94);border:1px solid var(--glass-edge);border-radius:10px;
+  padding:.5rem .7rem;font-size:.79rem;line-height:1.45;white-space:nowrap;
+  box-shadow:0 12px 28px -12px rgba(0,0,0,.9);
+  transition:opacity .14s;
+}
+.vtip[data-show="true"]{opacity:1}
+.vtip b{font-weight:600;font-variant-numeric:tabular-nums}
+.vtip span{color:var(--muted)}
+
+/* --- Tabelas de dados (gêmeas acessíveis de cada gráfico) --- */
+.vtable-wrap{overflow-x:auto;max-height:340px;overflow-y:auto;overscroll-behavior:contain}
+table.vtable{width:100%;border-collapse:collapse;font-size:.85rem}
+table.vtable caption{text-align:left;color:var(--muted);font-size:.78rem;padding-bottom:.6rem}
+table.vtable th,table.vtable td{padding:.6rem .7rem;text-align:left;border-bottom:1px solid var(--grid)}
+table.vtable thead th{
+  position:sticky;top:0;background:rgba(20,20,20,.96);backdrop-filter:blur(8px);
+  font-size:.72rem;text-transform:uppercase;letter-spacing:.06em;color:var(--muted);font-weight:600;
+}
+table.vtable td.num,table.vtable th.num{text-align:right;font-variant-numeric:tabular-nums}
+table.vtable tbody tr:last-child td{border-bottom:none}
+table.vtable tbody tr:hover{background:rgba(255,255,255,.025)}
+.cell-strong{font-weight:600}
+.cell-muted{color:var(--muted);font-size:.8rem}
+.cell-clip{max-width:230px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+
+.v-empty{text-align:center;padding:3.5rem 1.5rem;color:var(--muted)}
+.v-empty .icon{font-size:2.4rem;margin-bottom:.9rem;opacity:.6}
+.v-empty h4{font-family:'Fraunces',serif;font-size:1.15rem;color:var(--text);margin-bottom:.45rem;font-weight:700}
+.v-empty p{font-size:.9rem;max-width:38ch;margin:0 auto 1.2rem;line-height:1.6}
+.skeleton{color:var(--muted);font-size:.88rem;padding:1.5rem 0}
+
+/* --- Foco visível (nunca remover contorno sem substituto) --- */
+.seg button:focus-visible,.link-btn:focus-visible,.chart-body svg:focus-visible,
+.skip-link:focus-visible{
+  outline:2px solid var(--accent2);outline-offset:3px;border-radius:8px;
+}
+.skip-link{
+  position:absolute;left:-9999px;top:0;z-index:400;background:var(--accent);color:#fff;
+  padding:.6rem 1rem;border-radius:0 0 8px 0;font-size:.85rem;font-weight:600;
+}
+.skip-link:focus{left:0}
+.hitbox{fill:transparent;cursor:pointer}
+
+@media(prefers-reduced-motion:reduce){
+  .peak-glow,.vtip,.seg button,.link-btn,.nav-item{transition:none}
+}
+
 /* RESPONSIVE */
+@media(max-width:980px){
+  .chart-grid{grid-template-columns:1fr}
+}
 @media(max-width:768px){
   .sidebar{display:none}
   .main{padding:1.2rem}
   .form-grid{grid-template-columns:1fr}
   .form-group.span2{grid-column:span 1}
+  .hero-panel{padding:1.3rem 1.2rem .9rem}
+  .chart-card{padding:1.15rem 1.1rem 1rem}
+  .v-ambient{filter:blur(70px);opacity:.34}
+  .cell-clip{max-width:130px}
 }
 </style>
 </head>
 <body>
+<a class="skip-link" href="#conteudo">Pular para o conteúdo</a>
 
 <!-- SIDEBAR -->
 <aside class="sidebar">
   <div class="logo">mercado<span>local</span></div>
   <div class="nav-section">Minha Loja</div>
-  <div class="nav-item active" onclick="showPage('dashboard')"><span class="icon">📊</span> Visão Geral</div>
-  <div class="nav-item" onclick="showPage('loja')"><span class="icon">🏪</span> Dados da Loja</div>
-  <div class="nav-item" onclick="showPage('produtos')"><span class="icon">📦</span> Produtos</div>
-  <div class="nav-item" onclick="showPage('vendas')"><span class="icon">🧾</span> Vendas</div>
+  <button type="button" class="nav-item active" data-aba="dashboard" onclick="showPage('dashboard',this)"><span class="icon" aria-hidden="true">📊</span> Visão Geral</button>
+  <button type="button" class="nav-item" data-aba="loja" onclick="showPage('loja',this)"><span class="icon" aria-hidden="true">🏪</span> Dados da Loja</button>
+  <button type="button" class="nav-item" data-aba="produtos" onclick="showPage('produtos',this)"><span class="icon" aria-hidden="true">📦</span> Produtos</button>
+  <button type="button" class="nav-item" data-aba="vendas" onclick="showPage('vendas',this)"><span class="icon" aria-hidden="true">🧾</span> Vendas</button>
   <div class="nav-section">Explorar</div>
-  <div class="nav-item" onclick="window.location.href='marketplace.html'"><span class="icon">🔍</span> Marketplace</div>
+  <a class="nav-item" href="marketplace.html"><span class="icon" aria-hidden="true">🔍</span> Marketplace</a>
   <div class="sidebar-footer">
-    <div class="user-chip" onclick="window.location.href='profile.html'" title="Clique para editar perfil">
-      <div class="avatar" id="avatar-letter">?</div>
+    <a class="user-chip" href="profile.html" title="Editar perfil">
+      <div class="avatar" id="avatar-letter" aria-hidden="true">?</div>
       <div class="user-info">
         <div class="user-name" id="user-name-display">Carregando…</div>
         <div class="user-role">Lojista</div>
       </div>
-    </div>
+    </a>
     <button class="logout-btn" onclick="doLogout()">Sair da conta</button>
   </div>
 </aside>
 
 <!-- MAIN -->
-<main class="main">
+<main class="main" id="conteudo" tabindex="-1">
 
   <!-- DASHBOARD PAGE -->
   <div class="page active" id="page-dashboard">
@@ -334,29 +518,85 @@ select option{background:var(--bg)}
   </div>
 
   <!-- VENDAS PAGE -->
-  <style>
-    .sale-item{display:flex;justify-content:space-between;align-items:center;gap:1rem;padding:1rem 0;border-bottom:1px solid var(--border)}
-    .sale-item:last-child{border-bottom:none}
-    .sale-prod{font-weight:600}
-    .sale-qty{color:var(--accent);font-size:.85rem;margin-left:.3rem}
-    .sale-buyer{color:var(--muted);font-size:.85rem;margin-top:.25rem}
-    .sale-date{color:var(--muted);font-size:.75rem;margin-top:.2rem}
-    .sale-value{color:var(--accent2);font-size:1.1rem;font-weight:700;white-space:nowrap}
-  </style>
   <div class="page" id="page-vendas">
-    <div class="topbar">
-      <div>
-        <div class="page-title">Vendas</div>
-        <div class="page-sub">Quem comprou os produtos da sua loja</div>
+    <div class="v-ambient" aria-hidden="true"></div>
+
+    <div class="v-stack">
+      <div class="topbar" style="margin-bottom:0">
+        <div>
+          <h1 class="page-title">Vendas</h1>
+          <p class="page-sub">O que a sua loja vendeu, e para quem</p>
+        </div>
       </div>
-    </div>
-    <div class="stats-row">
-      <div class="stat-card"><div class="label">Total vendido</div><div class="value g" id="sales-total">R$0,00</div></div>
-      <div class="stat-card"><div class="label">Itens vendidos</div><div class="value o" id="sales-count">0</div></div>
-    </div>
-    <div class="form-card">
-      <h3>🧾 Compras recebidas</h3>
-      <div id="sales-list"><p style="color:var(--muted)">Carregando…</p></div>
+
+      <!-- FILTRO: uma linha só, acima de tudo que ela filtra -->
+      <div class="v-filters">
+        <div class="seg" role="group" aria-label="Período das vendas">
+          <button type="button" data-periodo="7"   aria-pressed="false">7 dias</button>
+          <button type="button" data-periodo="30"  aria-pressed="true">30 dias</button>
+          <button type="button" data-periodo="90"  aria-pressed="false">90 dias</button>
+          <button type="button" data-periodo="all" aria-pressed="false">Tudo</button>
+        </div>
+        <p class="v-note" id="v-range" aria-live="polite"></p>
+      </div>
+
+      <!-- HERÓI: uma figura, e o gráfico dentro do vidro -->
+      <section class="glass hero-panel" aria-labelledby="hero-lbl">
+        <div class="hero-head">
+          <div>
+            <p class="eyebrow" id="hero-lbl">Receita no período</p>
+            <p class="hero-figure" id="hero-receita" aria-live="polite">—</p>
+          </div>
+          <div style="display:flex;align-items:center;gap:.6rem;flex-wrap:wrap">
+            <span class="delta delta-flat" id="hero-delta">—</span>
+            <button type="button" class="link-btn" id="toggle-serie"
+                    aria-pressed="false" aria-controls="serie-body">Ver tabela</button>
+          </div>
+        </div>
+        <div class="chart-body" id="serie-body" style="margin-top:.4rem"></div>
+      </section>
+
+      <!-- INDICADORES -->
+      <div class="kpi-row" id="kpi-row"></div>
+
+      <!-- GRÁFICOS -->
+      <div class="chart-grid">
+        <section class="glass chart-card" aria-labelledby="top-lbl">
+          <div class="chart-head">
+            <div>
+              <h2 class="chart-title" id="top-lbl">Produtos que mais faturam</h2>
+              <p class="chart-sub">Receita por produto no período</p>
+            </div>
+            <button type="button" class="link-btn" id="toggle-top"
+                    aria-pressed="false" aria-controls="top-body">Ver tabela</button>
+          </div>
+          <div class="chart-body" id="top-body"></div>
+        </section>
+
+        <section class="glass chart-card" aria-labelledby="dow-lbl">
+          <div class="chart-head">
+            <div>
+              <h2 class="chart-title" id="dow-lbl">Quando o bairro compra</h2>
+              <p class="chart-sub">Receita por dia da semana</p>
+            </div>
+            <button type="button" class="link-btn" id="toggle-dow"
+                    aria-pressed="false" aria-controls="dow-body">Ver tabela</button>
+          </div>
+          <div class="chart-body" id="dow-body"></div>
+        </section>
+      </div>
+
+      <!-- REGISTRO -->
+      <section class="glass chart-card" aria-labelledby="reg-lbl">
+        <div class="chart-head">
+          <div>
+            <h2 class="chart-title" id="reg-lbl">Compras recebidas</h2>
+            <!-- Só o resumo é anunciado: reler a tabela inteira a cada filtro é ruído -->
+            <p class="chart-sub" id="reg-count" aria-live="polite">Cada item vendido, do mais recente ao mais antigo</p>
+          </div>
+        </div>
+        <div id="sales-list"><p class="skeleton">Carregando…</p></div>
+      </section>
     </div>
   </div>
 
@@ -449,41 +689,523 @@ document.addEventListener('DOMContentLoaded', async ()=>{
   
   currentStore = await DB.getMyStore(currentUser.id);
   loadLojaForm();
-  await loadStats();
-  await renderProductList('dash-product-list', true);
+  ligarControlesVendas();
+
+  // Restaura a aba do link — o filtro de período só é compartilhável se a aba voltar junto.
+  // Aceita ?page= também: é o parâmetro que os links antigos de outras páginas usam.
+  const q = new URLSearchParams(location.search);
+  const aba = q.get('aba') || q.get('page');
+  if(['dashboard','loja','produtos','vendas'].includes(aba) && aba !== 'dashboard'){
+    await showPage(aba, null);
+  } else {
+    await loadStats();
+    await renderProductList('dash-product-list', true);
+  }
 });
 
-async function showPage(name){
+async function showPage(name, origem){
   document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));
   document.querySelectorAll('.nav-item').forEach(n=>n.classList.remove('active'));
   document.getElementById('page-'+name).classList.add('active');
-  event?.currentTarget?.classList.add('active');
+  const nav = origem || document.querySelector(`.nav-item[data-aba="${name}"]`);
+  nav?.classList.add('active');
+  const u = new URL(location); u.searchParams.set('aba', name); history.replaceState({}, '', u);
   if(name==='produtos') await renderProductList('full-product-list', false);
   if(name==='vendas') await renderSales();
   if(name==='dashboard'){ await loadStats(); await renderProductList('dash-product-list', true); }
 }
 
-// ---- VENDAS (quem comprou os produtos da loja) ----
+// ============================================================
+//  VENDAS — painel analítico
+//  Toda marca de dado usa UMA matiz (--data). O par laranja+dourado da
+//  marca reprova no teste de daltonismo, então a distinção vem de
+//  posição e rótulo, nunca de cor.
+// ============================================================
+const V = { raw:null, carregado:false, periodo:'30', vista:{serie:'chart',top:'chart',dow:'chart'} };
+
+const SVGNS = 'http://www.w3.org/2000/svg';
+const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const fmtInt = n => new Intl.NumberFormat('pt-BR').format(n);
+const fmtCompact = n => new Intl.NumberFormat('pt-BR',{notation:'compact',maximumFractionDigits:1}).format(n);
+const fmtEixo = n => n >= 1000 ? 'R$ '+fmtCompact(n) : 'R$ '+fmtInt(Math.round(n));
+const fmtData = (d,o) => new Intl.DateTimeFormat('pt-BR',o).format(d);
+const chaveDia = d => `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+const DIAS = ['Dom','Seg','Ter','Qua','Qui','Sex','Sáb'];
+
+function tetoRedondo(v){
+  if(!(v>0)) return 10;
+  const e = Math.floor(Math.log10(v)), f = v/Math.pow(10,e);
+  return (f<=1?1:f<=2?2:f<=2.5?2.5:f<=5?5:10)*Math.pow(10,e);
+}
+// Barra horizontal: ponta arredondada 4px, quadrada na linha de base
+function pathBarraH(x,y,w,h,r){
+  r = Math.max(0, Math.min(r, w, h/2));
+  if(w<=0.5) return `M${x},${y} h0.5 v${h} h-0.5 Z`;
+  return `M${x},${y} H${x+w-r} A${r},${r} 0 0 1 ${x+w},${y+r} V${y+h-r} A${r},${r} 0 0 1 ${x+w-r},${y+h} H${x} Z`;
+}
+// Coluna vertical: topo arredondado 4px, quadrada na linha de base
+function pathColuna(x,yTopo,w,h,r){
+  r = Math.max(0, Math.min(r, w/2, h));
+  if(h<=0.5) return `M${x},${yTopo+h} h${w} v-0.5 h-${w} Z`;
+  return `M${x},${yTopo+h} V${yTopo+r} A${r},${r} 0 0 1 ${x+r},${yTopo} H${x+w-r} A${r},${r} 0 0 1 ${x+w},${yTopo+r} V${yTopo+h} Z`;
+}
+
+// ---- Janela de tempo e comparação com o período anterior ----
+function janela(periodo, vendas){
+  const fim = new Date(); fim.setHours(23,59,59,999);
+  if(periodo === 'all'){
+    const ts = vendas.map(v=>v.data && +new Date(v.data)).filter(Boolean);
+    const ini = new Date(ts.length ? Math.min(...ts) : Date.now());
+    ini.setHours(0,0,0,0);
+    return { ini, fim, prevIni:null, prevFim:null, tudo:true };
+  }
+  const n = parseInt(periodo,10);
+  const ini = new Date(fim); ini.setDate(ini.getDate()-(n-1)); ini.setHours(0,0,0,0);
+  const prevFim = new Date(ini.getTime()-1);
+  const prevIni = new Date(prevFim); prevIni.setDate(prevIni.getDate()-(n-1)); prevIni.setHours(0,0,0,0);
+  return { ini, fim, prevIni, prevFim, tudo:false };
+}
+const noIntervalo = (v,a,b) => { const t = v.data && +new Date(v.data); return t && t>=+a && t<=+b; };
+
+function metricas(vendas){
+  const pedidos = new Set(), clientes = new Set();
+  let receita = 0, itens = 0;
+  vendas.forEach(v=>{
+    receita += +v.subtotal||0;
+    itens   += +v.qty||0;
+    if(v.pedido_id) pedidos.add(v.pedido_id);
+    clientes.add(v.comprador_email || v.comprador || '—');
+  });
+  return { receita, itens, pedidos:pedidos.size, clientes:clientes.size,
+           ticket: pedidos.size ? receita/pedidos.size : 0 };
+}
+
+function variacao(atual, anterior){
+  if(anterior <= 0) return atual>0 ? {dir:'up',txt:'Primeiras vendas'} : {dir:'flat',txt:'Sem histórico'};
+  const p = (atual-anterior)/anterior*100;
+  if(Math.abs(p) < 0.5) return {dir:'flat',txt:'Estável'};
+  // Base quase zero gera porcentagem sem sentido (“▲ 99.999.900%”) — corta em 999%
+  if(Math.abs(p) > 999) return { dir:p>0?'up':'down', txt:(p>0?'▲ ':'▼ ')+'mais de 999%' };
+  return { dir: p>0?'up':'down',
+           txt: (p>0?'▲ ':'▼ ')+new Intl.NumberFormat('pt-BR',{maximumFractionDigits:1}).format(Math.abs(p))+'%' };
+}
+
+// ---- Série temporal com granularidade adaptada ao intervalo ----
+function serieTemporal(vendas, ini, fim){
+  const dias = Math.round((fim-ini)/864e5)+1;
+  const gran = dias<=92 ? 'dia' : dias<=550 ? 'semana' : 'mes';
+  const baldes = [], indice = new Map();
+  const cursor = new Date(ini); cursor.setHours(0,0,0,0);
+  if(gran==='semana') cursor.setDate(cursor.getDate()-((cursor.getDay()+6)%7));
+  if(gran==='mes')    cursor.setDate(1);
+
+  while(cursor <= fim){
+    const k = chaveDia(cursor);
+    indice.set(k, baldes.length);
+    baldes.push({ t:new Date(cursor), valor:0, itens:0 });
+    if(gran==='dia')    cursor.setDate(cursor.getDate()+1);
+    if(gran==='semana') cursor.setDate(cursor.getDate()+7);
+    if(gran==='mes')    cursor.setMonth(cursor.getMonth()+1);
+  }
+  const chaveDe = d => {
+    const c = new Date(d); c.setHours(0,0,0,0);
+    if(gran==='semana') c.setDate(c.getDate()-((c.getDay()+6)%7));
+    if(gran==='mes')    c.setDate(1);
+    return chaveDia(c);
+  };
+  vendas.forEach(v=>{
+    if(!v.data) return;
+    const i = indice.get(chaveDe(new Date(v.data)));
+    if(i !== undefined){ baldes[i].valor += +v.subtotal||0; baldes[i].itens += +v.qty||0; }
+  });
+  return { baldes, gran };
+}
+
+const rotuloBalde = (b,gran) =>
+  gran==='mes'    ? fmtData(b.t,{month:'short',year:'2-digit'})
+: gran==='semana' ? 'Semana de '+fmtData(b.t,{day:'2-digit',month:'short'})
+:                   fmtData(b.t,{day:'2-digit',month:'short'});
+
+// ============================================================
+//  Renderização
+// ============================================================
 async function renderSales(){
-  const el = document.getElementById('sales-list');
-  el.innerHTML = '<p style="color:var(--muted)">Carregando…</p>';
-  const data = await DB.getSales();
-  const vendas = data.vendas || [];
-  document.getElementById('sales-total').textContent = formatPrice(data.total || 0);
-  document.getElementById('sales-count').textContent = vendas.reduce((s,v)=>s+(v.qty||0),0);
-  if(!vendas.length){
-    el.innerHTML = `<p style="color:var(--muted);text-align:center;padding:2rem">Nenhuma venda ainda.<br/>Quando alguém comprar um produto da sua loja, aparece aqui com o nome de quem comprou.</p>`;
+  aplicarPeriodoDaURL();
+  if(!V.carregado){
+    const data = await DB.getSales();
+    V.raw = (data.vendas || []).slice();
+    V.carregado = true;
+  }
+  desenharVendas();
+}
+
+function aplicarPeriodoDaURL(){
+  const p = new URLSearchParams(location.search).get('periodo');
+  if(['7','30','90','all'].includes(p)) V.periodo = p;
+  document.querySelectorAll('.seg [data-periodo]').forEach(b=>
+    b.setAttribute('aria-pressed', String(b.dataset.periodo === V.periodo)));
+}
+
+function desenharVendas(){
+  const todas = V.raw || [];
+  const j = janela(V.periodo, todas);
+  const atuais = j.tudo ? todas : todas.filter(v=>noIntervalo(v,j.ini,j.fim));
+  const antes  = j.tudo ? [] : todas.filter(v=>noIntervalo(v,j.prevIni,j.prevFim));
+  const m = metricas(atuais), mAntes = metricas(antes);
+  const semData = todas.filter(v=>!v.data).length;
+
+  // Intervalo em texto
+  const range = document.getElementById('v-range');
+  // Vendas sem data entram nos totais mas não na linha do tempo — a diferença é dita, nunca silenciosa
+  const notaSemData = semData
+    ? ` · ${semData} ${semData===1?'venda sem data registrada fica de fora':'vendas sem data registrada ficam de fora'} dos gráficos por tempo`
+    : '';
+  if(!todas.length){ range.textContent = ''; }
+  else if(j.tudo){
+    range.textContent = `Desde ${fmtData(j.ini,{day:'2-digit',month:'long',year:'numeric'})}` + notaSemData;
+  } else {
+    range.textContent = `${fmtData(j.ini,{day:'2-digit',month:'short'})} – ${fmtData(j.fim,{day:'2-digit',month:'short'})}`
+      + (semData ? ` · ${semData} ${semData===1?'venda sem data aparece':'vendas sem data aparecem'} só em “Tudo”` : '');
+  }
+
+  // Estado vazio: convite para agir, não um beco sem saída
+  if(!todas.length){
+    document.getElementById('hero-receita').textContent = formatPrice(0);
+    document.getElementById('hero-delta').className = 'delta delta-flat';
+    document.getElementById('hero-delta').textContent = 'Sem histórico';
+    document.getElementById('serie-body').innerHTML = '';
+    document.getElementById('kpi-row').innerHTML = '';
+    ['top-body','dow-body'].forEach(id=>document.getElementById(id).innerHTML =
+      '<p class="skeleton" style="text-align:center">Sem dados no período</p>');
+    document.getElementById('reg-count').textContent = 'Cada item vendido, do mais recente ao mais antigo';
+    document.getElementById('sales-list').innerHTML = `
+      <div class="v-empty">
+        <div class="icon" aria-hidden="true">🧾</div>
+        <h4>Nenhuma venda ainda</h4>
+        <p>Assim que alguém comprar um produto da sua loja, a compra aparece aqui com o nome de quem comprou — e os gráficos acima começam a se preencher.</p>
+        <button type="button" class="btn btn-primary" onclick="showPage('produtos',null)">Publicar um produto</button>
+      </div>`;
     return;
   }
-  el.innerHTML = vendas.map(v=>`
-    <div class="sale-item">
-      <div>
-        <div class="sale-prod">${v.produto_nome}<span class="sale-qty">×${v.qty}</span></div>
-        <div class="sale-buyer">👤 ${v.comprador}${v.comprador_email?` · ${v.comprador_email}`:''}</div>
-        ${v.data?`<div class="sale-date">${new Date(v.data).toLocaleString('pt-BR')}</div>`:''}
-      </div>
-      <div class="sale-value">${formatPrice(v.subtotal)}</div>
+
+  // Herói
+  document.getElementById('hero-receita').textContent = formatPrice(m.receita);
+  const dv = j.tudo ? {dir:'flat',txt:'Período completo'} : variacao(m.receita, mAntes.receita);
+  const elDelta = document.getElementById('hero-delta');
+  elDelta.className = 'delta delta-'+dv.dir;
+  elDelta.innerHTML = `${esc(dv.txt)}${j.tudo?'':' <small>vs. período anterior</small>'}`;
+
+  // Indicadores
+  const tiles = [
+    { rot:'Pedidos',      val:fmtInt(m.pedidos),        d:j.tudo?null:variacao(m.pedidos,mAntes.pedidos) },
+    { rot:'Ticket médio', val:formatPrice(m.ticket),    d:j.tudo?null:variacao(m.ticket,mAntes.ticket) },
+    { rot:'Itens vendidos',val:fmtInt(m.itens),         d:j.tudo?null:variacao(m.itens,mAntes.itens) },
+    { rot:'Clientes',     val:fmtInt(m.clientes),       d:j.tudo?null:variacao(m.clientes,mAntes.clientes) },
+  ];
+  document.getElementById('kpi-row').innerHTML = tiles.map(t=>`
+    <div class="glass kpi">
+      <p class="kpi-label">${t.rot}</p>
+      <p class="kpi-value" title="${esc(t.val)}">${esc(t.val)}</p>
+      <div class="kpi-foot">${t.d?`<span class="delta delta-${t.d.dir}">${esc(t.d.txt)}</span>`:'<span></span>'}</div>
     </div>`).join('');
+
+  // Gráficos
+  const serie = serieTemporal(atuais, j.ini, j.fim);
+  V.dados = { serie, atuais, m };
+  pintarSerie(); pintarTop(); pintarDow();
+  pintarRegistro(atuais);
+}
+
+// ---- 1. Receita ao longo do tempo (área + linha, série única) ----
+function pintarSerie(){
+  const box = document.getElementById('serie-body');
+  const { baldes, gran } = V.dados.serie;
+  if(V.vista.serie === 'table'){
+    box.innerHTML = tabela(
+      'Receita por período',
+      [{t:'Período'},{t:'Itens',num:true},{t:'Receita',num:true}],
+      baldes.map(b=>[ rotuloBalde(b,gran), fmtInt(b.itens), formatPrice(b.valor) ])
+    );
+    return;
+  }
+  const w = Math.max(320, box.clientWidth || 640), h = 250;
+  const pad = { t:18, r:22, b:30, l:62 };
+  const iw = w-pad.l-pad.r, ih = h-pad.t-pad.b;
+  const n = baldes.length;
+  const teto = tetoRedondo(Math.max(...baldes.map(b=>b.valor), 0)) || 10;
+  const X = i => pad.l + (n<=1 ? iw/2 : i*(iw/(n-1)));
+  const Y = v => pad.t + ih - (v/teto)*ih;
+  const iMax = baldes.reduce((best,b,i)=> b.valor > baldes[best].valor ? i : best, 0);
+
+  let g = '';
+  // Grade: hairline sólida, recuada
+  for(let k=0;k<=4;k++){
+    const v = teto*k/4, y = Y(v);
+    g += `<line x1="${pad.l}" y1="${y}" x2="${w-pad.r}" y2="${y}" stroke="var(--grid)" stroke-width="1"/>`;
+    g += `<text x="${pad.l-10}" y="${y+4}" text-anchor="end" font-size="11" fill="var(--axis)"
+            style="font-variant-numeric:tabular-nums">${fmtEixo(v)}</text>`;
+  }
+  // Eixo x: ~5 marcas
+  const passo = Math.max(1, Math.ceil(n/5));
+  for(let i=0;i<n;i+=passo){
+    g += `<text x="${X(i)}" y="${h-10}" text-anchor="middle" font-size="11" fill="var(--axis)">${
+      gran==='dia' ? fmtData(baldes[i].t,{day:'2-digit',month:'short'}) : rotuloBalde(baldes[i],gran)}</text>`;
+  }
+  const linha = baldes.map((b,i)=>`${i?'L':'M'}${X(i).toFixed(1)},${Y(b.valor).toFixed(1)}`).join(' ');
+  g += `<defs><linearGradient id="grad-serie" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0%" stop-color="var(--data)" stop-opacity="0.16"/>
+          <stop offset="100%" stop-color="var(--data)" stop-opacity="0"/>
+        </linearGradient></defs>`;
+  g += `<path d="${linha} L${X(n-1)},${Y(0)} L${X(0)},${Y(0)} Z" fill="url(#grad-serie)"/>`;
+  g += `<path d="${linha}" fill="none" stroke="var(--data)" stroke-width="2"
+          stroke-linejoin="round" stroke-linecap="round"/>`;
+  // Marcadores: todos quando cabem; senão só pico e ponta. Anel de 2px na superfície.
+  const pontos = n<=14 ? baldes.map((_,i)=>i) : [...new Set([iMax, n-1])];
+  pontos.forEach(i=>{
+    g += `<circle cx="${X(i)}" cy="${Y(baldes[i].valor)}" r="4.5" fill="var(--data)"
+            stroke="#141414" stroke-width="2"/>`;
+  });
+  // Rótulo direto: só o pico (e a ponta, se não colidir)
+  const rotular = [iMax];
+  if(n-1 !== iMax && Math.abs(X(n-1)-X(iMax)) > 78) rotular.push(n-1);
+  rotular.forEach(i=>{
+    if(baldes[i].valor <= 0) return;
+    const anchor = X(i) > w-90 ? 'end' : X(i) < pad.l+40 ? 'start' : 'middle';
+    g += `<text x="${X(i)}" y="${Math.max(pad.t+2, Y(baldes[i].valor)-13)}" text-anchor="${anchor}"
+            font-size="11.5" font-weight="600" fill="var(--text)"
+            style="font-variant-numeric:tabular-nums">${fmtEixo(baldes[i].valor)}</text>`;
+  });
+  // Camada de leitura: mira + dica, com faixas de toque largas
+  g += `<g id="serie-mira" opacity="0">
+          <line y1="${pad.t}" y2="${pad.t+ih}" stroke="var(--data)" stroke-width="1" opacity=".55"/>
+          <circle r="5.5" fill="var(--data)" stroke="#141414" stroke-width="2"/>
+        </g>`;
+  baldes.forEach((b,i)=>{
+    const bw = n<=1 ? iw : iw/(n-1);
+    g += `<rect class="hitbox" x="${X(i)-bw/2}" y="${pad.t}" width="${bw}" height="${ih}" data-i="${i}"/>`;
+  });
+
+  const resumo = `Receita por ${gran}, de ${rotuloBalde(baldes[0],gran)} a ${rotuloBalde(baldes[n-1],gran)}. `
+    + `Pico de ${fmtEixo(baldes[iMax].valor)} em ${rotuloBalde(baldes[iMax],gran)}.`;
+  box.innerHTML =
+    `<div class="peak-glow" aria-hidden="true" style="left:${X(iMax)}px"></div>`
+    + `<svg viewBox="0 0 ${w} ${h}" width="${w}" height="${h}" role="img" tabindex="0"
+         aria-label="${esc(resumo)}" style="max-width:100%">${g}</svg>`
+    + `<div class="vtip" id="serie-tip" role="status"></div>`;
+
+  ligarDica(box, '#serie-tip', i => {
+    const b = baldes[i];
+    return { x:X(i), y:Y(b.valor),
+      html:`<b>${formatPrice(b.valor)}</b><br><span>${rotuloBalde(b,gran)} · ${fmtInt(b.itens)} ${b.itens===1?'item':'itens'}</span>` };
+  }, n, box.querySelector('#serie-mira'), X, i=>Y(baldes[i].valor));
+}
+
+// ---- 2. Produtos que mais faturam (barras horizontais, matiz única) ----
+function pintarTop(){
+  const box = document.getElementById('top-body');
+  const mapa = new Map();
+  V.dados.atuais.forEach(v=>{
+    const k = v.produto_nome || 'Sem nome';
+    const a = mapa.get(k) || { nome:k, receita:0, qty:0 };
+    a.receita += +v.subtotal||0; a.qty += +v.qty||0; mapa.set(k,a);
+  });
+  const itens = [...mapa.values()].sort((a,b)=>b.receita-a.receita).slice(0,6);
+  if(!itens.length){ box.innerHTML = '<p class="skeleton" style="text-align:center">Sem vendas no período</p>'; return; }
+
+  if(V.vista.top === 'table'){
+    box.innerHTML = tabela('Receita por produto',
+      [{t:'Produto'},{t:'Qtd',num:true},{t:'Receita',num:true}],
+      itens.map(i=>[i.nome, fmtInt(i.qty), formatPrice(i.receita)]));
+    return;
+  }
+  const w = Math.max(300, box.clientWidth || 420);
+  const linhaH = 48, barH = 18, padR = 8;
+  const h = itens.length*linhaH;
+  const teto = itens[0].receita || 1;
+  const larguraMax = w - padR - 96;   // reserva espaço p/ o valor na ponta
+
+  let g = '';
+  itens.forEach((it,i)=>{
+    const y = i*linhaH, bw = Math.max(2, (it.receita/teto)*larguraMax), by = y+20;
+    g += `<text x="0" y="${y+12}" font-size="12.5" fill="var(--text)">${esc(cortar(it.nome, Math.floor(w/8.4)))}</text>`;
+    g += `<path d="${pathBarraH(0, by, bw, barH, 4)}" fill="var(--data)"/>`;
+    g += `<text x="${bw+10}" y="${by+13}" font-size="12" font-weight="600" fill="var(--text)"
+            style="font-variant-numeric:tabular-nums">${fmtEixo(it.receita)}</text>`;
+    g += `<rect class="hitbox" x="0" y="${y}" width="${w}" height="${linhaH}" data-i="${i}"/>`;
+  });
+  const resumo = 'Receita por produto. ' + itens.map(i=>`${i.nome}: ${fmtEixo(i.receita)}`).join('; ') + '.';
+  box.innerHTML = `<svg viewBox="0 0 ${w} ${h}" width="${w}" height="${h}" role="img" tabindex="0"
+      aria-label="${esc(resumo)}" style="max-width:100%">${g}</svg><div class="vtip" id="top-tip" role="status"></div>`;
+
+  ligarDica(box, '#top-tip', i => ({
+    x: Math.min(w-70, (itens[i].receita/teto)*larguraMax),
+    y: i*linhaH + 20,
+    html:`<b>${formatPrice(itens[i].receita)}</b><br><span>${esc(itens[i].nome)} · ${fmtInt(itens[i].qty)} ${itens[i].qty===1?'unidade':'unidades'}</span>`
+  }), itens.length);
+}
+
+// ---- 3. Receita por dia da semana (colunas, categorias ordenadas) ----
+function pintarDow(){
+  const box = document.getElementById('dow-body');
+  const acc = DIAS.map((d,i)=>({ dia:d, i, receita:0, qty:0 }));
+  let comData = 0;
+  V.dados.atuais.forEach(v=>{
+    if(!v.data) return;
+    comData++;
+    const d = acc[new Date(v.data).getDay()];
+    d.receita += +v.subtotal||0; d.qty += +v.qty||0;
+  });
+  if(!comData){ box.innerHTML = '<p class="skeleton" style="text-align:center">Sem vendas com data no período</p>'; return; }
+
+  if(V.vista.dow === 'table'){
+    box.innerHTML = tabela('Receita por dia da semana',
+      [{t:'Dia'},{t:'Itens',num:true},{t:'Receita',num:true}],
+      acc.map(d=>[d.dia, fmtInt(d.qty), formatPrice(d.receita)]));
+    return;
+  }
+  const w = Math.max(300, box.clientWidth || 420), h = 250;
+  const pad = { t:26, r:4, b:28, l:4 };
+  const iw = w-pad.l-pad.r, ih = h-pad.t-pad.b;
+  const teto = tetoRedondo(Math.max(...acc.map(d=>d.receita))) || 10;
+  const banda = iw/7, barW = Math.min(24, banda-10);   // ≤24px, folga de superfície entre vizinhas
+  const iMax = acc.reduce((b,d,i)=> d.receita > acc[b].receita ? i : b, 0);
+
+  let g = `<line x1="${pad.l}" y1="${pad.t+ih}" x2="${w-pad.r}" y2="${pad.t+ih}" stroke="var(--grid)" stroke-width="1"/>`;
+  acc.forEach((d,i)=>{
+    const cx = pad.l + banda*i + banda/2;
+    const bh = d.receita>0 ? Math.max(2,(d.receita/teto)*ih) : 0;
+    if(bh) g += `<path d="${pathColuna(cx-barW/2, pad.t+ih-bh, barW, bh, 4)}"
+                    fill="var(--data)" fill-opacity="${i===iMax?1:.55}"/>`;
+    // Rótulo direto só no pico — nunca um número sobre cada coluna
+    if(i===iMax && d.receita>0)
+      g += `<text x="${cx}" y="${pad.t+ih-bh-9}" text-anchor="middle" font-size="11.5" font-weight="600"
+              fill="var(--text)" style="font-variant-numeric:tabular-nums">${fmtEixo(d.receita)}</text>`;
+    g += `<text x="${cx}" y="${h-9}" text-anchor="middle" font-size="11"
+            fill="${i===iMax?'var(--text)':'var(--axis)'}">${d.dia}</text>`;
+    g += `<rect class="hitbox" x="${pad.l+banda*i}" y="${pad.t}" width="${banda}" height="${ih}" data-i="${i}"/>`;
+  });
+  const resumo = 'Receita por dia da semana. ' + acc.map(d=>`${d.dia}: ${fmtEixo(d.receita)}`).join('; ')
+    + `. Melhor dia: ${acc[iMax].dia}.`;
+  box.innerHTML = `<svg viewBox="0 0 ${w} ${h}" width="${w}" height="${h}" role="img" tabindex="0"
+      aria-label="${esc(resumo)}" style="max-width:100%">${g}</svg><div class="vtip" id="dow-tip" role="status"></div>`;
+
+  ligarDica(box, '#dow-tip', i => ({
+    x: pad.l + banda*i + banda/2,
+    y: pad.t+ih-(acc[i].receita/teto)*ih,
+    html:`<b>${formatPrice(acc[i].receita)}</b><br><span>${acc[i].dia} · ${fmtInt(acc[i].qty)} ${acc[i].qty===1?'item':'itens'}</span>`
+  }), 7);
+}
+
+// ---- 4. Registro de compras (a tabela é a leitura primária, não um fallback) ----
+function pintarRegistro(atuais){
+  const el = document.getElementById('sales-list');
+  document.getElementById('reg-count').textContent =
+    `${fmtInt(atuais.length)} ${atuais.length===1?'item vendido':'itens vendidos'} no período, do mais recente ao mais antigo`;
+  if(!atuais.length){
+    el.innerHTML = `<div class="v-empty"><div class="icon" aria-hidden="true">🗓️</div>
+      <h4>Nenhuma venda neste período</h4>
+      <p>Sua loja já vendeu antes — experimente um intervalo maior no filtro acima.</p></div>`;
+    return;
+  }
+  el.innerHTML = `<div class="vtable-wrap"><table class="vtable">
+    <caption>Compras recebidas no período selecionado</caption>
+    <thead><tr>
+      <th scope="col">Produto</th><th scope="col">Comprador</th>
+      <th scope="col">Data</th><th scope="col" class="num">Qtd</th><th scope="col" class="num">Valor</th>
+    </tr></thead><tbody>
+    ${atuais.map(v=>`<tr>
+      <td class="cell-strong cell-clip" title="${esc(v.produto_nome)}">${esc(v.produto_nome)}</td>
+      <td class="cell-clip" title="${esc(v.comprador_email||v.comprador)}">${esc(v.comprador)}
+        ${v.comprador_email?`<div class="cell-muted">${esc(v.comprador_email)}</div>`:''}</td>
+      <td class="cell-muted">${v.data ? fmtData(new Date(v.data),{day:'2-digit',month:'short',year:'2-digit',hour:'2-digit',minute:'2-digit'}) : '—'}</td>
+      <td class="num">${fmtInt(v.qty)}</td>
+      <td class="num cell-strong">${formatPrice(v.subtotal)}</td>
+    </tr>`).join('')}
+    </tbody></table></div>`;
+}
+
+// ---- Utilidades compartilhadas ----
+const cortar = (s,n) => { s = String(s||''); return s.length>n ? s.slice(0,Math.max(1,n-1)).trimEnd()+'…' : s; };
+
+function tabela(legenda, colunas, linhas){
+  return `<div class="vtable-wrap"><table class="vtable">
+    <caption>${esc(legenda)}</caption>
+    <thead><tr>${colunas.map(c=>`<th scope="col"${c.num?' class="num"':''}>${esc(c.t)}</th>`).join('')}</tr></thead>
+    <tbody>${linhas.map(r=>`<tr>${r.map((v,i)=>{
+      const cls = [colunas[i].num?'num':'', i===0?'cell-clip':''].filter(Boolean).join(' ');
+      return `<td${cls?` class="${cls}"`:''}${i===0?` title="${esc(v)}"`:''}>${esc(v)}</td>`;
+    }).join('')}</tr>`).join('')}
+    </tbody></table></div>`;
+}
+
+// Mira + dica, com paridade de teclado: o foco mostra o mesmo que o ponteiro.
+function ligarDica(box, seletorTip, dadosDe, total, mira, X, Yv){
+  const svg = box.querySelector('svg'), tip = box.querySelector(seletorTip);
+  if(!svg || !tip) return;
+  let ativo = -1;
+
+  const mostrar = i => {
+    if(i<0 || i>=total) return;
+    ativo = i;
+    const d = dadosDe(i), r = svg.getBoundingClientRect(), bb = box.getBoundingClientRect();
+    const k = r.width / svg.viewBox.baseVal.width;
+    tip.innerHTML = d.html;
+    tip.style.left = ((r.left-bb.left) + d.x*k) + 'px';
+    tip.style.top  = ((r.top -bb.top ) + d.y*k) + 'px';
+    tip.dataset.show = 'true';
+    if(mira && X){ mira.setAttribute('opacity','1');
+      mira.querySelector('line').setAttribute('x1',X(i)); mira.querySelector('line').setAttribute('x2',X(i));
+      mira.querySelector('circle').setAttribute('cx',X(i)); mira.querySelector('circle').setAttribute('cy',Yv(i)); }
+  };
+  const esconder = () => { ativo=-1; tip.dataset.show='false'; mira?.setAttribute('opacity','0'); };
+
+  box.querySelectorAll('.hitbox').forEach(hb=>{
+    hb.addEventListener('pointerenter', ()=>mostrar(+hb.dataset.i));
+    hb.addEventListener('pointermove',  ()=>mostrar(+hb.dataset.i));
+  });
+  svg.addEventListener('pointerleave', esconder);
+  svg.addEventListener('blur', esconder);
+  svg.addEventListener('focus', ()=>mostrar(Math.max(0,ativo)));
+  svg.addEventListener('keydown', e=>{
+    if(e.key==='ArrowRight'||e.key==='ArrowDown'){ e.preventDefault(); mostrar(Math.min(total-1, ativo+1)); }
+    else if(e.key==='ArrowLeft'||e.key==='ArrowUp'){ e.preventDefault(); mostrar(Math.max(0, ativo-1)); }
+    else if(e.key==='Home'){ e.preventDefault(); mostrar(0); }
+    else if(e.key==='End'){ e.preventDefault(); mostrar(total-1); }
+    else if(e.key==='Escape'){ esconder(); }
+  });
+}
+
+// ---- Controles: filtro de período e alternância gráfico/tabela ----
+function ligarControlesVendas(){
+  document.querySelectorAll('.seg [data-periodo]').forEach(btn=>{
+    btn.addEventListener('click', ()=>{
+      V.periodo = btn.dataset.periodo;
+      document.querySelectorAll('.seg [data-periodo]').forEach(b=>
+        b.setAttribute('aria-pressed', String(b===btn)));
+      const u = new URL(location); u.searchParams.set('periodo', V.periodo);
+      history.replaceState({}, '', u);
+      desenharVendas();                       // sem refetch, sem pisca-pisca de esqueleto
+    });
+  });
+  [['toggle-serie','serie',pintarSerie],['toggle-top','top',pintarTop],['toggle-dow','dow',pintarDow]]
+    .forEach(([id,chave,pintar])=>{
+      const btn = document.getElementById(id);
+      btn?.addEventListener('click', ()=>{
+        V.vista[chave] = V.vista[chave]==='chart' ? 'table' : 'chart';
+        const tabelaAtiva = V.vista[chave]==='table';
+        btn.setAttribute('aria-pressed', String(tabelaAtiva));
+        btn.textContent = tabelaAtiva ? 'Ver gráfico' : 'Ver tabela';
+        if(V.dados) pintar();
+      });
+    });
+
+  // Redesenha na mudança de largura — SVG nítido em vez de esticado
+  let t;
+  new ResizeObserver(()=>{
+    clearTimeout(t);
+    t = setTimeout(()=>{ if(V.dados && document.getElementById('page-vendas').classList.contains('active')){
+      pintarSerie(); pintarTop(); pintarDow(); } }, 140);
+  }).observe(document.querySelector('.main'));
 }
 
 // ---- STORE ----

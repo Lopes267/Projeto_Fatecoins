@@ -201,6 +201,9 @@ app.post('/api/auth/register', async (req, res) => {
   if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
     return res.status(400).json({ ok: false, msg: 'Formato de e-mail inválido.' });
   }
+  if (!['lojista', 'cliente', 'entregador'].includes(tipo)) {
+    return res.status(400).json({ ok: false, msg: 'Tipo de conta inválido.' });
+  }
 
   try {
     let firebaseUser;
@@ -835,8 +838,13 @@ app.post('/api/orders', authenticateToken, async (req, res) => {
 
     // Dados do comprador (para o lojista ver quem comprou)
     const userDoc = await db.collection('usuarios').doc(req.user.uid).get();
-    const usuario_nome  = userDoc.exists ? userDoc.data().nome  : 'Cliente';
-    const usuario_email = userDoc.exists ? userDoc.data().email : null;
+    const perfil = userDoc.exists ? userDoc.data() : {};
+    const usuario_nome  = perfil.nome  || 'Cliente';
+    const usuario_email = perfil.email || null;
+
+    // Endereço de entrega: o que o checkout mandou, completado pelo CEP (ViaCEP)
+    // e, no que faltar, pelo cadastro do cliente. É o que o entregador vai ver.
+    const entrega = await montarEnderecoEntrega(req.body.entrega || {}, perfil);
 
     // Baixa o estoque conforme a quantidade comprada de cada produto
     const qtyPorProduto = {};
@@ -850,13 +858,23 @@ app.post('/api/orders', authenticateToken, async (req, res) => {
       }
     }
 
+    const agora = new Date().toISOString();
     const ref = await db.collection('pedidos').add({
       usuario_id: req.user.uid,
       usuario_nome, usuario_email,
+      usuario_telefone: perfil.telefone || null,
       itens: normalizados,
       produto_ids,                               // facilita checar "comprou este produto?"
       loja_ids,                                  // facilita listar vendas por loja
       total: Math.round(total * 100) / 100,
+      // --- entrega: o pedido nasce na fila, esperando um entregador aceitar ---
+      entrega_status: 'aguardando',
+      entrega,
+      entregador_id: null,
+      entregador_nome: null,
+      entregador_telefone: null,
+      entregador_local: null,                    // última posição GPS enviada pelo entregador
+      entrega_historico: [{ status: 'aguardando', em: agora }],
       criado_em: admin.firestore.FieldValue.serverTimestamp()
     });
     res.json({ ok: true, pedido: { id: ref.id } });
@@ -873,7 +891,19 @@ app.get('/api/sales', authenticateToken, async (req, res) => {
     const myLojaIds = lojasSnap.docs.map(d => d.id);
     if (!myLojaIds.length) return res.json({ ok: true, vendas: [], total: 0 });
 
-    const pedidosSnap = await db.collection('pedidos').get();   // escala de demo: filtra em memória
+    // Consulta só os pedidos que tocam as minhas lojas, usando o loja_ids gravado na criação.
+    // (Antes isto lia a coleção inteira e filtrava em memória: uma leitura por pedido do
+    //  marketplace a cada abertura do painel.) array-contains-any aceita 30 valores por
+    //  consulta, então lojistas com mais de 30 lojas viram vários lotes, deduplicados por id.
+    const lotes = [];
+    for (let i = 0; i < myLojaIds.length; i += 30) lotes.push(myLojaIds.slice(i, i + 30));
+    const docsPorId = new Map();
+    for (const lote of lotes) {
+      const snap = await db.collection('pedidos').where('loja_ids', 'array-contains-any', lote).get();
+      snap.docs.forEach(d => docsPorId.set(d.id, d));
+    }
+    const pedidosSnap = { docs: [...docsPorId.values()] };
+
     const vendas = [];
     pedidosSnap.docs.forEach(d => {
       const ped = d.data();
@@ -915,6 +945,438 @@ app.get('/api/orders', authenticateToken, async (req, res) => {
     res.json({ ok: true, produtos: Object.values(porProduto) });
   } catch (err) {
     console.error('Erro ao listar pedidos:', err);
+    res.status(500).json({ ok: false, msg: 'Erro interno do servidor.' });
+  }
+});
+
+// ============================================================
+//  ENTREGAS – o entregador escolhe um pedido e compartilha o GPS
+//
+//  Os dados vivem no próprio documento de "pedidos" (não há coleção nova):
+//    entrega_status ....... aguardando → aceito → a_caminho → entregue
+//    entrega .............. endereço do cliente (+ lat/lng quando dá para geocodificar)
+//    entregador_id/nome ... quem aceitou (null enquanto está na fila)
+//    entregador_local ..... última posição enviada pelo app do entregador
+//    entrega_historico .... carimbo de cada mudança de status
+// ============================================================
+
+const ENTREGA_FLUXO = ['aguardando', 'aceito', 'a_caminho', 'entregue'];
+
+// Só o dono do tipo certo passa. Devolve o perfil, ou null (já respondeu o erro).
+async function exigirTipo(req, res, tipo) {
+  const doc = await db.collection('usuarios').doc(req.user.uid).get();
+  if (!doc.exists) { res.status(404).json({ ok: false, msg: 'Usuário não encontrado.' }); return null; }
+  const perfil = doc.data();
+  if (perfil.tipo !== tipo) {
+    res.status(403).json({ ok: false, msg: `Acesso restrito a contas do tipo "${tipo}".` });
+    return null;
+  }
+  return perfil;
+}
+
+// Lê uma coordenada vinda do cliente. CUIDADO: Number(null) é 0 e Number.isFinite(0)
+// é true — foi assim que endereços sem GPS acabaram gravados na "Ilha Nula" (0,0),
+// no Golfo da Guiné. Aqui, ausência de valor vira null de verdade.
+function coordenada(v) {
+  if (v === null || v === undefined || v === '') return null;
+  const n = Number(v);
+  return Number.isFinite(n) ? n : null;
+}
+
+// O marketplace é brasileiro: coordenada fora daqui (ou exatamente 0,0) é erro,
+// não endereço. Serve de rede de segurança para qualquer origem de coordenada.
+function coordenadaPlausivel(lat, lng) {
+  if (lat === null || lng === null) return false;
+  if (lat === 0 && lng === 0) return false;                    // Ilha Nula
+  return lat >= -34.5 && lat <= 5.5 && lng >= -74.5 && lng <= -33.5;
+}
+
+// Devolve { lat, lng } do par se ele for plausível; senão null.
+function coordsValidas(o) {
+  if (!o) return null;
+  const lat = coordenada(o.lat), lng = coordenada(o.lng);
+  return coordenadaPlausivel(lat, lng) ? { lat, lng } : null;
+}
+
+const esperar = (ms) => new Promise(r => setTimeout(r, ms));
+
+// Uma consulta ao Nominatim (OpenStreetMap, sem chave de API).
+async function nominatim(params) {
+  const url = 'https://nominatim.openstreetmap.org/search?format=jsonv2&limit=1&countrycodes=br&' +
+              new URLSearchParams(params);
+  try {
+    const r = await fetch(url, {
+      headers: { 'User-Agent': 'MercadoLocal/1.0 (entregas)' },   // exigido pela política de uso
+      signal: AbortSignal.timeout(7000)
+    });
+    if (!r.ok) return null;
+    const lista = await r.json();
+    if (!Array.isArray(lista) || !lista.length) return null;
+    const lat = parseFloat(lista[0].lat), lng = parseFloat(lista[0].lon);
+    return coordenadaPlausivel(lat, lng) ? { lat, lng } : null;
+  } catch {
+    return null;
+  }
+}
+
+// Converte o endereço em coordenadas tentando do mais exato para o mais genérico.
+// Devolve também QUÃO preciso foi o acerto, para a interface não prometer exatidão
+// que não tem:
+//   exata → rua + número    rua → rua sem número    bairro → centro do bairro
+//   cep   → centro do CEP   cidade → centro da cidade (último recurso)
+//
+// O passo do BAIRRO é essencial no Brasil: o OpenStreetMap não conhece a maioria
+// das ruas e CEPs das cidades médias, mas conhece os bairros. Sem ele, um endereço
+// no Jardim Ana Rosa caía no centroide de Taubaté — ou seja, mandava o entregador
+// para o Centro, a quase 3 km do lugar certo.
+async function geocodificarEndereco(e) {
+  const cidadeUf = [e.cidade, e.uf].filter(Boolean).join(', ');
+  const tentativas = [];
+
+  if (e.logradouro && e.cidade) {
+    if (e.numero) {
+      tentativas.push({ precisao: 'exata', params: {
+        street: `${e.numero} ${e.logradouro}`, city: e.cidade, state: e.uf || '' } });
+      tentativas.push({ precisao: 'exata', params: {
+        q: [e.logradouro, e.numero, e.bairro, cidadeUf, 'Brasil'].filter(Boolean).join(', ') } });
+    }
+    tentativas.push({ precisao: 'rua', params: {
+      street: e.logradouro, city: e.cidade, state: e.uf || '' } });
+    tentativas.push({ precisao: 'rua', params: {
+      q: [e.logradouro, e.bairro, cidadeUf, 'Brasil'].filter(Boolean).join(', ') } });
+  }
+  if (e.bairro && e.cidade) {
+    tentativas.push({ precisao: 'bairro', params: {
+      q: [e.bairro, cidadeUf, 'Brasil'].filter(Boolean).join(', ') } });
+  }
+  if (e.cep && String(e.cep).replace(/\D/g, '').length === 8) {
+    tentativas.push({ precisao: 'cep', params: { postalcode: String(e.cep).replace(/\D/g, '') } });
+  }
+  if (e.cidade) {
+    tentativas.push({ precisao: 'cidade', params: { city: e.cidade, state: e.uf || '' } });
+  }
+
+  for (let i = 0; i < tentativas.length; i++) {
+    if (i > 0) await esperar(1100);            // política do Nominatim: no máx. 1 consulta/segundo
+    const t = tentativas[i];
+    const coords = await nominatim(t.params);
+    if (coords) return { ...coords, precisao: t.precisao };
+  }
+  return null;
+}
+
+// Junta o que o checkout mandou + ViaCEP + cadastro do cliente num endereço só.
+async function montarEnderecoEntrega(body, perfil) {
+  const cep = String(body.cep || perfil.cep || '').replace(/\D/g, '');
+  const viaCep = cep.length === 8 ? await resolverCep(cep) : null;
+
+  const entrega = {
+    cep:         cep || null,
+    logradouro:  body.logradouro || (viaCep && viaCep.logradouro) || perfil.endereco || null,
+    numero:      body.numero      || null,
+    complemento: body.complemento || null,
+    bairro:      body.bairro || (viaCep && viaCep.bairro) || null,
+    cidade:      body.cidade || (viaCep && viaCep.cidade) || perfil.cidade || null,
+    uf:          body.uf     || (viaCep && viaCep.uf)     || perfil.estado || null,
+    referencia:  body.referencia || null,
+    lat: null, lng: null,
+    precisao: null          // exata | rua | cep | cidade | gps  (null = sem localização)
+  };
+
+  // O GPS do próprio cliente é a melhor fonte; só depois cai para o geocoder.
+  const doCliente = coordsValidas(body);
+  if (doCliente) {
+    entrega.lat = doCliente.lat;
+    entrega.lng = doCliente.lng;
+    entrega.precisao = 'gps';
+  } else {
+    const coords = await geocodificarEndereco(entrega);
+    if (coords) {
+      entrega.lat = coords.lat;
+      entrega.lng = coords.lng;
+      entrega.precisao = coords.precisao;
+    }
+  }
+  return entrega;
+}
+
+// Distância em km entre dois pontos (haversine).
+// Só calcula com coordenadas plausíveis — senão devolveria "5.900 km" por causa
+// de um ponto inválido, que é pior do que não mostrar distância nenhuma.
+function distanciaKm(a, b) {
+  const p1 = coordsValidas(a), p2 = coordsValidas(b);
+  if (!p1 || !p2) return null;
+  const R = 6371, rad = x => x * Math.PI / 180;
+  const dLat = rad(p2.lat - p1.lat), dLng = rad(p2.lng - p1.lng);
+  const h = Math.sin(dLat / 2) ** 2 +
+            Math.cos(rad(p1.lat)) * Math.cos(rad(p2.lat)) * Math.sin(dLng / 2) ** 2;
+  return Math.round(2 * R * Math.asin(Math.sqrt(h)) * 10) / 10;
+}
+
+// Resumo de um pedido do ponto de vista da entrega
+function resumoEntrega(doc, { incluirCliente = false } = {}) {
+  const p = doc.data();
+  const criado = p.criado_em && p.criado_em.toDate ? p.criado_em.toDate().toISOString() : null;
+  const itens = (p.itens || []).map(i => ({
+    nome: i.nome, qty: i.qty || 1, preco: i.preco || 0,
+    imagem_url: i.imagem_url || null, loja_nome: i.loja_nome || null
+  }));
+  // Coordenada implausível (ex.: pedidos gravados antes da correção da Ilha Nula)
+  // é descartada na leitura: melhor mostrar só o endereço do que um ponto errado.
+  const entrega = p.entrega ? { ...p.entrega } : null;
+  if (entrega && !coordsValidas(entrega)) {
+    entrega.lat = null; entrega.lng = null; entrega.precisao = null;
+  }
+  const local = coordsValidas(p.entregador_local) ? p.entregador_local : null;
+
+  const base = {
+    id: doc.id,
+    itens,
+    total_itens: itens.reduce((s, i) => s + i.qty, 0),
+    total: p.total || 0,
+    lojas: [...new Set(itens.map(i => i.loja_nome).filter(Boolean))],
+    status: p.entrega_status || 'aguardando',
+    entrega,
+    entregador_local: local,
+    historico: p.entrega_historico || [],
+    criado_em: criado
+  };
+  if (incluirCliente) {
+    base.cliente = {
+      nome: p.usuario_nome || 'Cliente',
+      telefone: p.usuario_telefone || null,
+      email: p.usuario_email || null
+    };
+  }
+  base.entregador = p.entregador_id
+    ? { id: p.entregador_id, nome: p.entregador_nome, telefone: p.entregador_telefone }
+    : null;
+  return base;
+}
+
+// --- ENTREGADOR: pedidos de outras pessoas esperando alguém levar ---
+app.get('/api/deliveries/available', authenticateToken, async (req, res) => {
+  if (!await exigirTipo(req, res, 'entregador')) return;
+  try {
+    const snap = await db.collection('pedidos').where('entrega_status', '==', 'aguardando').get();
+
+    // Posição atual do entregador (opcional) para ordenar por proximidade
+    const eu = {
+      lat: Number(req.query.lat),
+      lng: Number(req.query.lng)
+    };
+    const temPosicao = Number.isFinite(eu.lat) && Number.isFinite(eu.lng);
+
+    const pedidos = snap.docs
+      .filter(d => d.data().usuario_id !== req.user.uid)   // ninguém entrega a própria compra
+      .map(d => {
+        const item = resumoEntrega(d, { incluirCliente: true });
+        item.distancia_km = temPosicao ? distanciaKm(eu, item.entrega || {}) : null;
+        return item;
+      });
+
+    // Mais perto primeiro; sem GPS, mais recente primeiro
+    pedidos.sort((a, b) => {
+      if (temPosicao && a.distancia_km != null && b.distancia_km != null) {
+        return a.distancia_km - b.distancia_km;
+      }
+      return (b.criado_em || '').localeCompare(a.criado_em || '');
+    });
+
+    res.json({ ok: true, pedidos });
+  } catch (err) {
+    console.error('Erro ao listar entregas disponíveis:', err);
+    res.status(500).json({ ok: false, msg: 'Erro interno do servidor.' });
+  }
+});
+
+// --- ENTREGADOR: aceitar um pedido (transação: dois entregadores não pegam o mesmo) ---
+app.post('/api/deliveries/:id/accept', authenticateToken, async (req, res) => {
+  const perfil = await exigirTipo(req, res, 'entregador');
+  if (!perfil) return;
+  try {
+    const ref = db.collection('pedidos').doc(req.params.id);
+    await db.runTransaction(async (tx) => {
+      const doc = await tx.get(ref);
+      if (!doc.exists) throw new Error('PEDIDO_NAO_ENCONTRADO');
+      const p = doc.data();
+      if (p.usuario_id === req.user.uid) throw new Error('PROPRIA_COMPRA');
+      if ((p.entrega_status || 'aguardando') !== 'aguardando') throw new Error('JA_ACEITO');
+
+      tx.update(ref, {
+        entrega_status: 'aceito',
+        entregador_id: req.user.uid,
+        entregador_nome: perfil.nome || 'Entregador',
+        entregador_telefone: perfil.telefone || null,
+        entrega_historico: admin.firestore.FieldValue.arrayUnion({
+          status: 'aceito', em: new Date().toISOString()
+        })
+      });
+    });
+
+    const doc = await ref.get();
+    res.json({ ok: true, pedido: resumoEntrega(doc, { incluirCliente: true }) });
+  } catch (err) {
+    if (err.message === 'PEDIDO_NAO_ENCONTRADO') return res.status(404).json({ ok: false, msg: 'Pedido não encontrado.' });
+    if (err.message === 'JA_ACEITO')             return res.status(409).json({ ok: false, msg: 'Outro entregador já aceitou este pedido.' });
+    if (err.message === 'PROPRIA_COMPRA')        return res.status(403).json({ ok: false, msg: 'Você não pode entregar a sua própria compra.' });
+    console.error('Erro ao aceitar entrega:', err);
+    res.status(500).json({ ok: false, msg: 'Erro interno do servidor.' });
+  }
+});
+
+// --- ENTREGADOR: devolver o pedido para a fila (só antes de sair para entregar) ---
+app.post('/api/deliveries/:id/release', authenticateToken, async (req, res) => {
+  if (!await exigirTipo(req, res, 'entregador')) return;
+  try {
+    const ref = db.collection('pedidos').doc(req.params.id);
+    const doc = await ref.get();
+    if (!doc.exists) return res.status(404).json({ ok: false, msg: 'Pedido não encontrado.' });
+
+    const p = doc.data();
+    if (p.entregador_id !== req.user.uid) return res.status(403).json({ ok: false, msg: 'Esta entrega não é sua.' });
+    if (p.entrega_status === 'entregue')  return res.status(400).json({ ok: false, msg: 'Entrega já concluída.' });
+
+    await ref.update({
+      entrega_status: 'aguardando',
+      entregador_id: null, entregador_nome: null, entregador_telefone: null,
+      entregador_local: null,
+      entrega_historico: admin.firestore.FieldValue.arrayUnion({
+        status: 'aguardando', em: new Date().toISOString()
+      })
+    });
+    res.json({ ok: true, msg: 'Pedido devolvido para a fila.' });
+  } catch (err) {
+    console.error('Erro ao liberar entrega:', err);
+    res.status(500).json({ ok: false, msg: 'Erro interno do servidor.' });
+  }
+});
+
+// --- ENTREGADOR: minhas entregas (em andamento e concluídas) ---
+app.get('/api/deliveries/mine', authenticateToken, async (req, res) => {
+  if (!await exigirTipo(req, res, 'entregador')) return;
+  try {
+    const snap = await db.collection('pedidos').where('entregador_id', '==', req.user.uid).get();
+    const pedidos = snap.docs.map(d => resumoEntrega(d, { incluirCliente: true }));
+    pedidos.sort((a, b) => (b.criado_em || '').localeCompare(a.criado_em || ''));
+    res.json({
+      ok: true,
+      ativas:     pedidos.filter(p => p.status !== 'entregue'),
+      concluidas: pedidos.filter(p => p.status === 'entregue')
+    });
+  } catch (err) {
+    console.error('Erro ao listar minhas entregas:', err);
+    res.status(500).json({ ok: false, msg: 'Erro interno do servidor.' });
+  }
+});
+
+// --- ENTREGADOR: enviar a posição atual (o comprador acompanha em tempo real) ---
+app.post('/api/deliveries/:id/location', authenticateToken, async (req, res) => {
+  if (!await exigirTipo(req, res, 'entregador')) return;
+
+  const pos = coordsValidas(req.body);
+  if (!pos) {
+    return res.status(400).json({ ok: false, msg: 'Coordenadas inválidas ou fora do Brasil.' });
+  }
+  const { lat, lng } = pos;
+
+  try {
+    const ref = db.collection('pedidos').doc(req.params.id);
+    const doc = await ref.get();
+    if (!doc.exists) return res.status(404).json({ ok: false, msg: 'Pedido não encontrado.' });
+
+    const p = doc.data();
+    if (p.entregador_id !== req.user.uid) return res.status(403).json({ ok: false, msg: 'Esta entrega não é sua.' });
+    if (p.entrega_status === 'entregue')  return res.status(400).json({ ok: false, msg: 'Entrega já concluída.' });
+
+    const local = {
+      lat, lng,
+      precisao: coordenada(req.body.precisao),   // metros do GPS; null quando não informado
+      atualizado_em: new Date().toISOString()
+    };
+    await ref.update({ entregador_local: local });
+
+    res.json({
+      ok: true,
+      local,
+      distancia_km: distanciaKm(local, p.entrega || {})   // quanto falta até o cliente
+    });
+  } catch (err) {
+    console.error('Erro ao atualizar localização:', err);
+    res.status(500).json({ ok: false, msg: 'Erro interno do servidor.' });
+  }
+});
+
+// --- ENTREGADOR: avançar o status (a_caminho / entregue) ---
+app.post('/api/deliveries/:id/status', authenticateToken, async (req, res) => {
+  if (!await exigirTipo(req, res, 'entregador')) return;
+
+  const novo = String(req.body.status || '');
+  if (!['a_caminho', 'entregue'].includes(novo)) {
+    return res.status(400).json({ ok: false, msg: 'Status inválido.' });
+  }
+
+  try {
+    const ref = db.collection('pedidos').doc(req.params.id);
+    const doc = await ref.get();
+    if (!doc.exists) return res.status(404).json({ ok: false, msg: 'Pedido não encontrado.' });
+
+    const p = doc.data();
+    if (p.entregador_id !== req.user.uid) return res.status(403).json({ ok: false, msg: 'Esta entrega não é sua.' });
+
+    // Só anda para frente no fluxo
+    const atual = ENTREGA_FLUXO.indexOf(p.entrega_status || 'aguardando');
+    if (ENTREGA_FLUXO.indexOf(novo) <= atual) {
+      return res.status(400).json({ ok: false, msg: 'A entrega já passou desta etapa.' });
+    }
+
+    await ref.update({
+      entrega_status: novo,
+      entrega_historico: admin.firestore.FieldValue.arrayUnion({
+        status: novo, em: new Date().toISOString()
+      })
+    });
+    const atualizado = await ref.get();
+    res.json({ ok: true, pedido: resumoEntrega(atualizado, { incluirCliente: true }) });
+  } catch (err) {
+    console.error('Erro ao atualizar status da entrega:', err);
+    res.status(500).json({ ok: false, msg: 'Erro interno do servidor.' });
+  }
+});
+
+// --- CLIENTE: rastrear as próprias compras ---
+app.get('/api/deliveries/tracking', authenticateToken, async (req, res) => {
+  try {
+    const snap = await db.collection('pedidos').where('usuario_id', '==', req.user.uid).get();
+    const pedidos = snap.docs.map(d => {
+      const item = resumoEntrega(d);
+      item.distancia_km = distanciaKm(item.entregador_local, item.entrega || {});
+      return item;
+    });
+    pedidos.sort((a, b) => (b.criado_em || '').localeCompare(a.criado_em || ''));
+    res.json({ ok: true, pedidos });
+  } catch (err) {
+    console.error('Erro ao rastrear pedidos:', err);
+    res.status(500).json({ ok: false, msg: 'Erro interno do servidor.' });
+  }
+});
+
+// --- Rastreio de um pedido (o comprador ou o entregador designado) ---
+app.get('/api/deliveries/:id/tracking', authenticateToken, async (req, res) => {
+  try {
+    const doc = await db.collection('pedidos').doc(req.params.id).get();
+    if (!doc.exists) return res.status(404).json({ ok: false, msg: 'Pedido não encontrado.' });
+
+    const p = doc.data();
+    const ehCliente    = p.usuario_id    === req.user.uid;
+    const ehEntregador = p.entregador_id === req.user.uid;
+    if (!ehCliente && !ehEntregador) return res.status(403).json({ ok: false, msg: 'Acesso negado.' });
+
+    const pedido = resumoEntrega(doc, { incluirCliente: ehEntregador });
+    pedido.distancia_km = distanciaKm(pedido.entregador_local, pedido.entrega || {});
+    res.json({ ok: true, pedido });
+  } catch (err) {
+    console.error('Erro ao rastrear pedido:', err);
     res.status(500).json({ ok: false, msg: 'Erro interno do servidor.' });
   }
 });
@@ -1063,7 +1525,10 @@ async function resolverCep(cep, cache) {
     if (!r.ok) throw new Error('ViaCEP indisponível');
     const data = await r.json();
     if (data.erro) throw new Error('CEP não encontrado');
-    const out = { uf: data.uf, regiao: UF_REGIAO[data.uf], cidade: data.localidade };
+    const out = {
+      uf: data.uf, regiao: UF_REGIAO[data.uf], cidade: data.localidade,
+      logradouro: data.logradouro || null, bairro: data.bairro || null
+    };
     if (cache) cache.set(limpo, out);
     return out;
   } catch (e) {
@@ -1082,6 +1547,26 @@ function freteEntreCeps(origem, destino, pesoKg) {
   const frete = base * mult + Math.max(0, peso - 1) * 3;
   return Math.round(frete * 100) / 100;
 }
+
+// Consulta de CEP para o checkout preencher (e o cliente poder CORRIGIR) o endereço.
+// Deixar rua/bairro visíveis importa: é o que o entregador vai ler, e o CEP às vezes
+// devolve o logradouro genérico da região em vez do endereço real.
+app.get('/api/cep/:cep', async (req, res) => {
+  const cep = String(req.params.cep || '').replace(/\D/g, '');
+  if (cep.length !== 8) return res.status(400).json({ ok: false, msg: 'CEP inválido.' });
+
+  const dados = await resolverCep(cep);
+  if (!dados) return res.status(404).json({ ok: false, msg: 'CEP não encontrado.' });
+
+  res.json({
+    ok: true,
+    cep,
+    logradouro: dados.logradouro || null,
+    bairro:     dados.bairro || null,
+    cidade:     dados.cidade || null,
+    uf:         dados.uf || null
+  });
+});
 
 // Cálculo de frete por loja. Body: { cep, lojas: [{ id, nome, subtotal, peso, itens }] }
 app.post('/api/shipping/quote', async (req, res) => {

@@ -1,0 +1,711 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1"/>
+<title>Entregas – Mercado Local</title>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,300;0,9..144,700;1,9..144,400&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet"/>
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script src="app.js"></script>
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --bg:#0d0d0d;--card:#161616;--card2:#1c1c1c;--border:#2a2a2a;
+  --text:#f0ece3;--muted:#888;--accent:#e8854a;--accent2:#f4c56a;--green:#5dcfa0;
+  --blue:#7b9ff4;--red:#e85a5a;
+}
+body{background:var(--bg);color:var(--text);font-family:'DM Sans',sans-serif;min-height:100vh}
+body::before{content:'';position:fixed;inset:0;pointer-events:none;z-index:999;
+  background-image:url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.04'/%3E%3C/svg%3E");opacity:.4}
+
+/* ---------- NAV ---------- */
+nav{padding:1rem 1.6rem;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:1rem;
+  position:sticky;top:0;background:rgba(13,13,13,.92);backdrop-filter:blur(10px);z-index:500}
+.logo{font-family:'Fraunces',serif;font-size:1.3rem;color:var(--accent);text-decoration:none}
+.logo span{color:var(--text)}
+.nav-right{margin-left:auto;display:flex;align-items:center;gap:.8rem}
+.user-chip{display:flex;align-items:center;gap:.5rem;font-size:.9rem;color:var(--muted)}
+.avatar-sm{width:30px;height:30px;border-radius:50%;background:var(--accent);color:#fff;
+  display:flex;align-items:center;justify-content:center;font-weight:600;font-size:.85rem}
+
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:.4rem;
+  padding:.6rem 1rem;border-radius:9px;font-weight:600;font-size:.88rem;cursor:pointer;
+  border:1px solid transparent;font-family:'DM Sans',sans-serif;transition:all .2s;text-decoration:none}
+.btn-primary{background:var(--accent);color:#fff}
+.btn-primary:hover{background:#d9733c}
+.btn-green{background:var(--green);color:#0d0d0d}
+.btn-green:hover{filter:brightness(1.1)}
+.btn-ghost{background:transparent;border-color:var(--border);color:var(--muted)}
+.btn-ghost:hover{color:var(--text);border-color:var(--muted)}
+.btn-danger{background:transparent;border-color:rgba(232,90,90,.4);color:var(--red)}
+.btn-danger:hover{background:rgba(232,90,90,.1)}
+.btn:disabled{opacity:.45;cursor:default}
+.btn-sm{padding:.42rem .7rem;font-size:.8rem}
+
+/* ---------- LAYOUT ---------- */
+main{max-width:1180px;margin:0 auto;padding:2rem 1.6rem 4rem}
+.page-head{margin-bottom:1.6rem}
+.page-head h1{font-family:'Fraunces',serif;font-size:2rem;font-weight:700}
+.page-head p{color:var(--muted);font-size:.92rem;margin-top:.3rem}
+
+.gps-bar{
+  display:flex;align-items:center;gap:.9rem;flex-wrap:wrap;
+  background:var(--card);border:1px solid var(--border);border-radius:14px;
+  padding:.9rem 1.1rem;margin-bottom:1.4rem;
+}
+.gps-dot{width:10px;height:10px;border-radius:50%;background:var(--muted);flex-shrink:0}
+.gps-dot.on{background:var(--green);box-shadow:0 0 0 0 rgba(93,207,160,.6);animation:pulse 2s infinite}
+.gps-dot.medio{background:var(--accent2)}
+.gps-dot.err{background:var(--red)}
+.gps-aviso{font-size:.76rem;color:var(--accent2);max-width:250px;display:inline-block;line-height:1.4}
+@keyframes pulse{
+  0%{box-shadow:0 0 0 0 rgba(93,207,160,.5)}
+  70%{box-shadow:0 0 0 9px rgba(93,207,160,0)}
+  100%{box-shadow:0 0 0 0 rgba(93,207,160,0)}
+}
+.gps-text{font-size:.88rem;flex:1;min-width:200px}
+.gps-text small{display:block;color:var(--muted);font-size:.78rem;margin-top:.15rem}
+
+.tabs{display:flex;gap:.3rem;background:var(--card);border:1px solid var(--border);
+  border-radius:11px;padding:.3rem;margin-bottom:1.6rem;max-width:560px}
+.tab{flex:1;padding:.6rem;text-align:center;border-radius:8px;cursor:pointer;
+  font-weight:500;font-size:.88rem;color:var(--muted);transition:all .2s;border:none;
+  background:transparent;font-family:'DM Sans',sans-serif}
+.tab.active{background:var(--card2);color:var(--text);box-shadow:0 1px 6px rgba(0,0,0,.4)}
+.tab .badge{display:inline-block;background:var(--accent);color:#fff;border-radius:20px;
+  padding:0 .42rem;font-size:.72rem;margin-left:.3rem;font-weight:600}
+
+/* ---------- CARDS DE PEDIDO ---------- */
+.lista{display:grid;gap:1rem}
+.pedido{
+  background:var(--card);border:1px solid var(--border);border-radius:16px;
+  padding:1.2rem;transition:border-color .2s;
+}
+.pedido:hover{border-color:#3a3a3a}
+.pedido.ativa{border-color:rgba(232,133,74,.45);background:linear-gradient(180deg,rgba(232,133,74,.05),transparent)}
+.pedido-head{display:flex;align-items:flex-start;gap:1rem;flex-wrap:wrap;margin-bottom:.9rem}
+.pedido-id{font-family:'Fraunces',serif;font-size:1.05rem}
+.pedido-sub{color:var(--muted);font-size:.8rem;margin-top:.2rem}
+.pedido-valor{margin-left:auto;text-align:right}
+.pedido-valor .v{font-family:'Fraunces',serif;font-size:1.2rem;color:var(--accent2)}
+.pedido-valor .l{font-size:.75rem;color:var(--muted)}
+
+.status-pill{
+  display:inline-flex;align-items:center;gap:.35rem;padding:.28rem .65rem;border-radius:20px;
+  font-size:.76rem;font-weight:600;border:1px solid currentColor;
+}
+.dist-pill{
+  display:inline-flex;align-items:center;gap:.3rem;padding:.28rem .65rem;border-radius:20px;
+  font-size:.76rem;font-weight:600;background:rgba(123,159,244,.12);color:var(--blue);
+}
+
+.itens{display:grid;gap:.55rem;margin:.9rem 0;padding:.85rem;background:var(--bg);
+  border:1px solid var(--border);border-radius:11px}
+.item{display:flex;align-items:center;gap:.7rem;font-size:.88rem}
+.item-img{width:38px;height:38px;border-radius:8px;object-fit:cover;background:var(--card2);flex-shrink:0}
+.item-img.ph{display:flex;align-items:center;justify-content:center;font-size:1.05rem}
+.item-nome{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.item-loja{font-size:.76rem;color:var(--muted)}
+.item-qty{color:var(--accent2);font-weight:600;font-size:.85rem;white-space:nowrap}
+
+.endereco{
+  display:flex;gap:.7rem;padding:.85rem;border-radius:11px;
+  background:rgba(123,159,244,.07);border:1px solid rgba(123,159,244,.2);font-size:.88rem;line-height:1.55;
+}
+.endereco .pin{font-size:1.1rem;line-height:1}
+.endereco .quem{color:var(--muted);font-size:.8rem;margin-top:.25rem}
+.endereco a{color:var(--blue);text-decoration:none;font-size:.8rem}
+.endereco a:hover{text-decoration:underline}
+.precisao{font-size:.76rem;margin-top:.35rem}
+.precisao.ok{color:var(--green)}
+.precisao.aprox{color:var(--accent2)}
+
+.acoes{display:flex;gap:.6rem;flex-wrap:wrap;margin-top:1rem}
+
+#mapa{height:330px;border-radius:14px;border:1px solid var(--border);margin-top:1rem;background:var(--card2)}
+.leaflet-container{background:#1a1a1a}
+.map-legend{display:flex;gap:1.1rem;flex-wrap:wrap;font-size:.78rem;color:var(--muted);margin-top:.6rem}
+.map-legend b{display:inline-block;width:9px;height:9px;border-radius:50%;margin-right:.3rem}
+
+.timeline{margin-top:1rem;padding-left:.4rem}
+.tl-item{display:flex;gap:.6rem;font-size:.8rem;color:var(--muted);padding:.18rem 0}
+.tl-item b{color:var(--text);font-weight:500}
+
+.vazio{text-align:center;padding:3rem 1.5rem;background:var(--card);
+  border:1px dashed var(--border);border-radius:16px;color:var(--muted)}
+.vazio .ic{font-size:2.4rem;display:block;margin-bottom:.7rem;opacity:.7}
+.vazio h3{font-family:'Fraunces',serif;color:var(--text);font-size:1.15rem;margin-bottom:.4rem}
+
+.toast{position:fixed;bottom:2rem;right:2rem;z-index:1000;background:var(--card);
+  border:1px solid var(--border);border-radius:10px;padding:.75rem 1.2rem;font-size:.9rem;
+  transform:translateY(20px);opacity:0;transition:all .3s;max-width:320px}
+.toast.show{transform:translateY(0);opacity:1}
+.toast-success{border-color:rgba(93,207,160,.4);color:var(--green)}
+.toast-error{border-color:rgba(232,90,90,.4);color:var(--red)}
+
+@media(max-width:640px){
+  main{padding:1.4rem 1rem 3rem}
+  .page-head h1{font-size:1.6rem}
+  .pedido-valor{margin-left:0;text-align:left}
+  .acoes .btn{flex:1}
+  .toast{left:1rem;right:1rem;bottom:1rem;max-width:none}
+}
+</style>
+</head>
+<body>
+
+<nav>
+  <a href="index.html" class="logo">mercado<span>local</span></a>
+  <div class="nav-right" id="nav-right"></div>
+</nav>
+
+<main>
+  <div class="page-head">
+    <h1>🛵 Painel de Entregas</h1>
+    <p>Escolha um pedido já pago por um cliente, aceite a entrega e compartilhe sua localização — o comprador acompanha você no mapa em tempo real.</p>
+  </div>
+
+  <!-- GPS -->
+  <div class="gps-bar">
+    <span class="gps-dot" id="gps-dot"></span>
+    <div class="gps-text" id="gps-text">
+      GPS desligado
+      <small>Ligue para ordenar as entregas por proximidade e enviar sua posição ao comprador.</small>
+    </div>
+    <span id="gps-extra"></span>
+    <button class="btn btn-primary btn-sm" id="gps-btn" onclick="toggleGPS()">Ligar GPS</button>
+    <button class="btn btn-ghost btn-sm" onclick="carregarTudo()">↻ Atualizar</button>
+  </div>
+
+  <!-- ABAS -->
+  <div class="tabs">
+    <button class="tab active" id="tab-btn-disponiveis" onclick="switchTab('disponiveis')">
+      📦 Disponíveis <span class="badge" id="badge-disp" hidden>0</span>
+    </button>
+    <button class="tab" id="tab-btn-minhas" onclick="switchTab('minhas')">
+      🛵 Minhas entregas <span class="badge" id="badge-minhas" hidden>0</span>
+    </button>
+    <button class="tab" id="tab-btn-historico" onclick="switchTab('historico')">✅ Concluídas</button>
+  </div>
+
+  <section id="tab-disponiveis">
+    <div class="lista" id="lista-disponiveis"><p style="color:var(--muted)">Carregando…</p></div>
+  </section>
+
+  <section id="tab-minhas" hidden>
+    <div class="lista" id="lista-minhas"><p style="color:var(--muted)">Carregando…</p></div>
+  </section>
+
+  <section id="tab-historico" hidden>
+    <div class="lista" id="lista-historico"><p style="color:var(--muted)">Carregando…</p></div>
+  </section>
+</main>
+
+<script>
+// ============================================================
+//  Painel do entregador
+//  - lista pedidos que outros clientes compraram e ainda não têm entregador
+//  - aceita um pedido, avança o status e envia a posição do GPS periodicamente
+// ============================================================
+
+let currentUser  = null;
+let abaAtual     = 'disponiveis';
+let disponiveis  = [];
+let ativas       = [];
+let concluidas   = [];
+
+// GPS
+let watchId      = null;   // id do navigator.geolocation.watchPosition
+let minhaPos     = null;   // { lat, lng, precisao }
+let ultimoEnvio  = 0;      // timestamp do último POST de localização
+const ENVIO_MS   = 10000;  // manda no máximo 1 posição a cada 10s (poupa bateria e escrita)
+
+// Mapa
+let mapa = null, marcadorEu = null, marcadorDestino = null, linhaRota = null, circuloPrecisao = null;
+
+// ---------- INIT ----------
+document.addEventListener('DOMContentLoaded', async ()=>{
+  currentUser = requireAuth('entregador');
+  if(!currentUser) return;
+  renderNav();
+  await carregarTudo();
+  // Mantém a lista fresca sem precisar recarregar a página
+  setInterval(()=>{ if(!document.hidden) carregarTudo(); }, 30000);
+});
+
+function renderNav(){
+  const inicial = (currentUser.nome || '?')[0].toUpperCase();
+  const avatar = currentUser.profile_image
+    ? `<div class="avatar-sm" style="background-image:url('${currentUser.profile_image}');background-size:cover;background-position:center"></div>`
+    : `<div class="avatar-sm">${inicial}</div>`;
+  document.getElementById('nav-right').innerHTML = `
+    <div class="user-chip">${avatar}<span>${currentUser.nome.split(' ')[0]}</span></div>
+    <button class="btn btn-ghost btn-sm" onclick="sair()">Sair</button>
+  `;
+}
+
+function sair(){
+  pararGPS();
+  DB.logout();
+  window.location.href = 'login.html';
+}
+
+// ---------- ABAS ----------
+function switchTab(aba){
+  abaAtual = aba;
+  ['disponiveis','minhas','historico'].forEach(t=>{
+    document.getElementById('tab-'+t).hidden = (t !== aba);
+    document.getElementById('tab-btn-'+t).classList.toggle('active', t === aba);
+  });
+  if(aba === 'minhas') setTimeout(ajustarMapa, 60);
+}
+
+// ---------- CARREGAR ----------
+async function carregarTudo(){
+  await Promise.all([carregarDisponiveis(), carregarMinhas()]);
+}
+
+async function carregarDisponiveis(){
+  const res = await DB.getAvailableDeliveries(minhaPos);
+  if(!res.ok){
+    document.getElementById('lista-disponiveis').innerHTML =
+      `<div class="vazio"><span class="ic">⚠️</span><h3>Não foi possível carregar</h3><p>${res.msg || 'Tente novamente.'}</p></div>`;
+    return;
+  }
+  disponiveis = res.pedidos || [];
+  renderDisponiveis();
+}
+
+async function carregarMinhas(){
+  const res = await DB.getMyDeliveries();
+  if(!res.ok) return;
+  ativas     = res.ativas     || [];
+  concluidas = res.concluidas || [];
+  renderMinhas();
+  renderHistorico();
+}
+
+// ---------- RENDER: DISPONÍVEIS ----------
+function renderDisponiveis(){
+  const el = document.getElementById('lista-disponiveis');
+  const badge = document.getElementById('badge-disp');
+  badge.hidden = !disponiveis.length;
+  badge.textContent = disponiveis.length;
+
+  if(!disponiveis.length){
+    el.innerHTML = `
+      <div class="vazio">
+        <span class="ic">📭</span>
+        <h3>Nenhum pedido esperando entrega</h3>
+        <p>Assim que um cliente finalizar uma compra, o pedido aparece aqui para você aceitar.</p>
+      </div>`;
+    return;
+  }
+  el.innerHTML = disponiveis.map(p => cardPedido(p, 'disponivel')).join('');
+}
+
+// ---------- RENDER: MINHAS ENTREGAS ----------
+function renderMinhas(){
+  const el = document.getElementById('lista-minhas');
+  const badge = document.getElementById('badge-minhas');
+  badge.hidden = !ativas.length;
+  badge.textContent = ativas.length;
+
+  if(!ativas.length){
+    el.innerHTML = `
+      <div class="vazio">
+        <span class="ic">🛵</span>
+        <h3>Você não tem entregas em andamento</h3>
+        <p>Vá em <b>Disponíveis</b> e escolha um pedido para entregar.</p>
+      </div>`;
+    destruirMapa();
+    return;
+  }
+
+  el.innerHTML =
+    ativas.map(p => cardPedido(p, 'ativa')).join('') +
+    `<div>
+       <div id="mapa"></div>
+       <div class="map-legend">
+         <span><b style="background:#e8854a"></b>Você</span>
+         <span><b style="background:#5dcfa0"></b>Endereço do cliente</span>
+         <span id="legenda-dist"></span>
+         <span style="width:100%;color:var(--accent2)">💡 Posição errada? Clique no mapa para marcar onde você está de verdade.</span>
+       </div>
+     </div>`;
+
+  setTimeout(ajustarMapa, 60);
+}
+
+function renderHistorico(){
+  const el = document.getElementById('lista-historico');
+  if(!concluidas.length){
+    el.innerHTML = `
+      <div class="vazio">
+        <span class="ic">✅</span>
+        <h3>Nenhuma entrega concluída ainda</h3>
+        <p>Suas entregas finalizadas ficam registradas aqui.</p>
+      </div>`;
+    return;
+  }
+  el.innerHTML = concluidas.map(p => cardPedido(p, 'concluida')).join('');
+}
+
+// ---------- CARD ----------
+function cardPedido(p, modo){
+  const st = entregaLabel(p.status);
+  const cliente = p.cliente || {};
+  const end = p.entrega || {};
+  const prec = precisaoEntrega(end);
+  const temCoord = end.lat != null && end.lng != null;
+  const mapsUrl = temCoord
+    ? `https://www.google.com/maps/dir/?api=1&destination=${end.lat},${end.lng}`
+    : `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(formatEndereco(end))}`;
+
+  const itens = (p.itens || []).map(i => `
+    <div class="item">
+      ${i.imagem_url
+        ? `<img class="item-img" src="${i.imagem_url}" alt=""/>`
+        : `<div class="item-img ph">📦</div>`}
+      <div class="item-nome">
+        ${escapeHtml(i.nome)}
+        ${i.loja_nome ? `<div class="item-loja">🏪 ${escapeHtml(i.loja_nome)}</div>` : ''}
+      </div>
+      <span class="item-qty">${i.qty}×</span>
+    </div>`).join('');
+
+  const dist = p.distancia_km != null
+    ? `<span class="dist-pill">📍 ${p.distancia_km} km de você</span>` : '';
+
+  return `
+    <article class="pedido ${modo === 'ativa' ? 'ativa' : ''}">
+      <div class="pedido-head">
+        <div>
+          <div class="pedido-id">Pedido #${p.id.slice(0,6).toUpperCase()}</div>
+          <div class="pedido-sub">${p.total_itens} item(ns) · ${(p.lojas||[]).map(escapeHtml).join(', ') || 'Loja'} · ${p.criado_em ? new Date(p.criado_em).toLocaleString('pt-BR') : ''}</div>
+          <div style="margin-top:.55rem;display:flex;gap:.5rem;flex-wrap:wrap">
+            <span class="status-pill" style="color:${st.cor}">${st.icone} ${st.texto}</span>
+            ${dist}
+          </div>
+        </div>
+        <div class="pedido-valor">
+          <div class="v">${formatPrice(p.total)}</div>
+          <div class="l">valor da compra</div>
+        </div>
+      </div>
+
+      <div class="itens">${itens}</div>
+
+      <div class="endereco">
+        <span class="pin">📍</span>
+        <div>
+          ${escapeHtml(formatEndereco(end))}
+          ${end.referencia ? `<div class="quem">Referência: ${escapeHtml(end.referencia)}</div>` : ''}
+          <div class="precisao ${prec.exato ? 'ok' : 'aprox'}">
+            ${prec.exato ? '🎯' : '⚠️'} ${escapeHtml(prec.texto)}${prec.exato ? '' : ' — confira o endereço ao chegar'}
+          </div>
+          <div class="quem">
+            Entregar para <b>${escapeHtml(cliente.nome || 'Cliente')}</b>
+            ${cliente.telefone ? ` · <a href="tel:${escapeHtml(cliente.telefone)}">${escapeHtml(cliente.telefone)}</a>` : ''}
+          </div>
+          <a href="${mapsUrl}" target="_blank" rel="noopener">🗺️ Abrir rota no Google Maps</a>
+        </div>
+      </div>
+
+      ${modo === 'concluida' ? timeline(p.historico) : ''}
+      <div class="acoes">${acoes(p, modo)}</div>
+    </article>`;
+}
+
+function acoes(p, modo){
+  if(modo === 'disponivel'){
+    return `<button class="btn btn-primary" onclick="aceitar('${p.id}', this)">Escolher este pedido para entregar</button>`;
+  }
+  if(modo === 'concluida') return '';
+
+  const btns = [];
+  if(p.status === 'aceito'){
+    btns.push(`<button class="btn btn-primary" onclick="mudarStatus('${p.id}','a_caminho',this)">🛵 Sair para entrega</button>`);
+    btns.push(`<button class="btn btn-danger" onclick="devolver('${p.id}',this)">Devolver à fila</button>`);
+  }
+  if(p.status === 'a_caminho'){
+    btns.push(`<button class="btn btn-green" onclick="mudarStatus('${p.id}','entregue',this)">✅ Confirmar entrega</button>`);
+  }
+  if(!watchId){
+    btns.push(`<button class="btn btn-ghost" onclick="toggleGPS()">Ligar GPS para o cliente te acompanhar</button>`);
+  }
+  return btns.join('');
+}
+
+function timeline(hist){
+  if(!hist || !hist.length) return '';
+  return `<div class="timeline">${hist.map(h=>{
+    const st = entregaLabel(h.status);
+    return `<div class="tl-item">${st.icone} <b>${st.texto}</b> — ${new Date(h.em).toLocaleString('pt-BR')}</div>`;
+  }).join('')}</div>`;
+}
+
+function escapeHtml(s){
+  return String(s ?? '').replace(/[&<>"']/g, c =>
+    ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+}
+
+// ---------- AÇÕES ----------
+async function aceitar(id, btn){
+  btn.disabled = true; btn.textContent = 'Aceitando…';
+  const res = await DB.acceptDelivery(id);
+  if(!res.ok){
+    toast(res.msg || 'Não foi possível aceitar o pedido.', 'error');
+    await carregarTudo();
+    return;
+  }
+  toast('Entrega aceita! Ligue o GPS para o cliente te acompanhar.');
+  await carregarTudo();
+  switchTab('minhas');
+  if(!watchId) iniciarGPS();
+}
+
+async function mudarStatus(id, status, btn){
+  if(status === 'entregue' && !confirm('Confirmar que o pedido foi entregue ao cliente?')) return;
+  btn.disabled = true;
+  const res = await DB.setDeliveryStatus(id, status);
+  if(!res.ok){ toast(res.msg || 'Erro ao atualizar status.', 'error'); btn.disabled = false; return; }
+  toast(status === 'entregue' ? 'Entrega concluída. Bom trabalho!' : 'Boa viagem! O cliente já está te vendo no mapa.');
+  await carregarMinhas();
+  if(status === 'entregue' && !ativas.length) pararGPS();
+}
+
+async function devolver(id, btn){
+  if(!confirm('Devolver este pedido para a fila? Outro entregador poderá pegá-lo.')) return;
+  btn.disabled = true;
+  const res = await DB.releaseDelivery(id);
+  if(!res.ok){ toast(res.msg || 'Erro ao devolver o pedido.', 'error'); btn.disabled = false; return; }
+  toast('Pedido devolvido para a fila.');
+  await carregarTudo();
+}
+
+// ---------- GPS ----------
+// Um navegador de computador não tem GPS: ele estima a posição pela rede/IP e
+// erra de centenas de metros a dezenas de quilômetros (é por isso que aparece
+// "outra cidade" mesmo você estando dentro do prédio). Por isso aqui:
+//   1) toda leitura vem com a margem de erro em metros (accuracy);
+//   2) leitura pior que RUIM_M não é enviada ao cliente — seria mentira;
+//   3) dá para corrigir o pino à mão clicando no mapa.
+const BOM_M   = 100;    // até 100 m: confiável (celular com GPS)
+const RUIM_M  = 1000;   // acima de 1 km: não envia, só avisa
+
+let ultimaPrecisaoM = null;
+let posManual = false;   // pino ajustado à mão pelo entregador
+
+function toggleGPS(){ watchId ? pararGPS() : iniciarGPS(); }
+
+function iniciarGPS(){
+  if(!navigator.geolocation){
+    statusGPS('err', 'Seu navegador não suporta geolocalização',
+              'Abra o painel pelo celular para aparecer no mapa do cliente.');
+    return;
+  }
+  posManual = false;
+  statusGPS('', 'Procurando sinal…', 'Autorize o acesso à localização quando o navegador pedir.');
+
+  watchId = navigator.geolocation.watchPosition(
+    async (pos)=>{
+      if(posManual) return;                       // respeita o ajuste manual
+      const metros = pos.coords.accuracy ? Math.round(pos.coords.accuracy) : null;
+      ultimaPrecisaoM = metros;
+
+      minhaPos = { lat: pos.coords.latitude, lng: pos.coords.longitude, precisao: metros };
+      atualizarMapa();
+
+      if(metros !== null && metros > RUIM_M){
+        // Posição grosseira demais: mostra no seu mapa, mas não manda para o cliente
+        statusGPS('err', `Sinal impreciso — margem de ~${formatarMetros(metros)}`,
+          'Provavelmente é a localização estimada pela internet, não o GPS. Abra pelo celular ' +
+          'com o GPS ligado, ou clique no mapa para marcar onde você está.');
+        atualizarBotoesGPS();
+        return;
+      }
+
+      const qualidade = (metros === null) ? '' :
+        (metros <= BOM_M ? `precisão boa (±${formatarMetros(metros)})`
+                         : `precisão média (±${formatarMetros(metros)}) — confira no mapa`);
+      statusGPS(metros !== null && metros <= BOM_M ? 'on' : 'medio',
+        `GPS ligado${ativas.length ? ` — enviando para ${ativas.length} entrega(s)` : ''}`,
+        `${qualidade} · atualizado ${new Date().toLocaleTimeString('pt-BR')}`);
+      atualizarBotoesGPS();
+      await enviarPosicao();
+    },
+    (err)=>{
+      const msgs = {
+        1: 'Permissão de localização negada',
+        2: 'Não foi possível obter sua posição',
+        3: 'Tempo esgotado ao buscar o GPS'
+      };
+      statusGPS('err', msgs[err.code] || 'Erro no GPS',
+        'Você ainda pode aceitar entregas. Clique no mapa para marcar sua posição à mão.');
+      pararGPS(true);
+    },
+    // maximumAge:0 evita reaproveitar uma posição antiga e errada que o navegador guardou
+    { enableHighAccuracy: true, maximumAge: 0, timeout: 30000 }
+  );
+  document.getElementById('gps-btn').textContent = 'Desligar GPS';
+}
+
+function pararGPS(silencioso){
+  if(watchId !== null){ navigator.geolocation.clearWatch(watchId); watchId = null; }
+  document.getElementById('gps-btn').textContent = 'Ligar GPS';
+  if(!silencioso) statusGPS('', 'GPS desligado', 'O comprador deixa de ver sua posição no mapa.');
+  atualizarBotoesGPS();
+}
+
+function formatarMetros(m){
+  return m >= 1000 ? (m/1000).toFixed(m >= 10000 ? 0 : 1) + ' km' : m + ' m';
+}
+
+function statusGPS(estado, texto, sub){
+  const dot = document.getElementById('gps-dot');
+  dot.className = 'gps-dot' + (estado ? ' ' + estado : '');
+  document.getElementById('gps-text').innerHTML = `${escapeHtml(texto)}<small>${escapeHtml(sub || '')}</small>`;
+}
+
+// Ajuste manual: clicar no mapa fixa a posição exata. É a saída definitiva quando
+// o navegador do computador insiste em achar que você está em outra cidade.
+function definirPosicaoManual(latlng){
+  posManual = true;
+  ultimaPrecisaoM = null;
+  minhaPos = { lat: latlng.lat, lng: latlng.lng, precisao: null };
+  statusGPS('on', 'Posição marcada por você no mapa',
+            'É esta posição que o cliente está vendo. Toque em "Voltar ao GPS" para retomar o automático.');
+  atualizarMapa();
+  atualizarBotoesGPS();
+  ultimoEnvio = 0;               // envia já, sem esperar o intervalo
+  enviarPosicao();
+  toast('Posição ajustada. O cliente já está vendo você aqui.');
+}
+
+function voltarAoGPS(){
+  posManual = false;
+  toast('Voltando à posição automática do GPS.');
+  if(!watchId) iniciarGPS(); else statusGPS('', 'Procurando sinal…', 'Aguardando nova leitura do GPS.');
+  atualizarBotoesGPS();
+}
+
+function atualizarBotoesGPS(){
+  const el = document.getElementById('gps-extra');
+  if(!el) return;
+  const partes = [];
+  if(posManual){
+    partes.push(`<button class="btn btn-ghost btn-sm" onclick="voltarAoGPS()">↺ Voltar ao GPS</button>`);
+  } else if(ultimaPrecisaoM !== null && ultimaPrecisaoM > RUIM_M){
+    partes.push(`<span class="gps-aviso">Clique no mapa (aba “Minhas entregas”) para marcar sua posição real</span>`);
+  }
+  el.innerHTML = partes.join('');
+}
+
+// Envia a posição para cada entrega ativa (no máximo 1 vez a cada ENVIO_MS)
+async function enviarPosicao(){
+  if(!minhaPos || !ativas.length) return;
+  if(Date.now() - ultimoEnvio < ENVIO_MS) return;
+  ultimoEnvio = Date.now();
+
+  for(const p of ativas){
+    try{
+      const r = await DB.sendDeliveryLocation(p.id, minhaPos.lat, minhaPos.lng, minhaPos.precisao);
+      if(r.ok && r.distancia_km != null){
+        p.distancia_km = r.distancia_km;
+        const leg = document.getElementById('legenda-dist');
+        if(leg) leg.textContent = `Faltam ~${r.distancia_km} km até o cliente`;
+      }
+    }catch{ /* rede instável na rua: tenta de novo na próxima leitura do GPS */ }
+  }
+}
+
+// ---------- MAPA ----------
+function destinoAtivo(){
+  const p = ativas.find(x => x.entrega && x.entrega.lat != null);
+  return p ? { lat: p.entrega.lat, lng: p.entrega.lng } : null;
+}
+
+function ajustarMapa(){
+  const el = document.getElementById('mapa');
+  if(!el || typeof L === 'undefined') return;
+
+  if(!mapa){
+    const centro = minhaPos || destinoAtivo() || { lat: -23.55, lng: -46.63 };  // fallback: SP
+    mapa = L.map('mapa', { zoomControl: true }).setView([centro.lat, centro.lng], 14);
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+      attribution: '© OpenStreetMap', maxZoom: 19
+    }).addTo(mapa);
+    // Clicar no mapa corrige a própria posição (útil quando o navegador erra feio)
+    mapa.on('click', (e)=> definirPosicaoManual(e.latlng));
+  }
+  mapa.invalidateSize();
+  atualizarMapa();
+}
+
+function atualizarMapa(){
+  if(!mapa) return;
+  const destino = destinoAtivo();
+
+  if(minhaPos){
+    if(!marcadorEu){
+      marcadorEu = L.circleMarker([minhaPos.lat, minhaPos.lng], {
+        radius: 9, color: '#e8854a', fillColor: '#e8854a', fillOpacity: .9, weight: 3
+      }).addTo(mapa);
+    } else {
+      marcadorEu.setLatLng([minhaPos.lat, minhaPos.lng]);
+    }
+    marcadorEu.bindPopup(posManual
+      ? 'Posição marcada por você'
+      : `Você está aqui${minhaPos.precisao ? ` (margem de ±${formatarMetros(minhaPos.precisao)})` : ''}`);
+
+    // O círculo mostra a margem de erro: se ele cobrir meio bairro, a posição
+    // não é confiável e o entregador enxerga isso na hora.
+    const raio = (!posManual && minhaPos.precisao) ? minhaPos.precisao : 0;
+    if(raio > 30){
+      if(!circuloPrecisao){
+        circuloPrecisao = L.circle([minhaPos.lat, minhaPos.lng], {
+          radius: raio, color:'#e8854a', weight:1, fillColor:'#e8854a', fillOpacity:.08
+        }).addTo(mapa);
+      } else {
+        circuloPrecisao.setLatLng([minhaPos.lat, minhaPos.lng]).setRadius(raio);
+      }
+    } else if(circuloPrecisao){
+      mapa.removeLayer(circuloPrecisao); circuloPrecisao = null;
+    }
+  }
+
+  if(destino){
+    if(!marcadorDestino){
+      marcadorDestino = L.circleMarker([destino.lat, destino.lng], {
+        radius: 9, color: '#5dcfa0', fillColor: '#5dcfa0', fillOpacity: .9, weight: 3
+      }).addTo(mapa).bindPopup('Endereço do cliente');
+    } else {
+      marcadorDestino.setLatLng([destino.lat, destino.lng]);
+    }
+  }
+
+  if(minhaPos && destino){
+    const pontos = [[minhaPos.lat, minhaPos.lng], [destino.lat, destino.lng]];
+    if(!linhaRota) linhaRota = L.polyline(pontos, { color:'#f4c56a', weight:2, dashArray:'6 6' }).addTo(mapa);
+    else linhaRota.setLatLngs(pontos);
+    mapa.fitBounds(pontos, { padding: [45, 45], maxZoom: 16 });
+  } else if(minhaPos){
+    mapa.setView([minhaPos.lat, minhaPos.lng], mapa.getZoom());
+  } else if(destino){
+    mapa.setView([destino.lat, destino.lng], mapa.getZoom());
+  }
+}
+
+function destruirMapa(){
+  if(mapa){ mapa.remove(); mapa = null; }
+  marcadorEu = marcadorDestino = linhaRota = circuloPrecisao = null;
+}
+
+// Não deixa o GPS ligado depois de fechar a aba
+window.addEventListener('beforeunload', ()=>{ if(watchId !== null) navigator.geolocation.clearWatch(watchId); });
+</script>
+<script src="accessibility.js"></script>
+</body>
+</html>

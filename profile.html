@@ -24,15 +24,20 @@
     .nav-section{font-size:.7rem;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);font-weight:600;margin-bottom:.5rem;margin-top:1rem}
     .nav-item{
       display:flex;align-items:center;gap:.7rem;padding:.7rem .9rem;border-radius:9px;
-      cursor:pointer;color:var(--muted);font-size:.9rem;font-weight:500;transition:all .2s;
-      margin-bottom:.2rem;
+      cursor:pointer;color:var(--muted);font-size:.9rem;font-weight:500;
+      transition:background-color .2s,color .2s;
+      margin-bottom:.2rem;text-decoration:none;touch-action:manipulation;
     }
     .nav-item:hover{background:var(--card2);color:var(--text)}
     .nav-item.active{background:rgba(232,133,74,.12);color:var(--accent)}
     .nav-item .icon{font-size:1.1rem;width:20px;text-align:center}
+    .nav-item:focus-visible,.user-chip:focus-visible,.logout-btn:focus-visible,.back-btn:focus-visible{
+      outline:2px solid var(--accent2);outline-offset:2px;
+    }
     .sidebar-footer{margin-top:auto;padding-top:1.5rem;border-top:1px solid var(--border)}
-    .user-chip{display:flex;align-items:center;gap:.7rem;margin-bottom:1rem;cursor:pointer;opacity:.7;transition:opacity .2s}
-    .user-chip:hover{opacity:1}
+    .user-chip{display:flex;align-items:center;gap:.7rem;margin-bottom:1rem;cursor:pointer;opacity:.7;
+      transition:opacity .2s;text-decoration:none;color:inherit}
+    .user-chip:hover,.user-chip.active-chip{opacity:1}
     .avatar{
       width:34px;height:34px;border-radius:50%;background:var(--accent);
       display:flex;align-items:center;justify-content:center;font-size:.85rem;font-weight:700;color:#fff;
@@ -140,19 +145,20 @@
 <aside class="sidebar">
   <div class="logo">mercado<span>local</span></div>
   <div class="nav-section">Minha Loja</div>
-  <div class="nav-item" onclick="window.location.href='dashboard.html'"><span class="icon">📊</span> Visão Geral</div>
-  <div class="nav-item" onclick="window.location.href='dashboard.html?page=loja'"><span class="icon">🏪</span> Dados da Loja</div>
-  <div class="nav-item" onclick="window.location.href='dashboard.html?page=produtos'"><span class="icon">📦</span> Produtos</div>
+  <a class="nav-item" href="dashboard.html"><span class="icon" aria-hidden="true">📊</span> Visão Geral</a>
+  <a class="nav-item" href="dashboard.html?aba=loja"><span class="icon" aria-hidden="true">🏪</span> Dados da Loja</a>
+  <a class="nav-item" href="dashboard.html?aba=produtos"><span class="icon" aria-hidden="true">📦</span> Produtos</a>
+  <a class="nav-item" href="dashboard.html?aba=vendas"><span class="icon" aria-hidden="true">🧾</span> Vendas</a>
   <div class="nav-section">Explorar</div>
-  <div class="nav-item" onclick="window.location.href='marketplace.html'"><span class="icon">🔍</span> Marketplace</div>
+  <a class="nav-item" href="marketplace.html"><span class="icon" aria-hidden="true">🔍</span> Marketplace</a>
   <div class="sidebar-footer">
-    <div class="user-chip" onclick="window.location.href='profile.html'">
-      <div class="avatar" id="avatar-letter">?</div>
+    <a class="user-chip active-chip" href="profile.html" aria-current="page">
+      <div class="avatar" id="avatar-letter" aria-hidden="true">?</div>
       <div class="user-info">
         <div class="user-name" id="user-name-display">Carregando…</div>
         <div class="user-role">Perfil</div>
       </div>
-    </div>
+    </a>
     <button class="logout-btn" onclick="doLogout()">Sair da conta</button>
   </div>
 </aside>

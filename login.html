@@ -49,17 +49,17 @@ input,select{
 input:focus,select:focus{border-color:var(--accent);box-shadow:0 0 0 3px rgba(232,133,74,.12)}
 select option{background:var(--bg)}
 
-.tipo-selector{display:grid;grid-template-columns:1fr 1fr;gap:.8rem;margin-bottom:1.2rem}
+.tipo-selector{display:grid;grid-template-columns:repeat(3,1fr);gap:.6rem;margin-bottom:1.2rem}
 .tipo-btn{
   display:flex;flex-direction:column;align-items:center;gap:.4rem;
-  padding:1rem;border-radius:12px;border:2px solid var(--border);
+  padding:.9rem .5rem;border-radius:12px;border:2px solid var(--border);
   cursor:pointer;transition:all .2s;text-align:center;
 }
 .tipo-btn:hover{border-color:var(--muted)}
 .tipo-btn.active{border-color:var(--accent);background:rgba(232,133,74,.08)}
-.tipo-btn .icon{font-size:1.8rem}
-.tipo-btn .name{font-weight:600;font-size:.9rem}
-.tipo-btn .desc{font-size:.75rem;color:var(--muted)}
+.tipo-btn .icon{font-size:1.6rem}
+.tipo-btn .name{font-weight:600;font-size:.85rem}
+.tipo-btn .desc{font-size:.72rem;color:var(--muted)}
 
 .btn{
   display:flex;align-items:center;justify-content:center;gap:.5rem;
@@ -161,6 +161,11 @@ select option{background:var(--bg)}
             <span class="name">Cliente</span>
             <span class="desc">Quero comprar</span>
           </div>
+          <div class="tipo-btn" id="tipo-entregador" onclick="selectTipo('entregador')">
+            <span class="icon">🛵</span>
+            <span class="name">Entregador</span>
+            <span class="desc">Quero entregar</span>
+          </div>
         </div>
         <input type="hidden" id="cad-tipo" value="lojista"/>
       </div>
@@ -195,10 +200,18 @@ function switchTab(tab){
   document.getElementById('form-cadastro').style.display = tab==='cadastro'?'':'none';
 }
 
+// Para onde cada tipo de conta vai depois de entrar
+function paginaInicial(tipo){
+  if(tipo === 'lojista')    return 'dashboard.html';
+  if(tipo === 'entregador') return 'entregas.html';
+  return 'marketplace.html';
+}
+
 function selectTipo(tipo){
   tipoSelecionado = tipo;
-  document.getElementById('tipo-lojista').classList.toggle('active', tipo==='lojista');
-  document.getElementById('tipo-cliente').classList.toggle('active', tipo==='cliente');
+  ['lojista','cliente','entregador'].forEach(t=>{
+    document.getElementById('tipo-'+t).classList.toggle('active', tipo===t);
+  });
   document.getElementById('cad-tipo').value = tipo;
 }
 
@@ -220,7 +233,7 @@ function doLogin(){
     if(!res.ok){ showError('login-error', res.msg); return; }
     toast('Login realizado! Redirecionando…');
     setTimeout(()=>{
-      window.location.href = res.user.tipo === 'lojista' ? 'dashboard.html' : 'marketplace.html';
+      window.location.href = paginaInicial(res.user.tipo);
     }, 800);
   })();
 }
@@ -241,7 +254,7 @@ function doCadastro(){
     if(loginRes.ok) {
       toast('Conta criada com sucesso!');
       setTimeout(()=>{
-        window.location.href = tipo === 'lojista' ? 'dashboard.html' : 'marketplace.html';
+        window.location.href = paginaInicial(tipo);
       }, 800);
     }
   })();

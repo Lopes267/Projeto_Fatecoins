@@ -117,6 +117,28 @@ nav{
 .ship-hint{font-size:.76rem;color:var(--accent2);margin-top:.4rem}
 .ship-err{color:var(--red);font-size:.8rem}
 
+/* ENDEREÇO DE ENTREGA (o que o entregador enxerga) */
+.addr-box{margin-top:1rem;padding-top:1rem;border-top:1px dashed var(--border)}
+.addr-label{font-size:.82rem;font-weight:600;margin-bottom:.7rem}
+.addr-grid{display:grid;grid-template-columns:100px 1fr;gap:.5rem;margin-bottom:.5rem}
+.addr-box > input{margin-bottom:.5rem}
+.addr-hint{font-size:.74rem;color:var(--muted);line-height:1.5;margin-top:.15rem}
+.addr-box input{
+  width:100%;padding:.6rem .8rem;background:var(--card2);border:1px solid var(--border);
+  border-radius:8px;color:var(--text);font-family:'DM Sans',sans-serif;font-size:.9rem;
+  outline:none;transition:border-color .2s;
+}
+.addr-box input:focus{border-color:var(--accent)}
+.addr-box input::placeholder{color:rgba(136,136,136,.6)}
+.addr-gps-btn{
+  width:100%;margin-top:.55rem;padding:.55rem .8rem;background:transparent;
+  border:1px dashed var(--border);color:var(--muted);border-radius:8px;
+  font-family:'DM Sans',sans-serif;font-size:.78rem;cursor:pointer;transition:all .2s;text-align:left;
+}
+.addr-gps-btn:hover{border-color:var(--accent);color:var(--accent)}
+.addr-gps-status{font-size:.76rem;margin-top:.4rem;color:var(--green)}
+.addr-gps-status.err{color:var(--red)}
+
 /* BOTÃO "POR LOJA" + POPUP DE FRETE */
 .frete-detail-btn{
   margin-left:.4rem;padding:.12rem .5rem;background:transparent;
@@ -423,6 +445,26 @@ nav{
       <a class="ship-cep-link" href="https://buscacepinter.correios.com.br/app/endereco/index.php"
          target="_blank" rel="noopener">Não sei meu CEP</a>
       <div class="ship-result" id="ship-result"></div>
+
+      <!-- Endereço exato: é o que o entregador vai ver e para onde ele leva o pedido -->
+      <div class="addr-box">
+        <div class="addr-label">🏠 Onde o entregador deve entregar</div>
+        <input id="addr-logradouro" placeholder="Rua / Avenida" maxlength="90"/>
+        <div class="addr-grid">
+          <input id="addr-numero" placeholder="Número" maxlength="10"/>
+          <input id="addr-complemento" placeholder="Complemento (apto, bloco)" maxlength="60"/>
+        </div>
+        <input id="addr-bairro" placeholder="Bairro" maxlength="60"/>
+        <input id="addr-referencia" placeholder="Ponto de referência (opcional)" maxlength="80"/>
+        <div class="addr-hint" id="addr-hint">
+          Preenchemos rua e bairro pelo CEP — corrija se estiver diferente. O bairro é o que
+          mais ajuda o entregador a chegar perto.
+        </div>
+        <button type="button" class="addr-gps-btn" id="addr-gps-btn" onclick="usarMinhaLocalizacao()">
+          📍 Usar minha localização atual (deixa o mapa do entregador mais preciso)
+        </button>
+        <div class="addr-gps-status" id="addr-gps-status"></div>
+      </div>
     </div>
 
     <div class="summary-rows">
@@ -706,6 +748,8 @@ function closeFreteBreakdown(e){
 }
 
 // Máscara de CEP: 00000-000
+let cepPreenchido = '';   // último CEP já buscado, para não repetir a consulta
+
 function onCepInput(input){
   let v = input.value.replace(/\D/g,'').slice(0,8);
   if(v.length>5) v = v.slice(0,5)+'-'+v.slice(5);
@@ -717,6 +761,27 @@ function onCepInput(input){
     const resultEl = document.getElementById('ship-result');
     if(resultEl){ resultEl.className = 'ship-result'; resultEl.innerHTML = ''; }
   }
+  const limpo = v.replace(/\D/g,'');
+  if(limpo.length === 8 && limpo !== cepPreenchido) preencherEndereco(limpo);
+}
+
+// Busca rua/bairro do CEP e preenche os campos — que continuam editáveis.
+// Só sobrescreve o que o cliente ainda não digitou.
+async function preencherEndereco(cep){
+  cepPreenchido = cep;
+  try{
+    const res = await fetch(`${API_URL}/api/cep/${cep}`);
+    const d = await res.json();
+    if(!d.ok) return;
+
+    const rua = document.getElementById('addr-logradouro');
+    const bairro = document.getElementById('addr-bairro');
+    if(d.logradouro && !rua.value.trim())    rua.value = d.logradouro;
+    if(d.bairro     && !bairro.value.trim()) bairro.value = d.bairro;
+
+    document.getElementById('addr-hint').textContent =
+      `${d.cidade || ''}${d.uf ? ' - ' + d.uf : ''} · confira a rua e o bairro; corrija se estiver diferente.`;
+  }catch{ /* sem internet: o cliente digita à mão */ }
 }
 
 async function calcularFrete(){
@@ -900,6 +965,14 @@ function processPayment(){
     toast('Calcule o frete com seu CEP antes de finalizar a compra.', 'error');
     return;
   }
+  // Sem número não há como o entregador achar o endereço
+  const numero = document.getElementById('addr-numero');
+  if(!numero.value.trim()){
+    toast('Informe o número do endereço para a entrega.', 'error');
+    numero.focus();
+    numero.scrollIntoView({ behavior:'smooth', block:'center' });
+    return;
+  }
   const overlay = document.getElementById('processing-overlay');
   overlay.classList.add('active');
   clearInterval(timerInterval);
@@ -909,14 +982,57 @@ function processPayment(){
   }, 2200);
 }
 
+// Coordenadas do cliente, se ele autorizar o GPS — o entregador vê o ponto exato no mapa
+let coordsCliente = null;
+
+function usarMinhaLocalizacao(){
+  const el = document.getElementById('addr-gps-status');
+  if(!navigator.geolocation){
+    el.className = 'addr-gps-status err';
+    el.textContent = 'Seu navegador não suporta geolocalização.';
+    return;
+  }
+  el.className = 'addr-gps-status';
+  el.textContent = 'Buscando sua localização…';
+  navigator.geolocation.getCurrentPosition(
+    (pos)=>{
+      coordsCliente = { lat: pos.coords.latitude, lng: pos.coords.longitude };
+      el.className = 'addr-gps-status';
+      el.textContent = '✓ Localização registrada — o entregador verá o ponto exato no mapa.';
+    },
+    (err)=>{
+      el.className = 'addr-gps-status err';
+      el.textContent = err.code === 1
+        ? 'Permissão negada. Sem problema: usaremos o endereço do CEP.'
+        : 'Não foi possível obter sua localização. Usaremos o endereço do CEP.';
+    },
+    { enableHighAccuracy: true, timeout: 12000 }
+  );
+}
+
+// Endereço enviado junto com o pedido (o servidor completa o resto pelo CEP e pelo cadastro)
+function getEnderecoEntrega(){
+  return {
+    cep:         document.getElementById('cep-input').value.replace(/\D/g,''),
+    logradouro:  document.getElementById('addr-logradouro').value.trim()  || null,
+    bairro:      document.getElementById('addr-bairro').value.trim()      || null,
+    numero:      document.getElementById('addr-numero').value.trim()      || null,
+    complemento: document.getElementById('addr-complemento').value.trim() || null,
+    referencia:  document.getElementById('addr-referencia').value.trim()  || null,
+    lat: coordsCliente ? coordsCliente.lat : null,
+    lng: coordsCliente ? coordsCliente.lng : null
+  };
+}
+
 function showSuccess(){
   const orderNum = 'PEDIDO #' + Math.floor(100000+Math.random()*900000);
   document.getElementById('order-chip').textContent = orderNum;
   document.getElementById('success-screen').classList.add('active');
-  // Registra a compra (libera a avaliação desses produtos) e então esvazia o carrinho
+  // Registra a compra (libera a avaliação desses produtos e coloca o pedido
+  // na fila de entrega) e então esvazia o carrinho
   const itensComprados = getCart();
   if (DB.currentUser() && itensComprados.length) {
-    DB.createOrder(itensComprados).catch(()=>{});
+    DB.createOrder(itensComprados, getEnderecoEntrega()).catch(()=>{});
   }
   clearCart();   // pedido concluído → esvazia o carrinho do cliente no servidor
   spawnConfetti();

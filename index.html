@@ -339,6 +339,21 @@ nav.scrolled{border-bottom-color:var(--border);background:rgba(10,10,10,.92)}
 .tdot:hover{background:var(--muted)}
 .tdot.active{background:var(--accent);width:22px;border-radius:5px}
 
+/* Rotador de produtos (vitrine) */
+.prot{max-width:420px;margin:2.8rem auto 0}
+.pcard{
+  background:var(--card);border:1px solid var(--border);border-radius:18px;
+  padding:1.3rem;text-align:center;transition:opacity .38s ease,transform .38s ease;
+}
+.pcard.anim-out{opacity:0;transform:translateY(16px)}
+.pcard-img{
+  width:100%;height:260px;border-radius:14px;overflow:hidden;background:var(--card2);
+  border:1px solid var(--border);display:flex;align-items:center;justify-content:center;font-size:4.5rem;
+}
+.pcard-img img{width:100%;height:100%;object-fit:cover;display:block}
+.pcard-name{font-family:'Fraunces',serif;font-size:1.2rem;margin-top:1.1rem;color:var(--text)}
+.pcard-meta{color:var(--muted);font-size:.82rem;margin-top:.35rem}
+
 /* ── CTA ── */
 .cta-section{
   padding:6.5rem 3.5rem;text-align:center;position:relative;overflow:hidden;
@@ -651,6 +666,18 @@ footer{border-top:1px solid var(--border);padding:3rem 3.5rem 2rem}
   </div>
 </section>
 
+<!-- PRODUTOS EM DESTAQUE (vindos do banco) -->
+<section class="testimonials-section" id="showcase-section">
+  <div class="reveal">
+    <div class="section-label">Vitrine</div>
+    <div class="section-title">Alguns <span>produtos</span> à venda</div>
+  </div>
+  <div class="prot reveal">
+    <div class="pcard" id="p-card"></div>
+    <div class="tdots" id="p-dots"></div>
+  </div>
+</section>
+
 <!-- CTA -->
 <section class="cta-section">
   <div class="section-label reveal">Comece agora</div>
@@ -680,6 +707,7 @@ footer{border-top:1px solid var(--border);padding:3rem 3.5rem 2rem}
       <h5>Conta</h5>
       <a href="profile.html">Perfil lojista</a>
       <a href="client-profile.html">Perfil cliente</a>
+      <a href="entregas.html">Painel do entregador</a>
       <a href="login.html?modo=cadastro">Cadastrar loja</a>
     </div>
   </div>
@@ -771,6 +799,58 @@ function initTestimonials(){
   }
 }
 document.addEventListener('DOMContentLoaded', initTestimonials);
+
+/* ── Vitrine rotativa de produtos (puxa do banco via /api/products) ── */
+let PRODUTOS = [], pIdx = 0, pTimer = null;
+
+function catEmojiHome(cat){
+  const m = {'Eletrônicos':'💻','Moda':'👗','Alimentos':'🍎','Casa & Decoração':'🏠','Esportes':'⚽','Beleza':'💄','Livros':'📚','Brinquedos':'🧸'};
+  return m[cat] || '📦';
+}
+function pHTML(p){
+  const img = p.imagem_url ? `<img src="${p.imagem_url}" alt="${p.nome}">` : catEmojiHome(p.categoria);
+  const loja = (p.loja && p.loja.nome) ? `<div class="pcard-meta">🏪 ${p.loja.nome}${p.loja.cidade ? ' · ' + p.loja.cidade : ''}</div>` : '';
+  return `<div class="pcard-img">${img}</div>
+    <div class="pcard-name">${p.nome}</div>
+    ${loja}`;
+}
+function pRender(i, animate){
+  const card = document.getElementById('p-card');
+  if(!card) return;
+  const paint = () => {
+    card.innerHTML = pHTML(PRODUTOS[i]);
+    card.classList.remove('anim-out');
+    document.querySelectorAll('#p-dots .tdot').forEach((d, k) => d.classList.toggle('active', k === i));
+  };
+  if(animate){ card.classList.add('anim-out'); setTimeout(paint, 360); }
+  else paint();
+}
+function pGo(i){ pIdx = (i + PRODUTOS.length) % PRODUTOS.length; pRender(pIdx, true); pReset(); }
+function pReset(){ clearInterval(pTimer); if(PRODUTOS.length > 1) pTimer = setInterval(() => pGo(pIdx + 1), 4000); }
+
+async function initProductShowcase(){
+  const sec = document.getElementById('showcase-section');
+  try{
+    const res = await fetch('http://localhost:4000/api/products');
+    const data = await res.json();
+    let prods = (data.products || []).filter(p => p.nome);
+    if(!prods.length){ if(sec) sec.style.display = 'none'; return; }   // sem produtos → esconde
+    prods.sort((a, b) => (b.imagem_url ? 1 : 0) - (a.imagem_url ? 1 : 0)); // os com foto primeiro
+    PRODUTOS = prods.slice(0, 8);                                        // mostra alguns
+    document.getElementById('p-dots').innerHTML =
+      PRODUTOS.map((_, k) => `<button class="tdot" aria-label="Produto ${k+1}" onclick="pGo(${k})"></button>`).join('');
+    pRender(0, false);
+    pReset();
+    const rot = document.querySelector('.prot');   // pausa ao passar o mouse
+    if(rot){
+      rot.addEventListener('mouseenter', () => clearInterval(pTimer));
+      rot.addEventListener('mouseleave', pReset);
+    }
+  }catch(e){
+    if(sec) sec.style.display = 'none';   // servidor offline → esconde a seção
+  }
+}
+document.addEventListener('DOMContentLoaded', initProductShowcase);
 </script>
 <script src="accessibility.js"></script>
 </body>
