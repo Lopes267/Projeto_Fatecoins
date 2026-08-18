@@ -12,6 +12,7 @@ const multer  = require('multer');
 const bcrypt  = require('bcrypt');
 const net     = require('net');
 const https   = require('https');
+const crypto  = require('crypto');   // códigos de confirmação de entrega
 const admin   = require('firebase-admin');
 
 // ============================================================
@@ -589,6 +590,14 @@ app.get('/api/stores-public', async (req, res) => {
 //  PRODUTOS – CRIAR
 // ============================================================
 
+// Medida em centímetros. Zero/vazio vira null de propósito: "não informado" e
+// "mede 0 cm" são coisas diferentes, e tratar as duas como 0 faria um produto
+// sem medida caber em qualquer lugar.
+function medidaCm(v) {
+  const n = Number(v);
+  return Number.isFinite(n) && n > 0 ? Math.round(n * 10) / 10 : null;
+}
+
 app.post('/api/products', authenticateToken, async (req, res) => {
   const { storeId, nome, preco, descricao, categoria, estoque, peso } = req.body;
   if (!storeId || !nome || !preco) return res.status(400).json({ ok: false, msg: 'Campos obrigatórios faltando.' });
@@ -602,6 +611,11 @@ app.post('/api/products', authenticateToken, async (req, res) => {
     const ref = await db.collection('produtos').add({
       loja_id: storeId, nome, preco, descricao, categoria: categoria || null,
       estoque: estoque || 0, peso: peso || 0, ativo: true, imagem_url: null,
+      // Medidas da embalagem — é por elas que a fila decide se o pedido cabe
+      // na moto ou exige carro
+      comprimento: medidaCm(req.body.comprimento),
+      largura:     medidaCm(req.body.largura),
+      altura:      medidaCm(req.body.altura),
       criado_em: admin.firestore.FieldValue.serverTimestamp()
     });
     const productDoc = await ref.get();
@@ -647,6 +661,10 @@ app.put('/api/products/:id', authenticateToken, async (req, res) => {
     const updates = {};
     for (const campo of campos) {
       if (req.body[campo] !== undefined) updates[campo] = req.body[campo];
+    }
+    // Medidas passam pelo saneamento, não direto do body
+    for (const campo of ['comprimento', 'largura', 'altura']) {
+      if (req.body[campo] !== undefined) updates[campo] = medidaCm(req.body[campo]);
     }
     if (Object.keys(updates).length === 0) return res.status(400).json({ ok: false, msg: 'Nenhum campo para atualizar.' });
 
@@ -703,7 +721,12 @@ app.get('/api/products', async (req, res) => {
         imagem_url: data.imagem_url,
         categoria:  data.categoria,
         estoque:    data.estoque,
-        peso:       data.peso || 0,   // oculto no front; usado só no cálculo de frete
+        // Peso e medidas ficam ocultos do comprador; servem ao frete e a decidir
+        // em que veículo o pedido cabe
+        peso:        data.peso || 0,
+        comprimento: data.comprimento ?? null,
+        largura:     data.largura ?? null,
+        altura:      data.altura ?? null,
         nota_media: data.nota_media || 0,
         nota_count: data.nota_count || 0,
         loja: {
@@ -827,7 +850,13 @@ app.post('/api/orders', authenticateToken, async (req, res) => {
       imagem_url: i.imagem_url || null,
       categoria:  i.categoria || null,
       loja_id:    (i.loja && i.loja.id)   || i.loja_id   || null,
-      loja_nome:  (i.loja && i.loja.nome) || i.loja_nome || null
+      loja_nome:  (i.loja && i.loja.nome) || i.loja_nome || null,
+      // Peso e medidas seguem para o pedido: sem eles não há como saber em que
+      // veículo a entrega cabe (antes ficavam só no produto e se perdiam aqui)
+      peso:        Number(i.peso) || 0,
+      comprimento: medidaCm(i.comprimento),
+      largura:     medidaCm(i.largura),
+      altura:      medidaCm(i.altura)
     })).filter(i => i.produto_id);
 
     if (!normalizados.length) return res.status(400).json({ ok: false, msg: 'Itens inválidos.' });
@@ -846,6 +875,19 @@ app.post('/api/orders', authenticateToken, async (req, res) => {
     // e, no que faltar, pelo cadastro do cliente. É o que o entregador vai ver.
     const entrega = await montarEnderecoEntrega(req.body.entrega || {}, perfil);
 
+    // --- Tarifa do entregador: congelada agora, para ele ver antes de aceitar ---
+    // A corrida sai da loja e termina no cliente. Com várias lojas, o ponto de
+    // partida é a primeira que tem coordenada, e cada loja conta como parada.
+    let origemColeta = null;
+    for (const id of loja_ids) {
+      origemColeta = await coordsDaLoja(id);
+      if (origemColeta) break;
+    }
+    const tarifa = calcularTarifa({
+      distanciaKm: distanciaKm(origemColeta, entrega),
+      paradas: loja_ids.length || 1
+    });
+
     // Baixa o estoque conforme a quantidade comprada de cada produto
     const qtyPorProduto = {};
     normalizados.forEach(i => { qtyPorProduto[i.produto_id] = (qtyPorProduto[i.produto_id] || 0) + i.qty; });
@@ -859,7 +901,7 @@ app.post('/api/orders', authenticateToken, async (req, res) => {
     }
 
     const agora = new Date().toISOString();
-    const ref = await db.collection('pedidos').add({
+    const dadosPedido = {
       usuario_id: req.user.uid,
       usuario_nome, usuario_email,
       usuario_telefone: perfil.telefone || null,
@@ -875,9 +917,25 @@ app.post('/api/orders', authenticateToken, async (req, res) => {
       entregador_telefone: null,
       entregador_local: null,                    // última posição GPS enviada pelo entregador
       entrega_historico: [{ status: 'aguardando', em: agora }],
+      // Quanto o entregador recebe por esta corrida, e como esse número foi feito
+      entrega_tarifa: tarifa.valor,
+      entrega_tarifa_detalhe: tarifa.detalhe,
+      // Peso, volume e maior item — é com isto que a fila decide se o pedido
+      // cabe no veículo de quem está olhando
+      entrega_medidas: envelopeDoPedido(normalizados),
+      entrega_origem: origemColeta,              // de onde sai a coleta
+      // Código que o cliente dita na porta. Só sai daqui para o próprio cliente:
+      // nenhuma rota do entregador devolve este campo.
+      entrega_codigo: gerarCodigoEntrega(),
+      entrega_tentativas: 0,
+      entrega_bloqueada: false,
       criado_em: admin.firestore.FieldValue.serverTimestamp()
-    });
-    res.json({ ok: true, pedido: { id: ref.id } });
+    };
+    const ref = await db.collection('pedidos').add(dadosPedido);
+    // O código volta junto: é o pedido de quem está pedindo, e mostrá-lo já na
+    // tela de sucesso é o que evita o cliente descobrir que ele existe só quando
+    // o entregador bate na porta.
+    res.json({ ok: true, pedido: { id: ref.id, codigo: dadosPedido.entrega_codigo } });
   } catch (err) {
     console.error('Erro ao registrar pedido:', err);
     res.status(500).json({ ok: false, msg: 'Erro interno do servidor.' });
@@ -962,6 +1020,196 @@ app.get('/api/orders', authenticateToken, async (req, res) => {
 
 const ENTREGA_FLUXO = ['aguardando', 'aceito', 'a_caminho', 'entregue'];
 
+// ============================================================
+//  O QUE CABE EM QUE VEÍCULO
+//
+//  Encaixar caixas num compartimento é bin packing 3D — NP-difícil, e resolver
+//  de verdade seria exagero para uma sacola de mercado. Em vez disso usamos as
+//  duas checagens que a logística real usa, e que pegam quase todos os casos:
+//
+//    1. O MAIOR ITEM cabe? Um cabo de vassoura de 120 cm não entra num baú de
+//       80 cm, e nenhuma conta de volume conserta isso.
+//    2. O VOLUME TOTAL cabe, descontando o ar entre as caixas?
+//
+//  Não é exato — mas erra para o lado seguro e é explicável ao entregador.
+// ============================================================
+
+// Caixas não se encaixam perfeitamente: sobra ar entre elas. 75% é a folga
+// usada em logística para carga miúda e variada.
+const APROVEITAMENTO = 0.75;
+
+// Um item cabe girado de qualquer jeito? Ordenar os dois trios em ordem
+// decrescente e comparar posição a posição resolve as 6 rotações de uma vez:
+// o maior lado do item tem que caber no maior lado do compartimento, e assim
+// por diante.
+function itemCabe(item, caixa) {
+  const a = [...item].sort((x, y) => y - x);
+  const b = [...caixa].sort((x, y) => y - x);
+  return a[0] <= b[0] && a[1] <= b[1] && a[2] <= b[2];
+}
+
+// Resume o pedido inteiro num "envelope": peso, volume e o maior item.
+// itens_sem_medida é contado e exposto — um pedido meio medido não pode passar
+// por totalmente medido.
+function envelopeDoPedido(itens) {
+  let peso = 0, volumeL = 0, semMedida = 0;
+  let maiorItem = null, maiorLado = 0;
+
+  (itens || []).forEach(i => {
+    const qty = Number(i.qty) || 1;
+    peso += (Number(i.peso) || 0) * qty;
+
+    const c = medidaCm(i.comprimento), l = medidaCm(i.largura), a = medidaCm(i.altura);
+    if (c && l && a) {
+      volumeL += (c * l * a / 1000) * qty;      // cm³ → litros
+      const maior = Math.max(c, l, a);
+      if (maior > maiorLado) { maiorLado = maior; maiorItem = [c, l, a]; }
+    } else {
+      semMedida += qty;
+    }
+  });
+
+  return {
+    peso_kg:  Math.round(peso * 100) / 100,
+    volume_l: Math.round(volumeL * 10) / 10,
+    maior_item: maiorItem,                      // [c,l,a] do item mais comprido
+    itens_sem_medida: semMedida
+  };
+}
+
+// Capacidade declarada pelo entregador. Campo faltando vira null — capacidade
+// pela metade não filtra nada, e é melhor não filtrar do que filtrar errado.
+function capacidadeValida(cap) {
+  if (!cap) return null;
+  const c = medidaCm(cap.comprimento), l = medidaCm(cap.largura), a = medidaCm(cap.altura);
+  const p = Number(cap.peso_max);
+  if (!c || !l || !a) return null;
+  return { comprimento: c, largura: l, altura: a,
+           peso_max: Number.isFinite(p) && p > 0 ? p : null,
+           categoria: cap.categoria || null };
+}
+
+// Veredito para um pedido: cabe, não cabe, ou não dá para saber.
+//   { cabe: true|false, motivo, incerto }
+// incerto=true significa "tem item sem medida" — o pedido aparece na fila com
+// aviso, em vez de sumir. Esconder trabalho por falta de cadastro do lojista
+// puniria o entregador por um erro que não é dele.
+function cabeNoVeiculo(env, cap) {
+  if (!cap) return { cabe: true, motivo: 'Capacidade do veículo não cadastrada', incerto: true };
+  if (!env) return { cabe: true, motivo: 'Pedido sem medidas', incerto: true };
+
+  if (cap.peso_max && env.peso_kg > cap.peso_max) {
+    return { cabe: false, motivo: `Pesa ${env.peso_kg} kg — seu limite é ${cap.peso_max} kg`, incerto: false };
+  }
+  if (env.maior_item && !itemCabe(env.maior_item, [cap.comprimento, cap.largura, cap.altura])) {
+    const [c, l, a] = env.maior_item;
+    return { cabe: false, motivo: `Tem item de ${c}×${l}×${a} cm — não entra no seu compartimento`, incerto: false };
+  }
+  const capacidadeL = (cap.comprimento * cap.largura * cap.altura / 1000) * APROVEITAMENTO;
+  if (env.volume_l > capacidadeL) {
+    return { cabe: false, motivo: `Ocupa ~${env.volume_l} L — cabem ~${Math.round(capacidadeL)} L`, incerto: false };
+  }
+  if (env.itens_sem_medida > 0) {
+    return { cabe: true, incerto: true,
+             motivo: `${env.itens_sem_medida} item(ns) sem medida cadastrada — confira antes de sair` };
+  }
+  return { cabe: true, motivo: null, incerto: false };
+}
+
+// ============================================================
+//  TARIFA DO ENTREGADOR
+//
+//  O entregador precisa saber quanto vai ganhar ANTES de aceitar — senão a
+//  escolha vira aposta. A tarifa é calculada uma vez, na criação do pedido, e
+//  congelada no documento: o que ele viu na fila é o que ele recebe, mesmo que
+//  a tabela mude depois.
+//
+//  Note que a tarifa NÃO acompanha o valor da mercadoria. Levar um pedido de
+//  R$ 900 a 8 km dá o mesmo trabalho que levar um de R$ 50 a 8 km — pagar por
+//  valor premiaria sorte, não esforço.
+// ============================================================
+const TARIFA = {
+  base:       5.00,   // sair, pegar o pacote, encarar o trânsito
+  por_km:     1.20,   // distância da coleta até o cliente
+  por_parada: 1.50,   // cada loja onde é preciso passar (pedido com 2 lojas = 2 paradas)
+  minimo:     7.00,   // ninguém roda por menos que isto
+  // Sem coordenadas não dá para medir a distância. Em vez de pagar só a base
+  // (que puniria o entregador por uma falha nossa de geocodificação), assume-se
+  // uma corrida curta típica de bairro.
+  km_presumido: 3
+};
+
+function calcularTarifa({ distanciaKm, paradas = 1 }) {
+  const km = distanciaKm != null ? distanciaKm : TARIFA.km_presumido;
+  const bruto = TARIFA.base
+              + km * TARIFA.por_km
+              + Math.max(1, paradas) * TARIFA.por_parada;
+  const valor = Math.max(TARIFA.minimo, bruto);
+  return {
+    valor: Math.round(valor * 100) / 100,
+    // A composição vai junto para o painel poder explicar o número em vez de
+    // só exibi-lo — entregador que não entende a conta desconfia dela.
+    detalhe: {
+      base: TARIFA.base,
+      km: Math.round(km * 10) / 10,
+      valor_km: Math.round(km * TARIFA.por_km * 100) / 100,
+      paradas: Math.max(1, paradas),
+      valor_paradas: Math.round(Math.max(1, paradas) * TARIFA.por_parada * 100) / 100,
+      estimado: distanciaKm == null,   // distância presumida, não medida
+      minimo_aplicado: valor > bruto
+    }
+  };
+}
+
+// Coordenadas da loja, para saber de onde sai a corrida. Geocodifica na primeira
+// vez e grava no documento da loja — as próximas leituras são de graça.
+async function coordsDaLoja(lojaId) {
+  if (!lojaId) return null;
+  try {
+    const ref = db.collection('lojas').doc(String(lojaId));
+    const doc = await ref.get();
+    if (!doc.exists) return null;
+    const l = doc.data();
+
+    const jaTem = coordsValidas(l);
+    if (jaTem) return jaTem;
+    if (l.geo_falhou) return null;      // não insiste a cada pedido num endereço que não resolve
+
+    const coords = await geocodificarEndereco({
+      logradouro: l.endereco || null, numero: null, bairro: null,
+      cidade: l.cidade || null, uf: l.estado || null, cep: l.cep || null
+    });
+    if (coords) {
+      await ref.update({ lat: coords.lat, lng: coords.lng, geo_precisao: coords.precisao }).catch(() => {});
+      return { lat: coords.lat, lng: coords.lng };
+    }
+    await ref.update({ geo_falhou: true }).catch(() => {});
+    return null;
+  } catch {
+    return null;   // tarifa não pode derrubar a criação do pedido
+  }
+}
+
+// ============================================================
+//  CÓDIGO DE CONFIRMAÇÃO DE ENTREGA
+//
+//  Quem prova que a entrega aconteceu é o CLIENTE, não o entregador. O sistema
+//  gera um código, mostra só para o cliente, e o entregador só finaliza (e só
+//  recebe) digitando o código que o cliente dita na porta.
+//
+//  Duas regras que sustentam isso:
+//    1. o código NUNCA entra em nenhuma resposta destinada ao entregador;
+//    2. tentativa errada é contada — 4 dígitos são adivinháveis por força bruta
+//       se ninguém estiver contando.
+// ============================================================
+const TENTATIVAS_MAX = 5;
+
+function gerarCodigoEntrega() {
+  // 4 dígitos: curto o bastante para ser ditado em voz alta na porta.
+  // A proteção real contra adivinhação é o limite de tentativas, não o tamanho.
+  return String(crypto.randomInt(0, 10000)).padStart(4, '0');
+}
+
 // Só o dono do tipo certo passa. Devolve o perfil, ou null (já respondeu o erro).
 async function exigirTipo(req, res, tipo) {
   const doc = await db.collection('usuarios').doc(req.user.uid).get();
@@ -1000,6 +1248,71 @@ function coordsValidas(o) {
 
 const esperar = (ms) => new Promise(r => setTimeout(r, ms));
 
+// Margem de erro do GPS, em metros. Um navegador de computador não tem GPS:
+// ele estima pela rede/IP e erra de centenas de metros a dezenas de quilômetros.
+// Aceitar essa leitura como "ponto exato" manda o entregador para outro bairro —
+// pior do que não ter coordenada nenhuma, porque parece confiável.
+const GPS_BOM_M  = 100;    // até 100 m: é GPS de verdade, vale mais que o geocoder
+const GPS_MEIO_M = 1000;   // até 1 km: só serve se o geocoder não achar o número
+                           // acima disso: descartado, o endereço escrito é melhor
+
+// Distância em km entre dois pontos (haversine).
+// Só calcula com coordenadas plausíveis — senão devolveria "5.900 km" por causa
+// de um ponto inválido, que é pior do que não mostrar distância nenhuma.
+function distanciaKm(a, b) {
+  const p1 = coordsValidas(a), p2 = coordsValidas(b);
+  if (!p1 || !p2) return null;
+  const R = 6371, rad = x => x * Math.PI / 180;
+  const dLat = rad(p2.lat - p1.lat), dLng = rad(p2.lng - p1.lng);
+  const h = Math.sin(dLat / 2) ** 2 +
+            Math.cos(rad(p1.lat)) * Math.cos(rad(p2.lat)) * Math.sin(dLng / 2) ** 2;
+  return Math.round(2 * R * Math.asin(Math.sqrt(h)) * 10) / 10;
+}
+
+// Mesma conta, sem arredondar — para somar trechos curtos de trajeto, onde
+// arredondar para 100 m a cada ping zeraria a soma inteira.
+function distanciaMetros(a, b) {
+  const p1 = coordsValidas(a), p2 = coordsValidas(b);
+  if (!p1 || !p2) return null;
+  const R = 6371000, rad = x => x * Math.PI / 180;
+  const dLat = rad(p2.lat - p1.lat), dLng = rad(p2.lng - p1.lng);
+  const h = Math.sin(dLat / 2) ** 2 +
+            Math.cos(rad(p1.lat)) * Math.cos(rad(p2.lat)) * Math.sin(dLng / 2) ** 2;
+  return 2 * R * Math.asin(Math.sqrt(h));
+}
+
+// ---------- Cache de geocodificação ----------
+// Geocodificar custa até 6 consultas ao Nominatim com 1,1 s de espera entre elas
+// (a política deles é 1 consulta/segundo), tudo dentro da criação do pedido: o
+// cliente ficava olhando a tela girar. Endereço é dado estável, então o resultado
+// é guardado por CEP+número — o segundo pedido para a mesma casa sai instantâneo.
+const CACHE_GEO_DIAS = 180;
+
+function chaveGeo(e) {
+  return [e.cep, e.numero, e.logradouro, e.bairro, e.cidade, e.uf]
+    .map(v => String(v || '').trim().toLowerCase().replace(/\s+/g, ' '))
+    .join('|');
+}
+
+async function geoDoCache(chave) {
+  try {
+    const doc = await db.collection('geocache').doc(Buffer.from(chave).toString('base64url').slice(0, 400)).get();
+    if (!doc.exists) return null;
+    const d = doc.data();
+    const idade = (Date.now() - new Date(d.em).getTime()) / 864e5;
+    if (idade > CACHE_GEO_DIAS) return null;
+    return coordsValidas(d) ? { lat: d.lat, lng: d.lng, precisao: d.precisao } : null;
+  } catch { return null; }   // cache indisponível nunca pode derrubar um pedido
+}
+
+async function guardarGeo(chave, coords) {
+  try {
+    await db.collection('geocache')
+      .doc(Buffer.from(chave).toString('base64url').slice(0, 400))
+      .set({ ...coords, em: new Date().toISOString() });
+  } catch { /* idem */ }
+}
+
 // Uma consulta ao Nominatim (OpenStreetMap, sem chave de API).
 async function nominatim(params) {
   const url = 'https://nominatim.openstreetmap.org/search?format=jsonv2&limit=1&countrycodes=br&' +
@@ -1029,7 +1342,17 @@ async function nominatim(params) {
 // das ruas e CEPs das cidades médias, mas conhece os bairros. Sem ele, um endereço
 // no Jardim Ana Rosa caía no centroide de Taubaté — ou seja, mandava o entregador
 // para o Centro, a quase 3 km do lugar certo.
+// Raio máximo, em km, que um resultado pode estar do centro da cidade informada
+// antes de virar suspeito. Nominatim tem o hábito de devolver a "Rua das Flores"
+// de outro estado quando não acha a da cidade certa; sem esta checagem o pedido
+// era gravado com um ponto a 400 km e o entregador via um mapa impossível.
+const RAIO_CIDADE_KM = 60;
+
 async function geocodificarEndereco(e) {
+  const chave = chaveGeo(e);
+  const emCache = await geoDoCache(chave);
+  if (emCache) return emCache;
+
   const cidadeUf = [e.cidade, e.uf].filter(Boolean).join(', ');
   const tentativas = [];
 
@@ -1056,13 +1379,35 @@ async function geocodificarEndereco(e) {
     tentativas.push({ precisao: 'cidade', params: { city: e.cidade, state: e.uf || '' } });
   }
 
+  // Âncora para conferir os acertos: o centro da cidade. Vem de graça quando a
+  // última tentativa roda, mas precisamos dele ANTES para validar as primeiras.
+  let centroCidade = null;
+  if (e.cidade) {
+    centroCidade = await nominatim({ city: e.cidade, state: e.uf || '' });
+  }
+
+  let achou = null;
   for (let i = 0; i < tentativas.length; i++) {
-    if (i > 0) await esperar(1100);            // política do Nominatim: no máx. 1 consulta/segundo
+    await esperar(1100);                       // política do Nominatim: no máx. 1 consulta/segundo
     const t = tentativas[i];
     const coords = await nominatim(t.params);
-    if (coords) return { ...coords, precisao: t.precisao };
+    if (!coords) continue;
+
+    // Longe demais da cidade informada? O resultado é de outro lugar com nome igual.
+    if (centroCidade && t.precisao !== 'cidade') {
+      const desvio = distanciaKm(coords, centroCidade);
+      if (desvio !== null && desvio > RAIO_CIDADE_KM) continue;
+    }
+    achou = { ...coords, precisao: t.precisao };
+    break;
   }
-  return null;
+
+  // Nada casou, mas sabemos onde é a cidade: melhor o centro dela (avisando que é
+  // impreciso) do que devolver "sem ponto no mapa".
+  if (!achou && centroCidade) achou = { ...centroCidade, precisao: 'cidade' };
+
+  if (achou) await guardarGeo(chave, achou);
+  return achou;
 }
 
 // Junta o que o checkout mandou + ViaCEP + cadastro do cliente num endereço só.
@@ -1080,41 +1425,81 @@ async function montarEnderecoEntrega(body, perfil) {
     uf:          body.uf     || (viaCep && viaCep.uf)     || perfil.estado || null,
     referencia:  body.referencia || null,
     lat: null, lng: null,
-    precisao: null          // exata | rua | cep | cidade | gps  (null = sem localização)
+    precisao: null,         // gps | exata | rua | bairro | cep | cidade | gps_aprox (null = sem localização)
+    precisao_m: null        // margem de erro do GPS em metros, quando veio do GPS
   };
 
-  // O GPS do próprio cliente é a melhor fonte; só depois cai para o geocoder.
+  // Onde o cliente diz que está, e quão confiável é essa leitura.
+  // O checkout manda precisao_m; pedidos antigos e clientes que ajustaram o pino
+  // à mão mandam sem — nesse caso confiamos, porque foi uma escolha deliberada.
   const doCliente = coordsValidas(body);
-  if (doCliente) {
+  const margemM   = coordenada(body.precisao_m);
+  const ajustadoAMao = body.origem === 'manual';
+
+  // GPS bom (ou pino posto a dedo no mapa) ganha de qualquer geocodificação:
+  // aponta a porta, não a rua.
+  if (doCliente && (ajustadoAMao || margemM === null || margemM <= GPS_BOM_M)) {
     entrega.lat = doCliente.lat;
     entrega.lng = doCliente.lng;
     entrega.precisao = 'gps';
-  } else {
-    const coords = await geocodificarEndereco(entrega);
-    if (coords) {
-      entrega.lat = coords.lat;
-      entrega.lng = coords.lng;
-      entrega.precisao = coords.precisao;
+    entrega.precisao_m = ajustadoAMao ? null : margemM;
+    return entrega;
+  }
+
+  const coords = await geocodificarEndereco(entrega);
+
+  // GPS mediano (100 m – 1 km): só vale se o geocoder não achou o número da casa.
+  // Um acerto "exata" do geocoder é melhor do que um raio de meio quilômetro.
+  if (doCliente && margemM !== null && margemM <= GPS_MEIO_M) {
+    if (coords && coords.precisao === 'exata') {
+      entrega.lat = coords.lat; entrega.lng = coords.lng; entrega.precisao = 'exata';
+    } else {
+      entrega.lat = doCliente.lat; entrega.lng = doCliente.lng;
+      entrega.precisao = 'gps_aprox'; entrega.precisao_m = margemM;
     }
+    return entrega;
+  }
+
+  // GPS ruim (> 1 km) é descartado sem dó: é a estimativa por IP do navegador de
+  // computador, que já mandou entregador para a cidade vizinha.
+  if (coords) {
+    entrega.lat = coords.lat;
+    entrega.lng = coords.lng;
+    entrega.precisao = coords.precisao;
   }
   return entrega;
 }
 
-// Distância em km entre dois pontos (haversine).
-// Só calcula com coordenadas plausíveis — senão devolveria "5.900 km" por causa
-// de um ponto inválido, que é pior do que não mostrar distância nenhuma.
-function distanciaKm(a, b) {
-  const p1 = coordsValidas(a), p2 = coordsValidas(b);
-  if (!p1 || !p2) return null;
-  const R = 6371, rad = x => x * Math.PI / 180;
-  const dLat = rad(p2.lat - p1.lat), dLng = rad(p2.lng - p1.lng);
-  const h = Math.sin(dLat / 2) ** 2 +
-            Math.cos(rad(p1.lat)) * Math.cos(rad(p2.lat)) * Math.sin(dLng / 2) ** 2;
-  return Math.round(2 * R * Math.asin(Math.sqrt(h)) * 10) / 10;
+// Quando cada etapa aconteceu, lido do histórico de status. O histórico é a única
+// fonte: não existe campo separado que possa divergir dele.
+function marcosDaEntrega(historico) {
+  const em = {};
+  (historico || []).forEach(h => {
+    // Primeira ocorrência vence: um pedido devolvido à fila e reaceito não deve
+    // fingir que a primeira aceitação nunca existiu.
+    if (h && h.status && h.em && !em[h.status]) em[h.status] = h.em;
+  });
+  const min = (a, b) => (a && b) ? Math.round((new Date(b) - new Date(a)) / 60000) : null;
+  return {
+    aceito_em:   em.aceito    || null,
+    saiu_em:     em.a_caminho || null,
+    entregue_em: em.entregue  || null,
+    // Quanto o pedido esperou na fila, quanto o entregador levou para sair e
+    // quanto tempo ficou na rua — os três números que explicam uma entrega lenta.
+    espera_min:  min(em.aguardando, em.aceito),
+    preparo_min: min(em.aceito, em.a_caminho),
+    rua_min:     min(em.a_caminho, em.entregue),
+    total_min:   min(em.aceito, em.entregue)
+  };
 }
 
-// Resumo de um pedido do ponto de vista da entrega
-function resumoEntrega(doc, { incluirCliente = false } = {}) {
+// Resumo de um pedido do ponto de vista da entrega.
+//
+// incluirCodigo é o interruptor de sigilo do código de confirmação: só as rotas
+// de rastreio do CLIENTE o ligam. Nenhuma rota do entregador pode ligá-lo — se
+// alguém ligar por engano, o entregador consegue finalizar sozinho e a trava
+// inteira deixa de existir.
+function resumoEntrega(doc, { incluirCliente = false, incluirCodigo = false } = {}) {
   const p = doc.data();
   const criado = p.criado_em && p.criado_em.toDate ? p.criado_em.toDate().toISOString() : null;
   const itens = (p.itens || []).map(i => ({
@@ -1129,6 +1514,8 @@ function resumoEntrega(doc, { incluirCliente = false } = {}) {
   }
   const local = coordsValidas(p.entregador_local) ? p.entregador_local : null;
 
+  const marcos = marcosDaEntrega(p.entrega_historico);
+
   const base = {
     id: doc.id,
     itens,
@@ -1139,8 +1526,30 @@ function resumoEntrega(doc, { incluirCliente = false } = {}) {
     entrega,
     entregador_local: local,
     historico: p.entrega_historico || [],
-    criado_em: criado
+    criado_em: criado,
+    ...marcos,
+    // Onde a entrega aconteceu, para agrupar por região sem o painel ter que
+    // reparsear o endereço inteiro
+    bairro: (entrega && entrega.bairro) || null,
+    cidade: (entrega && entrega.cidade) || null,
+    // Trajeto realmente percorrido (soma dos pings do GPS) e a distância que
+    // faltava quando o pedido foi aceito
+    percorrido_km: p.entregador_km != null ? Math.round(p.entregador_km * 10) / 10 : null,
+    distancia_inicial_km: p.entrega_km_inicial != null ? p.entrega_km_inicial : null,
+    // Peso, volume e maior item — para o entregador saber se cabe no veículo dele
+    medidas: p.entrega_medidas || null,
+    // Quanto esta corrida paga — o número que decide se vale aceitar
+    tarifa: p.entrega_tarifa != null ? p.entrega_tarifa : null,
+    tarifa_detalhe: p.entrega_tarifa_detalhe || null,
+    // Estado da trava de confirmação (sem revelar o código em si)
+    tentativas_restantes: Math.max(0, TENTATIVAS_MAX - (p.entrega_tentativas || 0)),
+    bloqueada: !!p.entrega_bloqueada,
+    pagamento: p.entrega_pagamento || null      // { destino, valor, em } depois de finalizada
   };
+
+  // O código só existe para quem comprou. Um `if` explícito, e não um campo
+  // solto no objeto, para que incluí-lo seja sempre uma decisão consciente.
+  if (incluirCodigo) base.codigo = p.entrega_codigo || null;
   if (incluirCliente) {
     base.cliente = {
       nome: p.usuario_nome || 'Cliente',
@@ -1154,9 +1563,53 @@ function resumoEntrega(doc, { incluirCliente = false } = {}) {
   return base;
 }
 
+// --- ENTREGADOR: cadastrar a capacidade do veículo ---
+// Medidas do compartimento, não do carro. O que importa é o que cabe no baú/
+// porta-malas — nenhuma tabela FIPE sabe isso, só quem carrega todo dia.
+app.put('/api/couriers/capacity', authenticateToken, async (req, res) => {
+  if (!await exigirTipo(req, res, 'entregador')) return;
+
+  // Enviar {} apaga a capacidade e volta a mostrar a fila inteira
+  if (req.body && req.body.limpar) {
+    await db.collection('usuarios').doc(req.user.uid).set({ capacidade: null }, { merge: true });
+    return res.json({ ok: true, capacidade: null });
+  }
+
+  const cap = capacidadeValida(req.body);
+  if (!cap) {
+    return res.status(400).json({
+      ok: false,
+      msg: 'Informe comprimento, largura e altura do compartimento (em cm), todos maiores que zero.'
+    });
+  }
+  try {
+    await db.collection('usuarios').doc(req.user.uid).set({ capacidade: cap }, { merge: true });
+    res.json({
+      ok: true,
+      capacidade: cap,
+      volume_util_l: Math.round((cap.comprimento * cap.largura * cap.altura / 1000) * APROVEITAMENTO)
+    });
+  } catch (err) {
+    console.error('Erro ao salvar capacidade:', err);
+    res.status(500).json({ ok: false, msg: 'Erro interno do servidor.' });
+  }
+});
+
+app.get('/api/couriers/capacity', authenticateToken, async (req, res) => {
+  const perfil = await exigirTipo(req, res, 'entregador');
+  if (!perfil) return;
+  const cap = capacidadeValida(perfil.capacidade);
+  res.json({
+    ok: true,
+    capacidade: cap,
+    volume_util_l: cap ? Math.round((cap.comprimento * cap.largura * cap.altura / 1000) * APROVEITAMENTO) : null
+  });
+});
+
 // --- ENTREGADOR: pedidos de outras pessoas esperando alguém levar ---
 app.get('/api/deliveries/available', authenticateToken, async (req, res) => {
-  if (!await exigirTipo(req, res, 'entregador')) return;
+  const perfilEntregador = await exigirTipo(req, res, 'entregador');
+  if (!perfilEntregador) return;
   try {
     const snap = await db.collection('pedidos').where('entrega_status', '==', 'aguardando').get();
 
@@ -1166,14 +1619,40 @@ app.get('/api/deliveries/available', authenticateToken, async (req, res) => {
       lng: Number(req.query.lng)
     };
     const temPosicao = Number.isFinite(eu.lat) && Number.isFinite(eu.lng);
+    // Raio máximo em km. Sem GPS ele é ignorado — filtrar por uma distância que
+    // não sabemos calcular esvaziaria a fila sem explicação.
+    const raioKm = Number(req.query.raio_km);
+    const temRaio = temPosicao && Number.isFinite(raioKm) && raioKm > 0;
 
-    const pedidos = snap.docs
+    // Capacidade do veículo: cada pedido vem com o veredito de encaixe, e
+    // 'so_cabe=1' esconde de vez o que não serve.
+    const capacidade = capacidadeValida(perfilEntregador.capacidade);
+    const soCabe = req.query.so_cabe === '1' && !!capacidade;
+
+    let pedidos = snap.docs
       .filter(d => d.data().usuario_id !== req.user.uid)   // ninguém entrega a própria compra
       .map(d => {
         const item = resumoEntrega(d, { incluirCliente: true });
         item.distancia_km = temPosicao ? distanciaKm(eu, item.entrega || {}) : null;
+        item.encaixe = cabeNoVeiculo(item.medidas, capacidade);
         return item;
       });
+
+    // Quantos ficaram de fora do raio — o painel diz isso em vez de só sumir com eles
+    let foraDoRaio = 0;
+    if (temRaio) {
+      const dentro = pedidos.filter(p => p.distancia_km == null || p.distancia_km <= raioKm);
+      foraDoRaio = pedidos.length - dentro.length;
+      pedidos = dentro;
+    }
+
+    // Idem para o que não cabe: o número é dito, nunca escondido em silêncio
+    let naoCabem = 0;
+    if (soCabe) {
+      const cabem = pedidos.filter(p => p.encaixe.cabe);
+      naoCabem = pedidos.length - cabem.length;
+      pedidos = cabem;
+    }
 
     // Mais perto primeiro; sem GPS, mais recente primeiro
     pedidos.sort((a, b) => {
@@ -1183,7 +1662,12 @@ app.get('/api/deliveries/available', authenticateToken, async (req, res) => {
       return (b.criado_em || '').localeCompare(a.criado_em || '');
     });
 
-    res.json({ ok: true, pedidos });
+    res.json({
+      ok: true, pedidos,
+      fora_do_raio: foraDoRaio,
+      nao_cabem: naoCabem,
+      tem_capacidade: !!capacidade
+    });
   } catch (err) {
     console.error('Erro ao listar entregas disponíveis:', err);
     res.status(500).json({ ok: false, msg: 'Erro interno do servidor.' });
@@ -1194,6 +1678,10 @@ app.get('/api/deliveries/available', authenticateToken, async (req, res) => {
 app.post('/api/deliveries/:id/accept', authenticateToken, async (req, res) => {
   const perfil = await exigirTipo(req, res, 'entregador');
   if (!perfil) return;
+  // Onde o entregador estava ao aceitar — vira a distância inicial do trajeto.
+  // Opcional: quem aceita com o GPS desligado simplesmente não tem esse número.
+  const daAceitacao = coordsValidas(req.body);
+
   try {
     const ref = db.collection('pedidos').doc(req.params.id);
     await db.runTransaction(async (tx) => {
@@ -1208,6 +1696,9 @@ app.post('/api/deliveries/:id/accept', authenticateToken, async (req, res) => {
         entregador_id: req.user.uid,
         entregador_nome: perfil.nome || 'Entregador',
         entregador_telefone: perfil.telefone || null,
+        // Zera o trajeto: o contador é deste entregador, não do que devolveu antes
+        entregador_km: 0,
+        entrega_km_inicial: daAceitacao ? distanciaKm(daAceitacao, p.entrega || {}) : null,
         entrega_historico: admin.firestore.FieldValue.arrayUnion({
           status: 'aceito', em: new Date().toISOString()
         })
@@ -1241,6 +1732,7 @@ app.post('/api/deliveries/:id/release', authenticateToken, async (req, res) => {
       entrega_status: 'aguardando',
       entregador_id: null, entregador_nome: null, entregador_telefone: null,
       entregador_local: null,
+      entregador_km: 0, entrega_km_inicial: null,   // o trajeto do próximo começa do zero
       entrega_historico: admin.firestore.FieldValue.arrayUnion({
         status: 'aguardando', em: new Date().toISOString()
       })
@@ -1271,12 +1763,27 @@ app.get('/api/deliveries/mine', authenticateToken, async (req, res) => {
 });
 
 // --- ENTREGADOR: enviar a posição atual (o comprador acompanha em tempo real) ---
+// Trecho entre dois pings que conta como deslocamento de verdade.
+// Abaixo de 25 m é tremor do GPS parado (somaria quilômetros fantasmas ao longo
+// de uma entrega); acima de 3 km num único ping é salto de sinal, não caminho.
+const PASSO_MIN_M = 25;
+const PASSO_MAX_M = 3000;
+
 app.post('/api/deliveries/:id/location', authenticateToken, async (req, res) => {
   if (!await exigirTipo(req, res, 'entregador')) return;
 
   const pos = coordsValidas(req.body);
   if (!pos) {
     return res.status(400).json({ ok: false, msg: 'Coordenadas inválidas ou fora do Brasil.' });
+  }
+  const margemM = coordenada(req.body.precisao);
+  // O painel já filtra, mas a regra tem que valer no servidor também: nenhuma
+  // leitura pior que 1 km vira "posição do entregador" na tela do comprador.
+  if (margemM !== null && margemM > GPS_MEIO_M) {
+    return res.status(400).json({
+      ok: false,
+      msg: `Leitura imprecisa demais (±${Math.round(margemM)} m). Use o celular com GPS ou marque sua posição no mapa.`
+    });
   }
   const { lat, lng } = pos;
 
@@ -1291,10 +1798,18 @@ app.post('/api/deliveries/:id/location', authenticateToken, async (req, res) => 
 
     const local = {
       lat, lng,
-      precisao: coordenada(req.body.precisao),   // metros do GPS; null quando não informado
+      precisao: margemM,                         // metros do GPS; null quando não informado
       atualizado_em: new Date().toISOString()
     };
-    await ref.update({ entregador_local: local });
+
+    // Soma o trecho desde o ping anterior — é isto que vira "distância percorrida"
+    // no painel de desempenho.
+    const patch = { entregador_local: local };
+    const passo = distanciaMetros(p.entregador_local, local);
+    if (passo !== null && passo >= PASSO_MIN_M && passo <= PASSO_MAX_M) {
+      patch.entregador_km = (Number(p.entregador_km) || 0) + passo / 1000;
+    }
+    await ref.update(patch);
 
     res.json({
       ok: true,
@@ -1308,38 +1823,207 @@ app.post('/api/deliveries/:id/location', authenticateToken, async (req, res) => 
 });
 
 // --- ENTREGADOR: avançar o status (a_caminho / entregue) ---
+//
+// Finalizar exige o código que o cliente dita na porta, e é o mesmo ato que
+// libera o pagamento. Por isso tudo aqui roda numa transação: conferir o código,
+// mudar o status e creditar o dinheiro precisam acontecer juntos ou não
+// acontecer. Sem isso, dois toques no botão pagariam a corrida duas vezes.
 app.post('/api/deliveries/:id/status', authenticateToken, async (req, res) => {
-  if (!await exigirTipo(req, res, 'entregador')) return;
+  const perfil = await exigirTipo(req, res, 'entregador');
+  if (!perfil) return;
 
   const novo = String(req.body.status || '');
   if (!['a_caminho', 'entregue'].includes(novo)) {
     return res.status(400).json({ ok: false, msg: 'Status inválido.' });
   }
+  const codigo  = String(req.body.codigo || '').replace(/\D/g, '');
+  // Para onde vai o dinheiro: fica na carteira ou sai como saque na hora
+  const destino = req.body.destino === 'saque' ? 'saque' : 'carteira';
 
   try {
     const ref = db.collection('pedidos').doc(req.params.id);
-    const doc = await ref.get();
-    if (!doc.exists) return res.status(404).json({ ok: false, msg: 'Pedido não encontrado.' });
+    const usuarioRef = db.collection('usuarios').doc(req.user.uid);
+    const movRef = db.collection('carteira_movimentos').doc();
 
-    const p = doc.data();
-    if (p.entregador_id !== req.user.uid) return res.status(403).json({ ok: false, msg: 'Esta entrega não é sua.' });
+    const finalizando = novo === 'entregue';
 
-    // Só anda para frente no fluxo
-    const atual = ENTREGA_FLUXO.indexOf(p.entrega_status || 'aguardando');
-    if (ENTREGA_FLUXO.indexOf(novo) <= atual) {
-      return res.status(400).json({ ok: false, msg: 'A entrega já passou desta etapa.' });
-    }
+    const saida = await db.runTransaction(async (tx) => {
+      // ---------- 1) TODAS as leituras ----------
+      // O Firestore exige ler tudo antes de escrever qualquer coisa. Por isso a
+      // carteira é lida aqui, junto com o pedido, mesmo que só seja usada lá
+      // embaixo — ler depois do primeiro tx.update() derruba a transação inteira.
+      const doc = await tx.get(ref);
+      if (!doc.exists) throw new Error('PEDIDO_NAO_ENCONTRADO');
+      const uDoc = finalizando ? await tx.get(usuarioRef) : null;
 
-    await ref.update({
-      entrega_status: novo,
-      entrega_historico: admin.firestore.FieldValue.arrayUnion({
-        status: novo, em: new Date().toISOString()
-      })
+      // ---------- 2) validações (nada escreve) ----------
+      const p = doc.data();
+      if (p.entregador_id !== req.user.uid) throw new Error('NAO_E_SUA');
+
+      // Só anda para frente no fluxo — é isto que impede pagar duas vezes:
+      // na segunda chamada o status já é 'entregue' e a transação aborta.
+      const atual = ENTREGA_FLUXO.indexOf(p.entrega_status || 'aguardando');
+      if (ENTREGA_FLUXO.indexOf(novo) <= atual) throw new Error('JA_PASSOU');
+
+      const patch = {
+        entrega_status: novo,
+        entrega_historico: admin.firestore.FieldValue.arrayUnion({
+          status: novo, em: new Date().toISOString()
+        })
+      };
+
+      // 'a_caminho' não mexe em dinheiro nem em código
+      if (!finalizando) { tx.update(ref, patch); return { pago: null }; }
+
+      if (p.entrega_bloqueada) throw new Error('BLOQUEADA');
+
+      const esperado = p.entrega_codigo || null;
+      if (esperado) {
+        if (!codigo) throw new Error('CODIGO_FALTANDO');
+        // Comparação em tempo constante: com 4 dígitos o vazamento por tempo é
+        // teórico, mas comparar segredo com === é um hábito que não vale ter.
+        const bateu = codigo.length === esperado.length &&
+          crypto.timingSafeEqual(Buffer.from(codigo), Buffer.from(esperado));
+        // NÃO conte a tentativa aqui: lançar erro desfaz toda a transação, e o
+        // contador iria embora junto. O registro acontece no catch, fora dela.
+        if (!bateu) throw new Error('CODIGO_ERRADO');
+      }
+      // Pedido antigo, criado antes do código existir: deixa finalizar sem ele,
+      // senão essas entregas ficariam presas para sempre.
+
+      const valor = Number(p.entrega_tarifa) || 0;
+      patch.entrega_pagamento = { destino, valor, em: new Date().toISOString() };
+
+      // ---------- 3) TODAS as escritas ----------
+      tx.update(ref, patch);
+      if (valor <= 0) return { pago: { destino, valor: 0, saldo: null } };
+
+      const saldoAtual = Number(uDoc && uDoc.exists ? uDoc.data().saldo : 0) || 0;
+      // 'carteira' acumula; 'saque' é recebido na hora e não entra no saldo.
+      const novoSaldo = destino === 'carteira'
+        ? Math.round((saldoAtual + valor) * 100) / 100
+        : saldoAtual;
+      tx.set(usuarioRef, { saldo: novoSaldo }, { merge: true });
+
+      // Extrato: toda entrada de dinheiro vira uma linha, inclusive o saque
+      // imediato — o entregador precisa poder provar o que recebeu.
+      tx.set(movRef, {
+        usuario_id: req.user.uid,
+        tipo: destino === 'carteira' ? 'credito' : 'saque_imediato',
+        valor,
+        pedido_id: req.params.id,
+        descricao: destino === 'carteira'
+          ? 'Entrega concluída — creditado na carteira'
+          : 'Entrega concluída — retirado na hora',
+        saldo_apos: novoSaldo,
+        em: new Date().toISOString()
+      });
+      return { pago: { destino, valor, saldo: novoSaldo } };
     });
+
     const atualizado = await ref.get();
-    res.json({ ok: true, pedido: resumoEntrega(atualizado, { incluirCliente: true }) });
+    res.json({
+      ok: true,
+      pedido: resumoEntrega(atualizado, { incluirCliente: true }),
+      pagamento: saida.pago
+    });
   } catch (err) {
+    const mapa = {
+      PEDIDO_NAO_ENCONTRADO: [404, 'Pedido não encontrado.'],
+      NAO_E_SUA:             [403, 'Esta entrega não é sua.'],
+      JA_PASSOU:             [400, 'A entrega já passou desta etapa.'],
+      CODIGO_FALTANDO:       [400, 'Peça ao cliente o código de 4 dígitos e digite-o para finalizar.'],
+      BLOQUEADA:             [423, 'Confirmação bloqueada por tentativas erradas. Fale com o suporte.'],
+    };
+    if (mapa[err.message]) {
+      const [status, msg] = mapa[err.message];
+      return res.status(status).json({ ok: false, msg });
+    }
+    // Tentativa errada: a transação foi desfeita, então o contador é gravado
+    // aqui, com increment atômico — não depende de ter lido o valor antes, o que
+    // o torna seguro mesmo com várias tentativas simultâneas.
+    if (err.message === 'CODIGO_ERRADO') {
+      let restantes = 0;
+      try {
+        const ref = db.collection('pedidos').doc(req.params.id);
+        await ref.update({ entrega_tentativas: admin.firestore.FieldValue.increment(1) });
+        const d = await ref.get();
+        const usadas = (d.exists && Number(d.data().entrega_tentativas)) || TENTATIVAS_MAX;
+        restantes = Math.max(0, TENTATIVAS_MAX - usadas);
+        if (restantes === 0) await ref.update({ entrega_bloqueada: true });
+      } catch (e) {
+        console.error('Falha ao registrar tentativa de código:', e);
+      }
+      return restantes === 0
+        ? res.status(423).json({ ok: false, restantes: 0,
+            msg: 'Código incorreto. A confirmação foi bloqueada — fale com o suporte para liberar.' })
+        : res.status(400).json({ ok: false, restantes,
+            msg: `Código incorreto. ${restantes} tentativa(s) restante(s).` });
+    }
     console.error('Erro ao atualizar status da entrega:', err);
+    res.status(500).json({ ok: false, msg: 'Erro interno do servidor.' });
+  }
+});
+
+// ============================================================
+//  CARTEIRA DO ENTREGADOR
+//  saldo fica em usuarios/{uid}.saldo; cada movimento vira uma linha em
+//  carteira_movimentos, para o extrato nunca depender de recalcular o saldo.
+// ============================================================
+
+app.get('/api/wallet', authenticateToken, async (req, res) => {
+  try {
+    const uDoc = await db.collection('usuarios').doc(req.user.uid).get();
+    const saldo = Number(uDoc.exists ? uDoc.data().saldo : 0) || 0;
+
+    const snap = await db.collection('carteira_movimentos')
+      .where('usuario_id', '==', req.user.uid).get();
+    const movimentos = snap.docs.map(d => ({ id: d.id, ...d.data() }))
+      .sort((a, b) => (b.em || '').localeCompare(a.em || ''))
+      .slice(0, 100);
+
+    // Totais que o entregador quer ver sem precisar somar na mão
+    const ganho = movimentos.reduce((s, m) =>
+      s + (['credito', 'saque_imediato'].includes(m.tipo) ? (Number(m.valor) || 0) : 0), 0);
+
+    res.json({ ok: true, saldo, movimentos, total_ganho: Math.round(ganho * 100) / 100 });
+  } catch (err) {
+    console.error('Erro ao ler carteira:', err);
+    res.status(500).json({ ok: false, msg: 'Erro interno do servidor.' });
+  }
+});
+
+// Sacar o que está acumulado. Em transação para dois pedidos de saque
+// simultâneos não tirarem o mesmo dinheiro duas vezes.
+app.post('/api/wallet/withdraw', authenticateToken, async (req, res) => {
+  const pedido = Number(req.body.valor);
+  try {
+    const usuarioRef = db.collection('usuarios').doc(req.user.uid);
+    const movRef = db.collection('carteira_movimentos').doc();
+
+    const saldoFinal = await db.runTransaction(async (tx) => {
+      const uDoc = await tx.get(usuarioRef);
+      const saldo = Number(uDoc.exists ? uDoc.data().saldo : 0) || 0;
+      // Sem valor informado, saca tudo — é o caso comum
+      const valor = Number.isFinite(pedido) && pedido > 0 ? Math.round(pedido * 100) / 100 : saldo;
+      if (valor <= 0)     throw new Error('SEM_SALDO');
+      if (valor > saldo)  throw new Error('SALDO_INSUFICIENTE');
+
+      const novo = Math.round((saldo - valor) * 100) / 100;
+      tx.set(usuarioRef, { saldo: novo }, { merge: true });
+      tx.set(movRef, {
+        usuario_id: req.user.uid, tipo: 'saque', valor: -valor,
+        pedido_id: null, descricao: 'Saque da carteira',
+        saldo_apos: novo, em: new Date().toISOString()
+      });
+      return { valor, saldo: novo };
+    });
+
+    res.json({ ok: true, ...saldoFinal });
+  } catch (err) {
+    if (err.message === 'SEM_SALDO')          return res.status(400).json({ ok: false, msg: 'Não há saldo para sacar.' });
+    if (err.message === 'SALDO_INSUFICIENTE') return res.status(400).json({ ok: false, msg: 'Valor maior que o saldo disponível.' });
+    console.error('Erro ao sacar:', err);
     res.status(500).json({ ok: false, msg: 'Erro interno do servidor.' });
   }
 });
@@ -1348,8 +2032,10 @@ app.post('/api/deliveries/:id/status', authenticateToken, async (req, res) => {
 app.get('/api/deliveries/tracking', authenticateToken, async (req, res) => {
   try {
     const snap = await db.collection('pedidos').where('usuario_id', '==', req.user.uid).get();
+    // São os pedidos DO PRÓPRIO cliente: aqui o código de confirmação pode (e
+    // precisa) aparecer — é o único lugar onde ele existe para ser lido.
     const pedidos = snap.docs.map(d => {
-      const item = resumoEntrega(d);
+      const item = resumoEntrega(d, { incluirCodigo: true });
       item.distancia_km = distanciaKm(item.entregador_local, item.entrega || {});
       return item;
     });
@@ -1372,7 +2058,9 @@ app.get('/api/deliveries/:id/tracking', authenticateToken, async (req, res) => {
     const ehEntregador = p.entregador_id === req.user.uid;
     if (!ehCliente && !ehEntregador) return res.status(403).json({ ok: false, msg: 'Acesso negado.' });
 
-    const pedido = resumoEntrega(doc, { incluirCliente: ehEntregador });
+    // O entregador vê os dados do cliente para conseguir entregar; o cliente vê
+    // o código. Nunca os dois ao mesmo tempo para a mesma pessoa.
+    const pedido = resumoEntrega(doc, { incluirCliente: ehEntregador, incluirCodigo: ehCliente });
     pedido.distancia_km = distanciaKm(pedido.entregador_local, pedido.entrega || {});
     res.json({ ok: true, pedido });
   } catch (err) {

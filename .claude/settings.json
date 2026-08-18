@@ -36,7 +36,18 @@
       "Bash(node corrigir-coordenadas.js)",
       "Bash(node corrigir-coordenadas.js --aplicar)",
       "Bash(node -e \"\\(async\\(\\)=>{const r=await fetch\\('https://viacep.com.br/ws/12070420/json/'\\);console.log\\(JSON.stringify\\(await r.json\\(\\),null,1\\)\\)}\\)\\(\\)\")",
-      "Bash(node \"C:/Users/NB-01/AppData/Local/Temp/claude/c--Users-NB-01-Documents-SIte-de-Mercado-Local/d8909d35-4ea1-498e-896c-5a19dbf98858/scratchpad/teste-precisao.js\")"
+      "Bash(node \"C:/Users/NB-01/AppData/Local/Temp/claude/c--Users-NB-01-Documents-SIte-de-Mercado-Local/d8909d35-4ea1-498e-896c-5a19dbf98858/scratchpad/teste-precisao.js\")",
+      "Bash(node -e \"const b=require\\('fs'\\).readFileSync\\('dashboard.html'\\);console.log\\('CRLF:',b.includes\\(Buffer.from\\('\\\\r\\\\n'\\)\\)\\);\")",
+      "Bash(node --check charts.js)",
+      "WebSearch",
+      "WebFetch(domain:vidademotorista.com.br)",
+      "WebFetch(domain:envios.mercadolivre.com.br)",
+      "Bash(node \"C:/Users/NB-01/AppData/Local/Temp/claude/c--Users-NB-01-Documents-SIte-de-Mercado-Local/68952250-700a-43b0-b9f6-514bf703dc99/scratchpad/teste-pagamento.js\")",
+      "Bash(node \"C:/Users/NB-01/AppData/Local/Temp/claude/c--Users-NB-01-Documents-SIte-de-Mercado-Local/68952250-700a-43b0-b9f6-514bf703dc99/scratchpad/verifica.js\")",
+      "Bash(node \"C:/Users/NB-01/AppData/Local/Temp/claude/c--Users-NB-01-Documents-SIte-de-Mercado-Local/68952250-700a-43b0-b9f6-514bf703dc99/scratchpad/teste-charts.js\")",
+      "Bash(node \"C:/Users/NB-01/AppData/Local/Temp/claude/c--Users-NB-01-Documents-SIte-de-Mercado-Local/68952250-700a-43b0-b9f6-514bf703dc99/scratchpad/teste-local.js\")",
+      "Bash(node \"C:/Users/NB-01/AppData/Local/Temp/claude/c--Users-NB-01-Documents-SIte-de-Mercado-Local/68952250-700a-43b0-b9f6-514bf703dc99/scratchpad/teste-painel.js\")",
+      "Bash(node \"C:/Users/NB-01/AppData/Local/Temp/claude/c--Users-NB-01-Documents-SIte-de-Mercado-Local/68952250-700a-43b0-b9f6-514bf703dc99/scratchpad/teste-encaixe.js\")"
     ]
   }
 }

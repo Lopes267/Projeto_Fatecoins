@@ -7,7 +7,10 @@
 <link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,300;0,9..144,700;1,9..144,400&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet"/>
 <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
 <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<!-- Mesmo sistema visual e as mesmas primitivas de gráfico do painel de Vendas -->
+<link rel="stylesheet" href="painel.css"/>
 <script src="app.js"></script>
+<script src="charts.js"></script>
 <style>
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
 :root{
@@ -68,13 +71,64 @@ main{max-width:1180px;margin:0 auto;padding:2rem 1.6rem 4rem}
 .gps-text small{display:block;color:var(--muted);font-size:.78rem;margin-top:.15rem}
 
 .tabs{display:flex;gap:.3rem;background:var(--card);border:1px solid var(--border);
-  border-radius:11px;padding:.3rem;margin-bottom:1.6rem;max-width:560px}
+  border-radius:11px;padding:.3rem;margin-bottom:1.6rem;max-width:760px;flex-wrap:wrap}
 .tab{flex:1;padding:.6rem;text-align:center;border-radius:8px;cursor:pointer;
   font-weight:500;font-size:.88rem;color:var(--muted);transition:all .2s;border:none;
   background:transparent;font-family:'DM Sans',sans-serif}
 .tab.active{background:var(--card2);color:var(--text);box-shadow:0 1px 6px rgba(0,0,0,.4)}
 .tab .badge{display:inline-block;background:var(--accent);color:#fff;border-radius:20px;
   padding:0 .42rem;font-size:.72rem;margin-left:.3rem;font-weight:600}
+
+/* ---------- BARRA DE ORGANIZAÇÃO DA FILA ---------- */
+/* Ordenar e filtrar ficam numa linha só, acima da lista que eles governam. */
+.fila-bar{display:flex;align-items:center;gap:.8rem;flex-wrap:wrap;margin-bottom:1rem}
+.fila-bar .rotulo{font-size:.78rem;color:var(--muted)}
+.fila-resumo{font-size:.79rem;color:var(--muted);margin-left:auto;text-align:right}
+.fila-resumo b{color:var(--text);font-weight:600}
+.sel{padding:.42rem .6rem;background:var(--card);border:1px solid var(--border);border-radius:8px;
+  color:var(--text);font:500 .82rem 'DM Sans',sans-serif;cursor:pointer}
+.sel:focus-visible{outline:2px solid var(--accent2);outline-offset:2px}
+.chk{display:flex;align-items:center;gap:.45rem;font-size:.82rem;color:var(--muted);cursor:pointer}
+.chk input{accent-color:var(--accent);cursor:pointer}
+.chk:hover{color:var(--text)}
+
+/* Veredito de encaixe no card — o entregador precisa ver de relance se o
+   pedido serve, sem abrir nada. */
+.cabe-pill{display:inline-flex;align-items:center;gap:.3rem;padding:.28rem .65rem;
+  border-radius:20px;font-size:.76rem;font-weight:600}
+.cabe-pill.sim{background:rgba(93,207,160,.12);color:var(--green)}
+.cabe-pill.nao{background:rgba(232,90,90,.12);color:var(--red)}
+.cabe-pill.talvez{background:rgba(244,197,106,.12);color:var(--accent2)}
+.pedido.nao-cabe{opacity:.62}
+.medidas-pill{display:inline-flex;align-items:center;gap:.3rem;padding:.28rem .65rem;
+  border-radius:20px;font-size:.76rem;font-weight:600;
+  background:rgba(240,236,227,.07);color:var(--muted)}
+
+/* Cadastro do veículo */
+.veic-presets{display:grid;gap:.5rem;margin-bottom:1.1rem}
+.veic-btn{display:flex;align-items:center;gap:.7rem;padding:.75rem .85rem;text-align:left;
+  background:var(--bg);border:1px solid var(--border);border-radius:11px;color:var(--text);
+  font-family:'DM Sans',sans-serif;cursor:pointer;transition:border-color .2s}
+.veic-btn:hover{border-color:var(--muted)}
+.veic-btn[aria-pressed="true"]{border-color:var(--green);background:rgba(93,207,160,.07)}
+.veic-btn b{display:block;font-size:.9rem;font-weight:600}
+.veic-btn small{color:var(--muted);font-size:.76rem}
+.veic-grid{display:grid;grid-template-columns:1fr auto 1fr auto 1fr;gap:.4rem;align-items:center;
+  margin-bottom:.7rem}
+.veic-grid input,.veic-peso{padding:.6rem;background:var(--bg);border:1px solid var(--border);
+  border-radius:9px;color:var(--text);font-family:'DM Sans',sans-serif;font-size:.88rem;
+  outline:none;width:100%}
+.veic-grid input:focus,.veic-peso:focus{border-color:var(--accent)}
+.veic-x{color:var(--muted);font-size:.85rem}
+.veic-resumo{font-size:.78rem;color:var(--green);margin-top:.6rem;min-height:1.2em}
+
+/* Cabeçalho de grupo dentro de uma lista (por status, por região) */
+.grupo-tit{display:flex;align-items:center;gap:.5rem;font-size:.78rem;color:var(--muted);
+  text-transform:uppercase;letter-spacing:.07em;font-weight:600;margin:.4rem 0 -.2rem}
+.grupo-tit::after{content:'';flex:1;height:1px;background:var(--border)}
+
+#mapa-fila{height:260px;border-radius:14px;border:1px solid var(--border);
+  margin-bottom:1rem;background:var(--card2)}
 
 /* ---------- CARDS DE PEDIDO ---------- */
 .lista{display:grid;gap:1rem}
@@ -88,8 +142,61 @@ main{max-width:1180px;margin:0 auto;padding:2rem 1.6rem 4rem}
 .pedido-id{font-family:'Fraunces',serif;font-size:1.05rem}
 .pedido-sub{color:var(--muted);font-size:.8rem;margin-top:.2rem}
 .pedido-valor{margin-left:auto;text-align:right}
-.pedido-valor .v{font-family:'Fraunces',serif;font-size:1.2rem;color:var(--accent2)}
+/* O que o ENTREGADOR ganha vem em destaque; o valor da mercadoria fica
+   secundário. Antes era o contrário, e o número grande não era o dele. */
+.pedido-valor .v{font-family:'Fraunces',serif;font-size:1.45rem;color:var(--green);line-height:1.1}
 .pedido-valor .l{font-size:.75rem;color:var(--muted)}
+.pedido-valor .merc{font-size:.75rem;color:var(--muted);margin-top:.3rem}
+.tarifa-detalhe{font-size:.72rem;color:var(--muted);margin-top:.25rem;line-height:1.5}
+
+/* ---------- MODAL DE CONFIRMAÇÃO ---------- */
+.overlay{position:fixed;inset:0;background:rgba(0,0,0,.75);z-index:1200;
+  display:none;align-items:center;justify-content:center;padding:1rem;backdrop-filter:blur(4px)}
+.overlay.open{display:flex}
+.modal{background:var(--card);border:1px solid var(--border);border-radius:18px;
+  padding:1.6rem;width:100%;max-width:420px;max-height:92vh;overflow-y:auto}
+.modal h3{font-family:'Fraunces',serif;font-size:1.25rem;margin-bottom:.4rem}
+.modal .sub{font-size:.86rem;color:var(--muted);line-height:1.55;margin-bottom:1.2rem}
+.codigo-in{width:100%;padding:.9rem;background:var(--bg);border:1px solid var(--border);
+  border-radius:11px;color:var(--text);font-family:'Fraunces',serif;font-size:2rem;
+  text-align:center;letter-spacing:.45em;text-indent:.45em;outline:none}
+.codigo-in:focus{border-color:var(--accent);box-shadow:0 0 0 3px rgba(232,133,74,.12)}
+.codigo-in.erro{border-color:var(--red);box-shadow:0 0 0 3px rgba(232,90,90,.12)}
+.codigo-msg{font-size:.8rem;margin-top:.5rem;min-height:1.2em}
+.codigo-msg.erro{color:var(--red)}
+
+.destino-tit{font-size:.78rem;font-weight:600;color:var(--muted);text-transform:uppercase;
+  letter-spacing:.05em;margin:1.4rem 0 .6rem}
+.destino{display:grid;gap:.6rem}
+.destino label{display:flex;align-items:flex-start;gap:.7rem;padding:.85rem;cursor:pointer;
+  background:var(--bg);border:1px solid var(--border);border-radius:11px;transition:border-color .2s}
+.destino label:hover{border-color:var(--muted)}
+.destino input:checked + .destino-txt{color:var(--text)}
+.destino label:has(input:checked){border-color:var(--green);background:rgba(93,207,160,.06)}
+.destino input{margin-top:.2rem;accent-color:var(--green);flex-shrink:0}
+.destino-txt{font-size:.88rem;line-height:1.5}
+.destino-txt b{display:block;font-weight:600;margin-bottom:.1rem}
+.destino-txt span{font-size:.78rem;color:var(--muted)}
+.modal-acoes{display:flex;gap:.7rem;margin-top:1.5rem}
+.modal-acoes .btn{flex:1}
+
+/* ---------- CARTEIRA ---------- */
+.saldo-card{background:linear-gradient(150deg,rgba(93,207,160,.14),rgba(93,207,160,.03));
+  border:1px solid rgba(93,207,160,.3);border-radius:18px;padding:1.7rem;margin-bottom:1.2rem}
+.saldo-lbl{font-size:.82rem;color:var(--muted)}
+.saldo-num{font-family:'DM Sans',sans-serif;font-size:clamp(2.3rem,6vw,3rem);font-weight:600;
+  letter-spacing:-.025em;color:var(--green);line-height:1.05;margin:.3rem 0 1rem}
+.saldo-acoes{display:flex;gap:.7rem;flex-wrap:wrap}
+.mov{display:flex;align-items:center;gap:.9rem;padding:.9rem 1rem;background:var(--card);
+  border:1px solid var(--border);border-radius:12px}
+.mov-ic{width:36px;height:36px;border-radius:50%;display:flex;align-items:center;
+  justify-content:center;font-size:1rem;flex-shrink:0;background:var(--card2)}
+.mov-txt{flex:1;min-width:0}
+.mov-txt b{font-size:.9rem;font-weight:500;display:block}
+.mov-txt small{color:var(--muted);font-size:.76rem}
+.mov-val{font-family:'Fraunces',serif;font-size:1.05rem;white-space:nowrap}
+.mov-val.pos{color:var(--green)}
+.mov-val.neg{color:var(--muted)}
 
 .status-pill{
   display:inline-flex;align-items:center;gap:.35rem;padding:.28rem .65rem;border-radius:20px;
@@ -187,9 +294,51 @@ main{max-width:1180px;margin:0 auto;padding:2rem 1.6rem 4rem}
       🛵 Minhas entregas <span class="badge" id="badge-minhas" hidden>0</span>
     </button>
     <button class="tab" id="tab-btn-historico" onclick="switchTab('historico')">✅ Concluídas</button>
+    <button class="tab" id="tab-btn-carteira" onclick="switchTab('carteira')">💰 Carteira</button>
+    <button class="tab" id="tab-btn-desempenho" onclick="switchTab('desempenho')">📊 Desempenho</button>
   </div>
 
   <section id="tab-disponiveis">
+    <!-- Organização da fila: ordem, raio e visão de mapa -->
+    <div class="fila-bar">
+      <span class="rotulo" id="lbl-ordem">Ordenar por</span>
+      <select class="sel" id="ordem-fila" aria-labelledby="lbl-ordem" onchange="renderDisponiveis()">
+        <option value="perto">Mais perto de mim</option>
+        <option value="valor">Maior valor do pedido</option>
+        <option value="itens">Menos itens para carregar</option>
+        <option value="novo">Pedido mais recente</option>
+        <option value="espera">Esperando há mais tempo</option>
+      </select>
+
+      <span class="rotulo" id="lbl-raio">Até</span>
+      <select class="sel" id="raio-fila" aria-labelledby="lbl-raio" onchange="carregarDisponiveis()">
+        <option value="">qualquer distância</option>
+        <option value="2">2 km</option>
+        <option value="5">5 km</option>
+        <option value="10">10 km</option>
+        <option value="20">20 km</option>
+      </select>
+
+      <button class="btn btn-ghost btn-sm" id="btn-mapa-fila" onclick="alternarMapaFila()"
+              aria-pressed="false">🗺️ Ver no mapa</button>
+
+      <button class="btn btn-ghost btn-sm" id="btn-veiculo" onclick="abrirVeiculo()">🚗 Meu veículo</button>
+
+      <label class="chk" id="chk-cabe-wrap" hidden>
+        <input type="checkbox" id="chk-cabe" onchange="carregarDisponiveis()"/>
+        <span>Só o que cabe no meu veículo</span>
+      </label>
+
+      <p class="fila-resumo" id="fila-resumo" aria-live="polite"></p>
+    </div>
+
+    <div id="mapa-fila" hidden></div>
+    <div class="map-legend" id="legenda-fila" hidden>
+      <span><b style="background:#e8854a"></b>Você</span>
+      <span><b style="background:#f4c56a"></b>Pedido esperando entregador</span>
+      <span style="width:100%">Clique num pino para ver o pedido.</span>
+    </div>
+
     <div class="lista" id="lista-disponiveis"><p style="color:var(--muted)">Carregando…</p></div>
   </section>
 
@@ -198,9 +347,179 @@ main{max-width:1180px;margin:0 auto;padding:2rem 1.6rem 4rem}
   </section>
 
   <section id="tab-historico" hidden>
+    <div class="fila-bar">
+      <span class="rotulo" id="lbl-agrupar">Agrupar por</span>
+      <select class="sel" id="agrupar-hist" aria-labelledby="lbl-agrupar" onchange="renderHistorico()">
+        <option value="data">Data</option>
+        <option value="bairro">Bairro</option>
+        <option value="cidade">Cidade</option>
+      </select>
+      <p class="fila-resumo" id="hist-resumo" aria-live="polite"></p>
+    </div>
     <div class="lista" id="lista-historico"><p style="color:var(--muted)">Carregando…</p></div>
   </section>
+
+  <!-- CARTEIRA -->
+  <section id="tab-carteira" hidden>
+    <div class="saldo-card">
+      <p class="saldo-lbl">Saldo acumulado na carteira</p>
+      <p class="saldo-num" id="saldo-num" aria-live="polite">—</p>
+      <div class="saldo-acoes">
+        <button class="btn btn-green" id="btn-sacar" onclick="sacarTudo(this)">Sacar tudo</button>
+        <button class="btn btn-ghost btn-sm" onclick="carregarCarteira()">↻ Atualizar</button>
+      </div>
+      <p class="tarifa-detalhe" id="saldo-nota" style="margin-top:1rem"></p>
+    </div>
+    <div class="lista" id="lista-movimentos"><p style="color:var(--muted)">Carregando…</p></div>
+  </section>
+
+  <!-- ============================================================
+       DESEMPENHO — mesmo sistema visual do painel de Vendas do lojista:
+       vidro fosco, uma matiz só nos dados, rótulo direto apenas no pico
+       e uma gêmea em tabela para cada figura.
+       ============================================================ -->
+  <section id="tab-desempenho" class="v-page" hidden>
+    <div class="v-ambient" aria-hidden="true"></div>
+
+    <div class="v-stack">
+      <div class="v-filters">
+        <div class="seg" role="group" aria-label="Período das entregas">
+          <button type="button" data-periodo="7"   aria-pressed="false">7 dias</button>
+          <button type="button" data-periodo="30"  aria-pressed="true">30 dias</button>
+          <button type="button" data-periodo="90"  aria-pressed="false">90 dias</button>
+          <button type="button" data-periodo="all" aria-pressed="false">Tudo</button>
+        </div>
+        <p class="v-note" id="d-range" aria-live="polite"></p>
+      </div>
+
+      <!-- HERÓI -->
+      <section class="glass hero-panel" aria-labelledby="d-hero-lbl">
+        <div class="hero-head">
+          <div>
+            <p class="eyebrow" id="d-hero-lbl">Entregas concluídas no período</p>
+            <p class="hero-figure" id="d-hero-num" aria-live="polite">—</p>
+          </div>
+          <div style="display:flex;align-items:center;gap:.6rem;flex-wrap:wrap">
+            <span class="delta delta-flat" id="d-hero-delta">—</span>
+            <button type="button" class="link-btn" id="d-toggle-serie"
+                    aria-pressed="false" aria-controls="d-serie-body">Ver tabela</button>
+          </div>
+        </div>
+        <div class="chart-body" id="d-serie-body" style="margin-top:.4rem"></div>
+      </section>
+
+      <!-- INDICADORES -->
+      <div class="kpi-row" id="d-kpi-row"></div>
+
+      <!-- GRÁFICOS -->
+      <div class="chart-grid">
+        <section class="glass chart-card" aria-labelledby="d-bairro-lbl">
+          <div class="chart-head">
+            <div>
+              <h2 class="chart-title" id="d-bairro-lbl">Onde você mais entrega</h2>
+              <p class="chart-sub">Entregas concluídas por bairro</p>
+            </div>
+            <button type="button" class="link-btn" id="d-toggle-bairro"
+                    aria-pressed="false" aria-controls="d-bairro-body">Ver tabela</button>
+          </div>
+          <div class="chart-body" id="d-bairro-body"></div>
+        </section>
+
+        <section class="glass chart-card" aria-labelledby="d-hora-lbl">
+          <div class="chart-head">
+            <div>
+              <h2 class="chart-title" id="d-hora-lbl">Horários que rendem</h2>
+              <p class="chart-sub">Entregas por faixa de horário</p>
+            </div>
+            <button type="button" class="link-btn" id="d-toggle-hora"
+                    aria-pressed="false" aria-controls="d-hora-body">Ver tabela</button>
+          </div>
+          <div class="chart-body" id="d-hora-body"></div>
+        </section>
+      </div>
+
+      <!-- REGISTRO -->
+      <section class="glass chart-card" aria-labelledby="d-reg-lbl">
+        <div class="chart-head">
+          <div>
+            <h2 class="chart-title" id="d-reg-lbl">Suas entregas</h2>
+            <p class="chart-sub" id="d-reg-count" aria-live="polite">Cada entrega concluída, da mais recente à mais antiga</p>
+          </div>
+        </div>
+        <div id="d-registro"><p class="skeleton">Carregando…</p></div>
+      </section>
+    </div>
+  </section>
 </main>
+
+<!-- Capacidade do veículo: medidas do COMPARTIMENTO, não do carro -->
+<div class="overlay" id="veiculo-overlay">
+  <div class="modal" role="dialog" aria-modal="true" aria-labelledby="veic-tit">
+    <h3 id="veic-tit">Meu veículo</h3>
+    <p class="sub">
+      Informe o que cabe no seu compartimento — baú, mochila ou porta-malas.
+      A fila passa a avisar quais pedidos não entram, antes de você aceitar.
+    </p>
+
+    <div class="veic-presets" id="veic-presets"></div>
+
+    <label style="font-size:.78rem;color:var(--muted);font-weight:600;
+           text-transform:uppercase;letter-spacing:.05em">Medidas do compartimento (cm)</label>
+    <div class="veic-grid" style="margin-top:.5rem">
+      <input type="number" id="veic-c" placeholder="Compr." min="0" step="1"/>
+      <span class="veic-x">×</span>
+      <input type="number" id="veic-l" placeholder="Larg." min="0" step="1"/>
+      <span class="veic-x">×</span>
+      <input type="number" id="veic-a" placeholder="Alt." min="0" step="1"/>
+    </div>
+    <label style="font-size:.78rem;color:var(--muted);font-weight:600;
+           text-transform:uppercase;letter-spacing:.05em">Peso máximo (kg) — opcional</label>
+    <input type="number" class="veic-peso" id="veic-peso" placeholder="25" min="0" step="1"
+           style="margin-top:.5rem"/>
+    <p class="veic-resumo" id="veic-resumo" aria-live="polite"></p>
+
+    <div class="modal-acoes">
+      <button class="btn btn-ghost" onclick="limparVeiculo(this)">Não filtrar</button>
+      <button class="btn btn-green" onclick="salvarVeiculo(this)">Salvar</button>
+    </div>
+  </div>
+</div>
+
+<!-- Confirmação de entrega: o código vem do cliente, na porta -->
+<div class="overlay" id="confirmar-overlay">
+  <div class="modal" role="dialog" aria-modal="true" aria-labelledby="conf-tit">
+    <h3 id="conf-tit">Confirmar entrega</h3>
+    <p class="sub">
+      Peça ao cliente o <b>código de 4 dígitos</b> que aparece no aplicativo dele.
+      A entrega só é finalizada — e você só recebe — com o código certo.
+    </p>
+
+    <label for="conf-codigo" style="font-size:.78rem;color:var(--muted);font-weight:600;
+           text-transform:uppercase;letter-spacing:.05em">Código do cliente</label>
+    <input class="codigo-in" id="conf-codigo" inputmode="numeric" maxlength="4"
+           autocomplete="off" placeholder="0000" aria-describedby="conf-msg"/>
+    <p class="codigo-msg" id="conf-msg" role="status"></p>
+
+    <p class="destino-tit">O que fazer com <span id="conf-valor">o valor</span></p>
+    <div class="destino">
+      <label>
+        <input type="radio" name="conf-destino" value="carteira" checked/>
+        <span class="destino-txt"><b>💰 Acumular na carteira</b>
+          <span>Fica guardado no app. Você saca quando quiser.</span></span>
+      </label>
+      <label>
+        <input type="radio" name="conf-destino" value="saque"/>
+        <span class="destino-txt"><b>⚡ Retirar na hora</b>
+          <span>Sai agora, sem passar pelo saldo. Fica registrado no extrato.</span></span>
+      </label>
+    </div>
+
+    <div class="modal-acoes">
+      <button class="btn btn-ghost" onclick="fecharConfirmacao()">Cancelar</button>
+      <button class="btn btn-green" id="conf-ok" onclick="enviarConfirmacao(this)">Finalizar entrega</button>
+    </div>
+  </div>
+</div>
 
 <script>
 // ============================================================
@@ -214,6 +533,8 @@ let abaAtual     = 'disponiveis';
 let disponiveis  = [];
 let ativas       = [];
 let concluidas   = [];
+let foraDoRaio   = 0;      // pedidos escondidos pelo filtro de raio (dito, nunca silencioso)
+let naoCabem     = 0;      // idem para os que não entram no veículo
 
 // GPS
 let watchId      = null;   // id do navigator.geolocation.watchPosition
@@ -229,6 +550,8 @@ document.addEventListener('DOMContentLoaded', async ()=>{
   currentUser = requireAuth('entregador');
   if(!currentUser) return;
   renderNav();
+  ligarControlesDesempenho();
+  await carregarCapacidade();
   await carregarTudo();
   // Mantém a lista fresca sem precisar recarregar a página
   setInterval(()=>{ if(!document.hidden) carregarTudo(); }, 30000);
@@ -252,13 +575,20 @@ function sair(){
 }
 
 // ---------- ABAS ----------
+const ABAS = ['disponiveis','minhas','historico','carteira','desempenho'];
+
 function switchTab(aba){
   abaAtual = aba;
-  ['disponiveis','minhas','historico'].forEach(t=>{
+  ABAS.forEach(t=>{
     document.getElementById('tab-'+t).hidden = (t !== aba);
     document.getElementById('tab-btn-'+t).classList.toggle('active', t === aba);
   });
-  if(aba === 'minhas') setTimeout(ajustarMapa, 60);
+  // Mapas e SVGs medidos enquanto escondidos saem com tamanho zero — só dá para
+  // dimensioná-los depois que a aba aparece.
+  if(aba === 'minhas')      setTimeout(ajustarMapa, 60);
+  if(aba === 'disponiveis') setTimeout(ajustarMapaFila, 60);
+  if(aba === 'desempenho')  setTimeout(desenharDesempenho, 60);
+  if(aba === 'carteira')    carregarCarteira();
 }
 
 // ---------- CARREGAR ----------
@@ -267,14 +597,123 @@ async function carregarTudo(){
 }
 
 async function carregarDisponiveis(){
-  const res = await DB.getAvailableDeliveries(minhaPos);
+  const raio = document.getElementById('raio-fila').value;
+  const soCabe = document.getElementById('chk-cabe').checked;
+  const res = await DB.getAvailableDeliveries(minhaPos, raio ? Number(raio) : null, soCabe);
   if(!res.ok){
     document.getElementById('lista-disponiveis').innerHTML =
       `<div class="vazio"><span class="ic">⚠️</span><h3>Não foi possível carregar</h3><p>${res.msg || 'Tente novamente.'}</p></div>`;
     return;
   }
   disponiveis = res.pedidos || [];
+  foraDoRaio  = res.fora_do_raio || 0;
+  naoCabem    = res.nao_cabem || 0;
+  // O filtro só faz sentido depois que existe um veículo cadastrado
+  document.getElementById('chk-cabe-wrap').hidden = !res.tem_capacidade;
   renderDisponiveis();
+}
+
+// ---------- CAPACIDADE DO VEÍCULO ----------
+// As medidas que importam são as do compartimento, não as do carro: nenhuma
+// tabela de veículos sabe o que cabe no baú que a pessoa realmente usa.
+let capacidadeAtual = null;
+
+async function carregarCapacidade(){
+  const res = await DB.getCapacity();
+  if(res.ok){
+    capacidadeAtual = res.capacidade;
+    document.getElementById('chk-cabe-wrap').hidden = !capacidadeAtual;
+    atualizarBotaoVeiculo();
+  }
+}
+
+function atualizarBotaoVeiculo(){
+  const btn = document.getElementById('btn-veiculo');
+  btn.textContent = capacidadeAtual
+    ? `🚗 ${formatarMedidas(capacidadeAtual.comprimento, capacidadeAtual.largura, capacidadeAtual.altura)}`
+    : '🚗 Meu veículo';
+}
+
+function abrirVeiculo(){
+  document.getElementById('veic-presets').innerHTML = VEICULOS.map(v=>
+    `<button type="button" class="veic-btn" data-v="${v.id}" aria-pressed="false"
+             onclick="aplicarVeiculo('${v.id}')">
+       <span><b>${v.nome}</b><small>${formatarMedidas(v.c,v.l,v.a)} · até ${v.peso} kg — ${v.nota}</small></span>
+     </button>`).join('');
+
+  const c = capacidadeAtual || {};
+  document.getElementById('veic-c').value    = c.comprimento || '';
+  document.getElementById('veic-l').value    = c.largura     || '';
+  document.getElementById('veic-a').value    = c.altura      || '';
+  document.getElementById('veic-peso').value = c.peso_max    || '';
+  sincronizarVeiculo();
+
+  ['veic-c','veic-l','veic-a','veic-peso'].forEach(id=>
+    document.getElementById(id).oninput = sincronizarVeiculo);
+  document.getElementById('veiculo-overlay').classList.add('open');
+}
+
+function fecharVeiculo(){ document.getElementById('veiculo-overlay').classList.remove('open'); }
+
+function aplicarVeiculo(id){
+  const v = VEICULOS.find(x=>x.id===id);
+  if(!v) return;
+  document.getElementById('veic-c').value = v.c;
+  document.getElementById('veic-l').value = v.l;
+  document.getElementById('veic-a').value = v.a;
+  document.getElementById('veic-peso').value = v.peso;
+  sincronizarVeiculo();
+}
+
+function lerVeiculo(){
+  const n = id => parseFloat(document.getElementById(id).value) || 0;
+  return { comprimento:n('veic-c'), largura:n('veic-l'), altura:n('veic-a'), peso_max:n('veic-peso') };
+}
+
+function sincronizarVeiculo(){
+  const v = lerVeiculo();
+  document.querySelectorAll('#veic-presets .veic-btn').forEach(btn=>{
+    const p = VEICULOS.find(x=>x.id===btn.dataset.v);
+    btn.setAttribute('aria-pressed',
+      String(!!p && p.c===v.comprimento && p.l===v.largura && p.a===v.altura));
+  });
+  const litros = volumeUtilLitros(v.comprimento, v.largura, v.altura);
+  document.getElementById('veic-resumo').textContent = litros
+    ? `Cabem cerca de ${litros} L de carga${v.peso_max ? ` · até ${v.peso_max} kg` : ''}`
+    : '';
+}
+
+async function salvarVeiculo(btn){
+  const v = lerVeiculo();
+  btn.disabled = true;
+  const res = await DB.saveCapacity({ ...v, categoria: veiculoEscolhido() });
+  btn.disabled = false;
+  if(!res.ok){ toast(res.msg || 'Não foi possível salvar.', 'error'); return; }
+  capacidadeAtual = res.capacidade;
+  atualizarBotaoVeiculo();
+  document.getElementById('chk-cabe-wrap').hidden = false;
+  fecharVeiculo();
+  toast('Veículo salvo. A fila já avisa o que não cabe.');
+  await carregarDisponiveis();
+}
+
+function veiculoEscolhido(){
+  const b = document.querySelector('#veic-presets .veic-btn[aria-pressed="true"]');
+  return b ? b.dataset.v : null;
+}
+
+async function limparVeiculo(btn){
+  btn.disabled = true;
+  const res = await DB.saveCapacity({ limpar:true });
+  btn.disabled = false;
+  if(!res.ok){ toast(res.msg || 'Erro.', 'error'); return; }
+  capacidadeAtual = null;
+  atualizarBotaoVeiculo();
+  document.getElementById('chk-cabe').checked = false;
+  document.getElementById('chk-cabe-wrap').hidden = true;
+  fecharVeiculo();
+  toast('Filtro por tamanho desligado — a fila volta a mostrar tudo.');
+  await carregarDisponiveis();
 }
 
 async function carregarMinhas(){
@@ -284,28 +723,88 @@ async function carregarMinhas(){
   concluidas = res.concluidas || [];
   renderMinhas();
   renderHistorico();
+  // O painel de Desempenho lê as mesmas entregas concluídas — redesenha só se
+  // estiver à vista, para o refresh de 30 s não custar nada nas outras abas.
+  if(abaAtual === 'desempenho') desenharDesempenho();
 }
 
 // ---------- RENDER: DISPONÍVEIS ----------
+// A fila é ordenável porque "melhor pedido" não é a mesma coisa para todo mundo:
+// quem está de bicicleta quer o mais perto e mais leve, quem está de moto quer o
+// de maior valor. Sem GPS a ordem por distância não existe — e o painel diz isso
+// em vez de fingir que ordenou.
+const ORDENADORES = {
+  perto:  (a,b) => (a.distancia_km ?? Infinity) - (b.distancia_km ?? Infinity),
+  valor:  (a,b) => (b.total || 0) - (a.total || 0),
+  itens:  (a,b) => (a.total_itens || 0) - (b.total_itens || 0),
+  novo:   (a,b) => (b.criado_em || '').localeCompare(a.criado_em || ''),
+  espera: (a,b) => (a.criado_em || '').localeCompare(b.criado_em || '')
+};
+
 function renderDisponiveis(){
   const el = document.getElementById('lista-disponiveis');
   const badge = document.getElementById('badge-disp');
   badge.hidden = !disponiveis.length;
   badge.textContent = disponiveis.length;
 
+  const selOrdem = document.getElementById('ordem-fila');
+  // Sem posição não dá para ordenar por proximidade: cai para "mais recente"
+  const semGps = !minhaPos && selOrdem.value === 'perto';
+  const ordem = semGps ? 'novo' : selOrdem.value;
+
+  atualizarResumoFila(semGps);
+
   if(!disponiveis.length){
-    el.innerHTML = `
-      <div class="vazio">
-        <span class="ic">📭</span>
-        <h3>Nenhum pedido esperando entrega</h3>
-        <p>Assim que um cliente finalizar uma compra, o pedido aparece aqui para você aceitar.</p>
-      </div>`;
+    el.innerHTML = naoCabem
+      ? `<div class="vazio">
+           <span class="ic">📦</span>
+           <h3>Nada que caiba no seu veículo</h3>
+           <p>${naoCabem} pedido(s) esperam entregador, mas não entram no seu compartimento.
+              Ajuste as medidas em <b>Meu veículo</b> ou desmarque o filtro para ver todos.</p>
+         </div>`
+      : foraDoRaio
+      ? `<div class="vazio">
+           <span class="ic">🔎</span>
+           <h3>Nada dentro do raio escolhido</h3>
+           <p>${foraDoRaio} pedido(s) esperam entregador, mas estão mais longe. Aumente a distância no filtro acima.</p>
+         </div>`
+      : `<div class="vazio">
+           <span class="ic">📭</span>
+           <h3>Nenhum pedido esperando entrega</h3>
+           <p>Assim que um cliente finalizar uma compra, o pedido aparece aqui para você aceitar.</p>
+         </div>`;
+    desenharMapaFila();
     return;
   }
-  el.innerHTML = disponiveis.map(p => cardPedido(p, 'disponivel')).join('');
+
+  const lista = disponiveis.slice().sort(ORDENADORES[ordem] || ORDENADORES.novo);
+  el.innerHTML = lista.map(p => cardPedido(p, 'disponivel')).join('');
+  desenharMapaFila();
+}
+
+function atualizarResumoFila(semGps){
+  const el = document.getElementById('fila-resumo');
+  const partes = [];
+  if(disponiveis.length){
+    const valor = disponiveis.reduce((s,p)=>s+(+p.total||0), 0);
+    partes.push(`<b>${disponiveis.length}</b> pedido(s) · ${formatPrice(valor)} em mercadoria`);
+  }
+  if(foraDoRaio) partes.push(`${foraDoRaio} fora do raio`);
+  if(naoCabem)   partes.push(`${naoCabem} não cabem no seu veículo`);
+  if(semGps)     partes.push('ligue o GPS para ordenar por proximidade');
+  el.innerHTML = partes.join(' · ');
 }
 
 // ---------- RENDER: MINHAS ENTREGAS ----------
+// Agrupadas por etapa: o que exige uma ação sua agora vem antes do que já está
+// a caminho. Numa tela de celular, essa ordem é a diferença entre achar o botão
+// certo de primeira e rolar a lista inteira.
+const ORDEM_ETAPA = ['a_caminho','aceito'];
+const TITULO_ETAPA = {
+  a_caminho: '🛵 Na rua agora',
+  aceito:    '📦 Aceitas — falta sair para entrega'
+};
+
 function renderMinhas(){
   const el = document.getElementById('lista-minhas');
   const badge = document.getElementById('badge-minhas');
@@ -323,8 +822,20 @@ function renderMinhas(){
     return;
   }
 
-  el.innerHTML =
-    ativas.map(p => cardPedido(p, 'ativa')).join('') +
+  let html = '';
+  ORDEM_ETAPA.forEach(st=>{
+    const doGrupo = ativas.filter(p => p.status === st);
+    if(!doGrupo.length) return;
+    // Só rotula o grupo quando há mais de uma etapa em jogo — com uma etapa só,
+    // o título seria ruído.
+    if(ativas.some(p => p.status !== st)) html += `<p class="grupo-tit">${TITULO_ETAPA[st]}</p>`;
+    html += doGrupo.map(p => cardPedido(p, 'ativa')).join('');
+  });
+  // Qualquer status inesperado ainda aparece — nunca sumir com uma entrega
+  const restantes = ativas.filter(p => !ORDEM_ETAPA.includes(p.status));
+  html += restantes.map(p => cardPedido(p, 'ativa')).join('');
+
+  el.innerHTML = html +
     `<div>
        <div id="mapa"></div>
        <div class="map-legend">
@@ -338,9 +849,12 @@ function renderMinhas(){
   setTimeout(ajustarMapa, 60);
 }
 
+// ---------- RENDER: CONCLUÍDAS ----------
 function renderHistorico(){
   const el = document.getElementById('lista-historico');
+  const resumo = document.getElementById('hist-resumo');
   if(!concluidas.length){
+    resumo.textContent = '';
     el.innerHTML = `
       <div class="vazio">
         <span class="ic">✅</span>
@@ -349,7 +863,31 @@ function renderHistorico(){
       </div>`;
     return;
   }
-  el.innerHTML = concluidas.map(p => cardPedido(p, 'concluida')).join('');
+
+  const km = concluidas.reduce((s,p)=>s+(+p.percorrido_km||0), 0);
+  resumo.innerHTML = `<b>${concluidas.length}</b> entrega(s)`
+    + (km > 0 ? ` · ${fmtKm(km)} percorridos` : '');
+
+  const modo = document.getElementById('agrupar-hist').value;
+  const chaveDe = p =>
+      modo === 'bairro' ? (p.bairro || 'Sem bairro registrado')
+    : modo === 'cidade' ? (p.cidade || 'Sem cidade registrada')
+    : (p.entregue_em ? fmtData(new Date(p.entregue_em), {day:'2-digit',month:'long',year:'numeric'})
+                     : 'Sem data de entrega');
+
+  // Map preserva a ordem de inserção, então o agrupamento por data já sai do mais
+  // recente para o mais antigo — que é como a lista chega do servidor.
+  const grupos = new Map();
+  concluidas.forEach(p=>{
+    const k = chaveDe(p);
+    if(!grupos.has(k)) grupos.set(k, []);
+    grupos.get(k).push(p);
+  });
+
+  el.innerHTML = [...grupos].map(([titulo, itens])=>
+    `<p class="grupo-tit">${escapeHtml(titulo)} · ${itens.length}</p>`
+    + itens.map(p => cardPedido(p, 'concluida')).join('')
+  ).join('');
 }
 
 // ---------- CARD ----------
@@ -378,8 +916,42 @@ function cardPedido(p, modo){
   const dist = p.distancia_km != null
     ? `<span class="dist-pill">📍 ${p.distancia_km} km de você</span>` : '';
 
+  // Tamanho da carga e se ela cabe — as duas coisas que decidem se vale ir
+  const med = p.medidas;
+  const medidasPill = (med && (med.peso_kg > 0 || med.volume_l > 0))
+    ? `<span class="medidas-pill">📐 ${[
+         med.volume_l > 0 ? `${med.volume_l} L` : null,
+         med.peso_kg  > 0 ? `${med.peso_kg} kg` : null
+       ].filter(Boolean).join(' · ')}</span>` : '';
+
+  const enc = p.encaixe;
+  const cabePill = (modo === 'disponivel' && enc)
+    ? (!enc.cabe
+        ? `<span class="cabe-pill nao" title="${escapeHtml(enc.motivo || '')}">🚫 Não cabe</span>`
+        : enc.incerto
+          ? `<span class="cabe-pill talvez" title="${escapeHtml(enc.motivo || '')}">⚠️ Confira</span>`
+          : `<span class="cabe-pill sim">✓ Cabe no seu veículo</span>`)
+    : '';
+
+  // Uma entrega concluída conta a própria história: quanto tempo levou e quanto
+  // se andou. Sem números inventados — só aparece o que foi realmente medido.
+  const marcas = [];
+  if(modo === 'concluida'){
+    if(p.pagamento) marcas.push(p.pagamento.destino === 'saque'
+      ? `⚡ ${formatPrice(p.pagamento.valor)} retirados na hora`
+      : `💰 ${formatPrice(p.pagamento.valor)} na carteira`);
+    if(p.total_min != null)      marcas.push(`⏱️ ${fmtMin(p.total_min)} do aceite à entrega`);
+    if(p.percorrido_km > 0)      marcas.push(`🛣️ ${fmtKm(p.percorrido_km)} percorridos`);
+    else if(p.distancia_inicial_km != null) marcas.push(`🛣️ ${fmtKm(p.distancia_inicial_km)} até o cliente`);
+  } else if(modo === 'disponivel' && p.espera_min != null && p.espera_min >= 10){
+    marcas.push(`🕓 na fila há ${fmtMin(p.espera_min)}`);
+  }
+  const metricas = marcas.length
+    ? `<div class="pedido-sub" style="margin-top:.5rem">${marcas.join(' · ')}</div>` : '';
+
   return `
-    <article class="pedido ${modo === 'ativa' ? 'ativa' : ''}">
+    <article class="pedido ${modo === 'ativa' ? 'ativa' : ''} ${
+      (modo === 'disponivel' && enc && !enc.cabe) ? 'nao-cabe' : ''}">
       <div class="pedido-head">
         <div>
           <div class="pedido-id">Pedido #${p.id.slice(0,6).toUpperCase()}</div>
@@ -387,14 +959,25 @@ function cardPedido(p, modo){
           <div style="margin-top:.55rem;display:flex;gap:.5rem;flex-wrap:wrap">
             <span class="status-pill" style="color:${st.cor}">${st.icone} ${st.texto}</span>
             ${dist}
+            ${medidasPill}
+            ${cabePill}
           </div>
+          ${(enc && enc.motivo && modo === 'disponivel')
+            ? `<div class="tarifa-detalhe" style="color:${enc.cabe ? 'var(--accent2)' : 'var(--red)'}">
+                 ${enc.cabe ? '⚠️' : '🚫'} ${escapeHtml(enc.motivo)}</div>` : ''}
         </div>
         <div class="pedido-valor">
-          <div class="v">${formatPrice(p.total)}</div>
-          <div class="l">valor da compra</div>
+          ${p.tarifa != null
+            ? `<div class="v">${formatPrice(p.tarifa)}</div>
+               <div class="l">você recebe</div>
+               <div class="merc">mercadoria: ${formatPrice(p.total)}</div>`
+            : `<div class="v" style="color:var(--accent2)">${formatPrice(p.total)}</div>
+               <div class="l">valor da compra</div>`}
         </div>
       </div>
+      ${modo === 'disponivel' ? explicarTarifa(p.tarifa_detalhe) : ''}
 
+      ${metricas}
       <div class="itens">${itens}</div>
 
       <div class="endereco">
@@ -418,6 +1001,19 @@ function cardPedido(p, modo){
     </article>`;
 }
 
+// A conta aberta: entregador que não entende de onde saiu o número desconfia
+// dele. É a mesma composição que o servidor usou para calcular.
+function explicarTarifa(d){
+  if(!d) return '';
+  const partes = [
+    `base ${formatPrice(d.base)}`,
+    `${d.km} km ${d.estimado ? '(estimados)' : ''} = ${formatPrice(d.valor_km)}`,
+    `${d.paradas} parada(s) = ${formatPrice(d.valor_paradas)}`
+  ];
+  if(d.minimo_aplicado) partes.push('valor mínimo garantido aplicado');
+  return `<div class="tarifa-detalhe">💵 ${partes.join(' · ')}</div>`;
+}
+
 function acoes(p, modo){
   if(modo === 'disponivel'){
     return `<button class="btn btn-primary" onclick="aceitar('${p.id}', this)">Escolher este pedido para entregar</button>`;
@@ -430,7 +1026,9 @@ function acoes(p, modo){
     btns.push(`<button class="btn btn-danger" onclick="devolver('${p.id}',this)">Devolver à fila</button>`);
   }
   if(p.status === 'a_caminho'){
-    btns.push(`<button class="btn btn-green" onclick="mudarStatus('${p.id}','entregue',this)">✅ Confirmar entrega</button>`);
+    btns.push(p.bloqueada
+      ? `<button class="btn btn-danger" disabled title="Fale com o suporte">🔒 Confirmação bloqueada</button>`
+      : `<button class="btn btn-green" onclick="abrirConfirmacao('${p.id}')">✅ Confirmar entrega com o código</button>`);
   }
   if(!watchId){
     btns.push(`<button class="btn btn-ghost" onclick="toggleGPS()">Ligar GPS para o cliente te acompanhar</button>`);
@@ -454,7 +1052,8 @@ function escapeHtml(s){
 // ---------- AÇÕES ----------
 async function aceitar(id, btn){
   btn.disabled = true; btn.textContent = 'Aceitando…';
-  const res = await DB.acceptDelivery(id);
+  // Manda de onde você saiu: é a origem do trajeto no painel de Desempenho
+  const res = await DB.acceptDelivery(id, minhaPos);
   if(!res.ok){
     toast(res.msg || 'Não foi possível aceitar o pedido.', 'error');
     await carregarTudo();
@@ -466,14 +1065,152 @@ async function aceitar(id, btn){
   if(!watchId) iniciarGPS();
 }
 
+// Só 'a_caminho' passa por aqui. Finalizar exige o código e vai pelo modal.
 async function mudarStatus(id, status, btn){
-  if(status === 'entregue' && !confirm('Confirmar que o pedido foi entregue ao cliente?')) return;
   btn.disabled = true;
   const res = await DB.setDeliveryStatus(id, status);
   if(!res.ok){ toast(res.msg || 'Erro ao atualizar status.', 'error'); btn.disabled = false; return; }
-  toast(status === 'entregue' ? 'Entrega concluída. Bom trabalho!' : 'Boa viagem! O cliente já está te vendo no mapa.');
+  toast('Boa viagem! O cliente já está te vendo no mapa.');
   await carregarMinhas();
-  if(status === 'entregue' && !ativas.length) pararGPS();
+}
+
+// ---------- CONFIRMAÇÃO COM CÓDIGO ----------
+// A entrega só termina com o código que o cliente dita na porta. É a mesma ação
+// que libera o pagamento — por isso a escolha do destino do dinheiro está aqui,
+// e não numa tela separada onde seria fácil esquecer de decidir.
+let pedidoConfirmando = null;
+
+function abrirConfirmacao(id){
+  const p = ativas.find(x => x.id === id);
+  if(!p) return;
+  pedidoConfirmando = p;
+
+  document.getElementById('conf-valor').textContent =
+    p.tarifa != null ? formatPrice(p.tarifa) : 'o valor da corrida';
+  const campo = document.getElementById('conf-codigo');
+  campo.value = ''; campo.classList.remove('erro');
+  const msg = document.getElementById('conf-msg');
+  msg.textContent = p.tentativas_restantes < 5
+    ? `${p.tentativas_restantes} tentativa(s) restante(s).` : '';
+  msg.className = 'codigo-msg';
+  document.querySelector('input[name="conf-destino"][value="carteira"]').checked = true;
+
+  document.getElementById('confirmar-overlay').classList.add('open');
+  setTimeout(()=>campo.focus(), 80);
+}
+
+function fecharConfirmacao(){
+  document.getElementById('confirmar-overlay').classList.remove('open');
+  pedidoConfirmando = null;
+}
+
+async function enviarConfirmacao(btn){
+  if(!pedidoConfirmando) return;
+  const campo = document.getElementById('conf-codigo');
+  const msg   = document.getElementById('conf-msg');
+  const codigo = campo.value.replace(/\D/g,'');
+
+  if(codigo.length !== 4){
+    campo.classList.add('erro');
+    msg.className = 'codigo-msg erro';
+    msg.textContent = 'Digite os 4 dígitos que o cliente informou.';
+    campo.focus();
+    return;
+  }
+  const destino = document.querySelector('input[name="conf-destino"]:checked').value;
+
+  btn.disabled = true; btn.textContent = 'Confirmando…';
+  const res = await DB.setDeliveryStatus(pedidoConfirmando.id, 'entregue', { codigo, destino });
+  btn.disabled = false; btn.textContent = 'Finalizar entrega';
+
+  if(!res.ok){
+    campo.classList.add('erro');
+    msg.className = 'codigo-msg erro';
+    msg.textContent = res.msg || 'Não foi possível confirmar.';
+    campo.select();
+    // Bloqueado: não adianta insistir, o painel precisa recarregar o estado
+    if(res.restantes === 0){ fecharConfirmacao(); await carregarMinhas(); }
+    return;
+  }
+
+  fecharConfirmacao();
+  const pg = res.pagamento;
+  toast(pg && pg.valor
+    ? (pg.destino === 'carteira'
+        ? `Entrega concluída! ${formatPrice(pg.valor)} na sua carteira.`
+        : `Entrega concluída! ${formatPrice(pg.valor)} retirados na hora.`)
+    : 'Entrega concluída. Bom trabalho!');
+
+  await carregarMinhas();
+  if(!ativas.length) pararGPS();
+}
+
+// Só dígitos no campo, e Enter confirma
+document.addEventListener('DOMContentLoaded', ()=>{
+  const campo = document.getElementById('conf-codigo');
+  campo.addEventListener('input', ()=>{
+    campo.value = campo.value.replace(/\D/g,'').slice(0,4);
+    campo.classList.remove('erro');
+  });
+  campo.addEventListener('keydown', e=>{
+    if(e.key === 'Enter') document.getElementById('conf-ok').click();
+    if(e.key === 'Escape') fecharConfirmacao();
+  });
+  document.getElementById('confirmar-overlay').addEventListener('click', e=>{
+    if(e.target.id === 'confirmar-overlay') fecharConfirmacao();
+  });
+  document.getElementById('veiculo-overlay').addEventListener('click', e=>{
+    if(e.target.id === 'veiculo-overlay') fecharVeiculo();
+  });
+  document.addEventListener('keydown', e=>{
+    if(e.key === 'Escape') fecharVeiculo();
+  });
+});
+
+// ---------- CARTEIRA ----------
+const ICONE_MOV = { credito:'💰', saque_imediato:'⚡', saque:'🏦' };
+
+async function carregarCarteira(){
+  const res = await DB.getWallet();
+  const lista = document.getElementById('lista-movimentos');
+  if(!res.ok){
+    lista.innerHTML = `<div class="vazio"><span class="ic">⚠️</span><h3>Não foi possível carregar</h3></div>`;
+    return;
+  }
+  document.getElementById('saldo-num').textContent = formatPrice(res.saldo || 0);
+  document.getElementById('btn-sacar').disabled = !(res.saldo > 0);
+  document.getElementById('saldo-nota').textContent =
+    `Total já ganho com entregas: ${formatPrice(res.total_ganho || 0)}`;
+
+  const movs = res.movimentos || [];
+  if(!movs.length){
+    lista.innerHTML = `<div class="vazio">
+      <span class="ic">🧾</span><h3>Nenhuma movimentação ainda</h3>
+      <p>Cada entrega concluída aparece aqui, com o valor e para onde ele foi.</p></div>`;
+    return;
+  }
+  lista.innerHTML = movs.map(m=>{
+    const v = Number(m.valor) || 0;
+    return `<div class="mov">
+      <div class="mov-ic">${ICONE_MOV[m.tipo] || '•'}</div>
+      <div class="mov-txt">
+        <b>${escapeHtml(m.descricao || m.tipo)}</b>
+        <small>${m.em ? new Date(m.em).toLocaleString('pt-BR') : ''}${
+          m.pedido_id ? ` · pedido #${m.pedido_id.slice(0,6).toUpperCase()}` : ''}</small>
+      </div>
+      <div class="mov-val ${v >= 0 ? 'pos' : 'neg'}">${v >= 0 ? '+' : '−'}${formatPrice(Math.abs(v))}</div>
+    </div>`;
+  }).join('');
+}
+
+async function sacarTudo(btn){
+  if(!confirm('Sacar todo o saldo acumulado?')) return;
+  btn.disabled = true; btn.textContent = 'Sacando…';
+  const res = await DB.withdraw();
+  btn.textContent = 'Sacar tudo';
+  if(!res.ok){ toast(res.msg || 'Não foi possível sacar.', 'error'); btn.disabled = false; return; }
+  toast(`${formatPrice(res.valor)} sacados da carteira.`);
+  await carregarCarteira();
 }
 
 async function devolver(id, btn){
@@ -559,9 +1296,7 @@ function pararGPS(silencioso){
   atualizarBotoesGPS();
 }
 
-function formatarMetros(m){
-  return m >= 1000 ? (m/1000).toFixed(m >= 10000 ? 0 : 1) + ' km' : m + ' m';
-}
+// formatarMetros vive em app.js (também usado pelo rastreio do comprador)
 
 function statusGPS(estado, texto, sub){
   const dot = document.getElementById('gps-dot');
@@ -619,6 +1354,72 @@ async function enviarPosicao(){
       }
     }catch{ /* rede instável na rua: tenta de novo na próxima leitura do GPS */ }
   }
+}
+
+// ---------- MAPA DA FILA ----------
+// Ver os pedidos espalhados no mapa responde uma pergunta que a lista não
+// responde: "dá para pegar dois que estão no mesmo caminho?"
+let mapaFila = null, pinosFila = [], pinoEu = null;
+
+function alternarMapaFila(){
+  const bloco = document.getElementById('mapa-fila');
+  const legenda = document.getElementById('legenda-fila');
+  const btn = document.getElementById('btn-mapa-fila');
+  const abrir = bloco.hidden;
+  bloco.hidden = legenda.hidden = !abrir;
+  btn.setAttribute('aria-pressed', String(abrir));
+  btn.textContent = abrir ? '🗺️ Ocultar mapa' : '🗺️ Ver no mapa';
+  if(abrir) setTimeout(ajustarMapaFila, 60);
+}
+
+function ajustarMapaFila(){
+  const el = document.getElementById('mapa-fila');
+  if(!el || el.hidden || typeof L === 'undefined') return;
+  if(!mapaFila){
+    const centro = minhaPos || primeiroPontoDaFila() || { lat:-23.55, lng:-46.63 };
+    mapaFila = L.map('mapa-fila', { zoomControl:true, attributionControl:false })
+                .setView([centro.lat, centro.lng], 13);
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom:19 }).addTo(mapaFila);
+  }
+  mapaFila.invalidateSize();
+  desenharMapaFila();
+}
+
+function primeiroPontoDaFila(){
+  const p = disponiveis.find(x => x.entrega && x.entrega.lat != null);
+  return p ? { lat:p.entrega.lat, lng:p.entrega.lng } : null;
+}
+
+function desenharMapaFila(){
+  if(!mapaFila) return;
+  pinosFila.forEach(m => mapaFila.removeLayer(m));
+  pinosFila = [];
+
+  const pontos = [];
+  disponiveis.forEach(p=>{
+    if(!p.entrega || p.entrega.lat == null) return;   // sem coordenada não vira pino falso
+    const m = L.circleMarker([p.entrega.lat, p.entrega.lng], {
+      radius:8, color:'#f4c56a', fillColor:'#f4c56a', fillOpacity:.85, weight:2
+    }).addTo(mapaFila);
+    m.bindPopup(
+      `<b>Pedido #${p.id.slice(0,6).toUpperCase()}</b><br>`
+      + `${formatPrice(p.total)} · ${p.total_itens} item(ns)<br>`
+      + (p.distancia_km != null ? `${p.distancia_km} km de você<br>` : '')
+      + `${escapeHtml(p.bairro || p.cidade || '')}`
+    );
+    pinosFila.push(m);
+    pontos.push([p.entrega.lat, p.entrega.lng]);
+  });
+
+  if(minhaPos){
+    if(pinoEu) mapaFila.removeLayer(pinoEu);
+    pinoEu = L.circleMarker([minhaPos.lat, minhaPos.lng], {
+      radius:9, color:'#e8854a', fillColor:'#e8854a', fillOpacity:.9, weight:3
+    }).addTo(mapaFila).bindPopup('Você está aqui');
+    pontos.push([minhaPos.lat, minhaPos.lng]);
+  }
+  if(pontos.length > 1) mapaFila.fitBounds(pontos, { padding:[35,35], maxZoom:15 });
+  else if(pontos.length === 1) mapaFila.setView(pontos[0], 15);
 }
 
 // ---------- MAPA ----------
@@ -701,6 +1502,283 @@ function atualizarMapa(){
 function destruirMapa(){
   if(mapa){ mapa.remove(); mapa = null; }
   marcadorEu = marcadorDestino = linhaRota = circuloPrecisao = null;
+}
+
+// ============================================================
+//  DESEMPENHO — o mesmo painel analítico das Vendas do lojista, aplicado às
+//  entregas. Todo desenho vem de charts.js: mesma matiz única, mesmo rótulo só
+//  no pico, mesma gêmea em tabela, mesma navegação por teclado.
+//
+//  A base é sempre a entrega CONCLUÍDA, datada por entregue_em: uma entrega
+//  aceita mas não terminada não é desempenho, é trabalho em andamento.
+// ============================================================
+const D = { periodo:'30', vista:{ serie:'chart', bairro:'chart', hora:'chart' }, dados:null };
+
+const dataEntrega = p => p.entregue_em;
+
+// Faixas de 3 h: 24 colunas não cabem num cartão, e "entre 18h e 21h" é uma
+// informação que o entregador usa; "às 19h" não muda nada na prática.
+const FAIXAS_HORA = [0,3,6,9,12,15,18,21];
+const rotuloFaixa = h => `${String(h).padStart(2,'0')}–${String((h+3)%24).padStart(2,'0')}h`;
+
+function metricasEntrega(lista){
+  let km = 0, min = 0, comTempo = 0, ganho = 0, valor = 0;
+  const bairros = new Set();
+  lista.forEach(p=>{
+    km    += +p.percorrido_km || 0;
+    valor += +p.total || 0;
+    // O ganho real é o que foi efetivamente pago; a tarifa é o plano B para
+    // entregas antigas, feitas antes do pagamento existir.
+    ganho += (p.pagamento && +p.pagamento.valor) || +p.tarifa || 0;
+    if(p.total_min != null){ min += p.total_min; comTempo++; }
+    if(p.bairro) bairros.add(p.bairro);
+  });
+  return {
+    entregas: lista.length,
+    km, valor, ganho,
+    bairros: bairros.size,
+    // Média só sobre as entregas que TÊM tempo medido — dividir pelo total
+    // diluiria a média com zeros de entregas antigas sem histórico.
+    tempoMedio: comTempo ? min / comTempo : 0,
+    // Quanto rende cada quilômetro rodado: o número que diz se a corrida
+    // compensa depois do combustível.
+    porKm: km > 0 ? ganho / km : 0
+  };
+}
+
+function desenharDesempenho(){
+  const todas = concluidas || [];
+  const j = janela(D.periodo, todas, dataEntrega);
+  const atuais = j.tudo ? todas.filter(p=>p.entregue_em)
+                        : todas.filter(p=>noIntervalo(p, j.ini, j.fim, dataEntrega));
+  const antes  = j.tudo ? [] : todas.filter(p=>noIntervalo(p, j.prevIni, j.prevFim, dataEntrega));
+  const m = metricasEntrega(atuais), mAntes = metricasEntrega(antes);
+  const semData = todas.filter(p=>!p.entregue_em).length;
+
+  // Intervalo em texto — e o que ficou de fora, dito em voz alta
+  const range = document.getElementById('d-range');
+  const nota = semData
+    ? ` · ${semData} ${semData===1?'entrega sem data fica de fora':'entregas sem data ficam de fora'} dos gráficos`
+    : '';
+  if(!todas.length) range.textContent = '';
+  else if(j.tudo)   range.textContent = `Desde ${fmtData(j.ini,{day:'2-digit',month:'long',year:'numeric'})}` + nota;
+  else range.textContent = `${fmtData(j.ini,{day:'2-digit',month:'short'})} – ${fmtData(j.fim,{day:'2-digit',month:'short'})}` + nota;
+
+  // Estado vazio: um convite, não um beco sem saída
+  if(!todas.length){
+    document.getElementById('d-hero-num').textContent = '0';
+    const dh = document.getElementById('d-hero-delta');
+    dh.className = 'delta delta-flat'; dh.textContent = 'Sem histórico';
+    document.getElementById('d-serie-body').innerHTML = '';
+    document.getElementById('d-kpi-row').innerHTML = '';
+    ['d-bairro-body','d-hora-body'].forEach(id=>document.getElementById(id).innerHTML =
+      '<p class="skeleton" style="text-align:center">Sem dados no período</p>');
+    document.getElementById('d-reg-count').textContent = 'Cada entrega concluída, da mais recente à mais antiga';
+    document.getElementById('d-registro').innerHTML = `
+      <div class="v-empty">
+        <div class="icon" aria-hidden="true">🛵</div>
+        <h4>Você ainda não concluiu nenhuma entrega</h4>
+        <p>Assim que a primeira entrega for finalizada, os gráficos aqui começam a se preencher:
+           quanto você anda, em que bairros e em quais horários.</p>
+        <button type="button" class="btn btn-primary" onclick="switchTab('disponiveis')">Ver pedidos disponíveis</button>
+      </div>`;
+    return;
+  }
+
+  // Herói
+  document.getElementById('d-hero-num').textContent = fmtInt(m.entregas);
+  const dv = j.tudo ? { dir:'flat', txt:'Período completo' }
+                    : variacao(m.entregas, mAntes.entregas, 'Primeiras entregas');
+  const elDelta = document.getElementById('d-hero-delta');
+  elDelta.className = 'delta delta-' + dv.dir;
+  elDelta.innerHTML = `${esc(dv.txt)}${j.tudo ? '' : ' <small>vs. período anterior</small>'}`;
+
+  // Agora que existe tarifa, o indicador de dinheiro é o GANHO do entregador —
+  // não o valor da mercadoria, que nunca foi dele.
+  const tiles = [
+    { rot:'Ganhos no período', val: formatPrice(m.ganho),
+      d: j.tudo ? null : variacao(m.ganho, mAntes.ganho, 'Primeiros ganhos') },
+    { rot:'Distância percorrida', val: m.km > 0 ? fmtKm(m.km) : '—',
+      d: j.tudo ? null : variacao(m.km, mAntes.km, 'Primeiro trajeto') },
+    { rot:'Ganho por km', val: m.porKm > 0 ? formatPrice(m.porKm) + '/km' : '—',
+      d: j.tudo || !m.porKm || !mAntes.porKm ? null : variacao(m.porKm, mAntes.porKm) },
+    { rot:'Tempo médio por entrega', val: fmtMin(m.tempoMedio),
+      // Menos tempo é melhor: a seta é invertida de propósito
+      d: j.tudo || !m.tempoMedio || !mAntes.tempoMedio ? null
+         : inverter(variacao(m.tempoMedio, mAntes.tempoMedio)) },
+    { rot:'Bairros atendidos', val: fmtInt(m.bairros), d:null }
+  ];
+  document.getElementById('d-kpi-row').innerHTML = tiles.map(t=>`
+    <div class="glass kpi">
+      <p class="kpi-label">${t.rot}</p>
+      <p class="kpi-value" title="${esc(t.val)}">${esc(t.val)}</p>
+      <div class="kpi-foot">${t.d ? `<span class="delta delta-${t.d.dir}">${esc(t.d.txt)}</span>` : '<span></span>'}</div>
+    </div>`).join('');
+
+  const serie = agruparNoTempo(atuais, j.ini, j.fim, {
+    dataDe: dataEntrega,
+    zero:  () => ({ qtd:0, km:0, ganho:0 }),
+    somar: (b,p) => {
+      b.qtd += 1;
+      b.km += +p.percorrido_km || 0;
+      b.ganho += (p.pagamento && +p.pagamento.valor) || +p.tarifa || 0;
+    }
+  });
+  D.dados = { serie, atuais, m };
+  pintarSerieEntregas(); pintarBairros(); pintarHoras();
+  pintarRegistroEntregas(atuais);
+}
+
+// Tempo é a única métrica aqui em que cair é bom — a seta precisa concordar
+// com isso, senão o painel elogia a piora.
+function inverter(v){
+  return v.dir === 'up'   ? { dir:'down', txt:v.txt }
+       : v.dir === 'down' ? { dir:'up',   txt:v.txt } : v;
+}
+
+// ---- 1. Entregas ao longo do tempo ----
+function pintarSerieEntregas(){
+  const box = document.getElementById('d-serie-body');
+  const { baldes, gran } = D.dados.serie;
+  if(D.vista.serie === 'table'){
+    box.innerHTML = tabela('Entregas por período',
+      [{t:'Período'},{t:'Entregas',num:true},{t:'Distância',num:true},{t:'Ganhos',num:true}],
+      baldes.map(b=>[ rotuloBalde(b,gran), fmtInt(b.qtd),
+                      b.km>0 ? fmtKm(b.km) : '—', formatPrice(b.ganho) ]));
+    return;
+  }
+  const iMax = baldes.reduce((m,b,i)=> b.qtd > baldes[m].qtd ? i : m, 0);
+  desenharLinha(box, {
+    baldes, gran, id:'d-serie', padEsq:40,
+    valorDe:  b => b.qtd,
+    fmtValor: fmtQtdEixo,
+    tipHtml:  b => `<b>${fmtInt(b.qtd)} ${b.qtd===1?'entrega':'entregas'}</b><br>`
+                 + `<span>${rotuloBalde(b,gran)}${b.ganho>0 ? ` · ${formatPrice(b.ganho)}` : ''}`
+                 + `${b.km>0 ? ` · ${fmtKm(b.km)}` : ''}</span>`,
+    resumo: `Entregas concluídas por ${gran}, de ${rotuloBalde(baldes[0],gran)} a ${rotuloBalde(baldes[baldes.length-1],gran)}. `
+          + `Pico de ${fmtInt(baldes[iMax].qtd)} em ${rotuloBalde(baldes[iMax],gran)}.`
+  });
+}
+
+// ---- 2. Bairros mais atendidos ----
+function pintarBairros(){
+  const box = document.getElementById('d-bairro-body');
+  const mapa = new Map();
+  D.dados.atuais.forEach(p=>{
+    const k = p.bairro || p.cidade || 'Sem bairro registrado';
+    const a = mapa.get(k) || { nome:k, qtd:0, km:0 };
+    a.qtd += 1; a.km += +p.percorrido_km || 0;
+    mapa.set(k, a);
+  });
+  const itens = [...mapa.values()].sort((a,b)=>b.qtd-a.qtd).slice(0,6);
+  if(!itens.length){ box.innerHTML = '<p class="skeleton" style="text-align:center">Sem entregas no período</p>'; return; }
+
+  if(D.vista.bairro === 'table'){
+    box.innerHTML = tabela('Entregas por bairro',
+      [{t:'Bairro'},{t:'Entregas',num:true},{t:'Distância',num:true}],
+      itens.map(i=>[i.nome, fmtInt(i.qtd), i.km>0 ? fmtKm(i.km) : '—']));
+    return;
+  }
+  desenharBarrasH(box, {
+    itens, id:'d-bairro', reservaValor:70,
+    rotuloDe: it => it.nome,
+    valorDe:  it => it.qtd,
+    fmtValor: fmtQtdEixo,
+    tipHtml:  it => `<b>${fmtInt(it.qtd)} ${it.qtd===1?'entrega':'entregas'}</b><br>`
+                  + `<span>${esc(it.nome)}${it.km>0 ? ` · ${fmtKm(it.km)}` : ''}</span>`,
+    resumo: 'Entregas por bairro. ' + itens.map(i=>`${i.nome}: ${i.qtd}`).join('; ') + '.'
+  });
+}
+
+// ---- 3. Horários que rendem ----
+function pintarHoras(){
+  const box = document.getElementById('d-hora-body');
+  const acc = FAIXAS_HORA.map(h=>({ h, rot:rotuloFaixa(h), qtd:0, valor:0 }));
+  let comData = 0;
+  D.dados.atuais.forEach(p=>{
+    if(!p.entregue_em) return;
+    comData++;
+    const faixa = acc[Math.floor(new Date(p.entregue_em).getHours() / 3)];
+    faixa.qtd += 1; faixa.valor += +p.total || 0;
+  });
+  if(!comData){ box.innerHTML = '<p class="skeleton" style="text-align:center">Sem entregas com horário no período</p>'; return; }
+
+  if(D.vista.hora === 'table'){
+    box.innerHTML = tabela('Entregas por faixa de horário',
+      [{t:'Faixa'},{t:'Entregas',num:true},{t:'Valor',num:true}],
+      acc.map(f=>[f.rot, fmtInt(f.qtd), formatPrice(f.valor)]));
+    return;
+  }
+  const iMax = acc.reduce((b,f,i)=> f.qtd > acc[b].qtd ? i : b, 0);
+  desenharColunas(box, {
+    itens: acc, id:'d-hora',
+    rotuloDe: f => f.rot,
+    valorDe:  f => f.qtd,
+    fmtValor: fmtQtdEixo,
+    tipHtml:  f => `<b>${fmtInt(f.qtd)} ${f.qtd===1?'entrega':'entregas'}</b><br>`
+                 + `<span>entre ${f.rot} · ${formatPrice(f.valor)}</span>`,
+    resumo: 'Entregas por faixa de horário. ' + acc.map(f=>`${f.rot}: ${f.qtd}`).join('; ')
+          + `. Melhor faixa: ${acc[iMax].rot}.`
+  });
+}
+
+// ---- 4. Registro (a tabela é leitura primária, não um plano B) ----
+function pintarRegistroEntregas(atuais){
+  const el = document.getElementById('d-registro');
+  document.getElementById('d-reg-count').textContent =
+    `${fmtInt(atuais.length)} ${atuais.length===1?'entrega concluída':'entregas concluídas'} no período, da mais recente à mais antiga`;
+  if(!atuais.length){
+    el.innerHTML = `<div class="v-empty"><div class="icon" aria-hidden="true">🗓️</div>
+      <h4>Nenhuma entrega neste período</h4>
+      <p>Você já entregou antes — experimente um intervalo maior no filtro acima.</p></div>`;
+    return;
+  }
+  const linhas = atuais.slice()
+    .sort((a,b)=>(b.entregue_em||'').localeCompare(a.entregue_em||''))
+    .map(p=>[
+      `#${p.id.slice(0,6).toUpperCase()}`,
+      p.bairro || p.cidade || '—',
+      p.entregue_em ? fmtData(new Date(p.entregue_em),
+        {day:'2-digit',month:'short',year:'2-digit',hour:'2-digit',minute:'2-digit'}) : '—',
+      p.total_min != null ? fmtMin(p.total_min) : '—',
+      p.percorrido_km > 0 ? fmtKm(p.percorrido_km) : '—',
+      formatPrice((p.pagamento && p.pagamento.valor) || p.tarifa || 0),
+      p.pagamento ? (p.pagamento.destino === 'saque' ? 'Retirado na hora' : 'Carteira') : '—'
+    ]);
+  el.innerHTML = tabela('Entregas concluídas no período selecionado',
+    [{t:'Pedido'},{t:'Bairro'},{t:'Entregue em'},{t:'Duração',num:true},
+     {t:'Distância',num:true},{t:'Ganho',num:true},{t:'Destino'}],
+    linhas);
+}
+
+// ---- Controles do painel ----
+function ligarControlesDesempenho(){
+  document.querySelectorAll('#tab-desempenho .seg [data-periodo]').forEach(btn=>{
+    btn.addEventListener('click', ()=>{
+      D.periodo = btn.dataset.periodo;
+      document.querySelectorAll('#tab-desempenho .seg [data-periodo]').forEach(b=>
+        b.setAttribute('aria-pressed', String(b === btn)));
+      desenharDesempenho();                     // sem refetch, sem pisca-pisca
+    });
+  });
+  [['d-toggle-serie','serie',pintarSerieEntregas],
+   ['d-toggle-bairro','bairro',pintarBairros],
+   ['d-toggle-hora','hora',pintarHoras]].forEach(([id,chave,pintar])=>{
+    const btn = document.getElementById(id);
+    btn?.addEventListener('click', ()=>{
+      D.vista[chave] = D.vista[chave] === 'chart' ? 'table' : 'chart';
+      const tabelaAtiva = D.vista[chave] === 'table';
+      btn.setAttribute('aria-pressed', String(tabelaAtiva));
+      btn.textContent = tabelaAtiva ? 'Ver gráfico' : 'Ver tabela';
+      if(D.dados) pintar();
+    });
+  });
+
+  aoRedimensionar(document.querySelector('main'), ()=>{
+    if(D.dados && abaAtual === 'desempenho'){
+      pintarSerieEntregas(); pintarBairros(); pintarHoras();
+    }
+  });
 }
 
 // Não deixa o GPS ligado depois de fechar a aba

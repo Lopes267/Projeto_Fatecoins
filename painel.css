@@ -1,0 +1,206 @@
+/* ============================================================
+   painel.css — sistema visual dos painéis analíticos
+   Usado pelo painel de Vendas (dashboard.html) e pelo painel de
+   Desempenho do entregador (entregas.html).
+
+   Regra de cor: TODO dado usa uma matiz só (--data). O par
+   laranja+dourado da marca reprova no teste de daltonismo (ΔE 4,1),
+   então a diferença entre marcas vem de posição e rótulo, nunca de cor.
+   ============================================================ */
+
+:root{
+  /* Vidro fosco */
+  --glass-fill:linear-gradient(158deg,rgba(255,255,255,.055),rgba(255,255,255,.016));
+  --glass-edge:rgba(255,255,255,.09);
+  --glass-rim:rgba(255,255,255,.14);
+  --glass-shadow:0 24px 48px -28px rgba(0,0,0,.85);
+
+  /* Marca de dados — #d9733c é o laranja da marca dentro da banda OKLCH L .48–.67 */
+  --data:#d9733c;
+  --data-soft:rgba(217,115,60,.14);
+  --data-dim:rgba(240,236,227,.16);
+  --grid:rgba(255,255,255,.06);
+  --axis:rgba(240,236,227,.42);
+  --tip-bg:rgba(18,18,18,.94);
+  --thead-bg:rgba(20,20,20,.96);
+  --glow:rgba(217,115,60,.75);
+}
+
+/* Modo claro (botão de acessibilidade). Sem isto o vidro branco sobre fundo
+   claro desaparece e a grade dos gráficos fica invisível. */
+body.a11y-light{
+  color-scheme:light;                  /* barras de rolagem e controles nativos acompanham o tema */
+  --glass-fill:linear-gradient(158deg,rgba(255,255,255,.92),rgba(255,255,255,.66));
+  --glass-edge:rgba(31,27,22,.12);
+  --glass-rim:rgba(31,27,22,.16);
+  --glass-shadow:0 18px 40px -26px rgba(64,50,35,.45);
+
+  --data:#b8551f;                      /* mesma matiz, escurecida p/ contrastar no claro */
+  --data-soft:rgba(184,85,31,.13);
+  --data-dim:rgba(31,27,22,.14);
+  --grid:rgba(31,27,22,.09);
+  --axis:rgba(31,27,22,.58);
+  --tip-bg:rgba(255,255,255,.97);
+  --thead-bg:rgba(248,246,241,.97);
+  --glow:rgba(184,85,31,.42);
+}
+
+/* ---------- Página do painel ---------- */
+.v-page{position:relative;isolation:isolate}
+.v-ambient{
+  position:absolute;inset:-160px -80px auto -80px;height:640px;z-index:0;
+  pointer-events:none;filter:blur(90px);opacity:.42;
+  background:
+    radial-gradient(46% 60% at 18% 30%,rgba(217,115,60,.55),transparent 70%),
+    radial-gradient(40% 55% at 78% 12%,rgba(244,197,106,.28),transparent 72%);
+}
+body.a11y-light .v-ambient{opacity:.3}
+.v-stack{position:relative;z-index:1;display:flex;flex-direction:column;gap:1.1rem}
+
+.glass{
+  position:relative;border-radius:18px;background:var(--glass-fill);
+  border:1px solid var(--glass-edge);box-shadow:var(--glass-shadow);
+  -webkit-backdrop-filter:blur(22px) saturate(1.35);backdrop-filter:blur(22px) saturate(1.35);
+  overflow:hidden;
+}
+/* Fio de luz na aresta superior — o vidro pegando luz */
+.glass::before{
+  content:"";position:absolute;top:0;left:12%;right:12%;height:1px;z-index:2;
+  background:linear-gradient(90deg,transparent,var(--glass-rim),transparent);
+}
+@supports not ((backdrop-filter:blur(1px)) or (-webkit-backdrop-filter:blur(1px))){
+  .glass{background:rgba(28,28,28,.92)}
+  body.a11y-light .glass{background:rgba(255,255,255,.94)}
+}
+
+/* Rótulo serifado itálico — a assinatura tipográfica dos painéis */
+.eyebrow{
+  font-family:'Fraunces',serif;font-style:italic;font-weight:400;
+  font-size:.95rem;color:var(--muted);letter-spacing:.01em;
+}
+
+/* ---------- Barra de filtro: uma linha, acima de tudo que ela filtra ---------- */
+.v-filters{display:flex;align-items:center;justify-content:space-between;gap:1rem;flex-wrap:wrap}
+.seg{display:inline-flex;gap:.15rem;padding:.25rem;border-radius:11px;
+  background:rgba(255,255,255,.04);border:1px solid var(--glass-edge)}
+body.a11y-light .seg{background:rgba(31,27,22,.03)}
+.seg button{
+  padding:.45rem .85rem;border-radius:8px;border:none;background:transparent;
+  color:var(--muted);font:500 .84rem 'DM Sans',sans-serif;cursor:pointer;
+  transition:background-color .18s,color .18s;touch-action:manipulation;
+}
+.seg button:hover{color:var(--text);background:rgba(255,255,255,.05)}
+body.a11y-light .seg button:hover{background:rgba(31,27,22,.05)}
+.seg button[aria-pressed="true"]{background:var(--data-soft);color:var(--data)}
+.v-note{font-size:.78rem;color:var(--muted)}
+
+/* ---------- Painel herói ---------- */
+.hero-panel{padding:1.7rem 1.7rem 1rem}
+.hero-head{display:flex;align-items:flex-start;justify-content:space-between;gap:1rem;flex-wrap:wrap}
+.hero-figure{
+  font-family:'DM Sans',sans-serif;font-size:clamp(2.6rem,6vw,3.5rem);font-weight:600;
+  line-height:1.02;letter-spacing:-.025em;margin-top:.35rem;
+}
+.delta{
+  display:inline-flex;align-items:center;gap:.4rem;padding:.32rem .7rem;border-radius:50px;
+  font-size:.82rem;font-weight:600;white-space:nowrap;
+}
+.delta-up{background:rgba(93,207,160,.13);color:var(--green)}
+.delta-down{background:rgba(232,90,90,.13);color:var(--red)}
+.delta-flat{background:rgba(255,255,255,.06);color:var(--muted)}
+body.a11y-light .delta-flat{background:rgba(31,27,22,.06)}
+.delta small{font-weight:400;opacity:.75}
+
+/* ---------- Tiles de indicador ---------- */
+.kpi-row{display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:1.1rem}
+.kpi{padding:1.15rem 1.25rem;display:flex;flex-direction:column;gap:.5rem;min-width:0}
+.kpi-label{font-size:.8rem;color:var(--muted)}
+.kpi-value{font-size:1.85rem;font-weight:600;letter-spacing:-.02em;line-height:1.1;
+  overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.kpi-foot{display:flex;align-items:center;justify-content:space-between;gap:.6rem;margin-top:auto}
+
+/* ---------- Cartões de gráfico ---------- */
+.chart-grid{display:grid;grid-template-columns:1.35fr 1fr;gap:1.1rem;align-items:start}
+.chart-card{padding:1.35rem 1.4rem 1.1rem;display:flex;flex-direction:column;gap:.2rem}
+.chart-head{display:flex;align-items:flex-start;justify-content:space-between;gap:1rem;margin-bottom:.9rem}
+.chart-title{font-family:'Fraunces',serif;font-size:1.08rem;font-weight:700;text-wrap:balance}
+.chart-sub{font-size:.79rem;color:var(--muted);margin-top:.15rem}
+.chart-body{position:relative;width:100%}
+.chart-body svg{display:block;width:100%;height:auto;overflow:visible}
+/* O brilho segue o pico da série — a luz mais forte onde mais aconteceu */
+.peak-glow{
+  position:absolute;top:8%;width:230px;height:150px;margin-left:-115px;z-index:0;
+  pointer-events:none;filter:blur(46px);opacity:.5;
+  background:radial-gradient(circle,var(--glow),transparent 68%);
+  transition:left .45s cubic-bezier(.22,1,.36,1);
+}
+
+.link-btn{
+  background:none;border:1px solid transparent;border-radius:7px;color:var(--muted);
+  font:500 .78rem 'DM Sans',sans-serif;cursor:pointer;padding:.3rem .6rem;white-space:nowrap;
+  transition:color .18s,border-color .18s;touch-action:manipulation;
+}
+.link-btn:hover,.link-btn[aria-pressed="true"]{color:var(--data);border-color:var(--glass-edge)}
+
+/* ---------- Dica flutuante ---------- */
+.vtip{
+  position:absolute;z-index:6;pointer-events:none;opacity:0;
+  transform:translate(-50%,-112%);
+  background:var(--tip-bg);border:1px solid var(--glass-edge);border-radius:10px;
+  padding:.5rem .7rem;font-size:.79rem;line-height:1.45;white-space:nowrap;
+  box-shadow:0 12px 28px -12px rgba(0,0,0,.9);color:var(--text);
+  transition:opacity .14s;
+}
+body.a11y-light .vtip{box-shadow:0 12px 28px -16px rgba(64,50,35,.5)}
+.vtip[data-show="true"]{opacity:1}
+.vtip b{font-weight:600;font-variant-numeric:tabular-nums}
+.vtip span{color:var(--muted)}
+
+/* ---------- Tabelas de dados (gêmeas acessíveis de cada gráfico) ---------- */
+.vtable-wrap{overflow-x:auto;max-height:340px;overflow-y:auto;overscroll-behavior:contain}
+table.vtable{width:100%;border-collapse:collapse;font-size:.85rem}
+table.vtable caption{text-align:left;color:var(--muted);font-size:.78rem;padding-bottom:.6rem}
+table.vtable th,table.vtable td{padding:.6rem .7rem;text-align:left;border-bottom:1px solid var(--grid)}
+table.vtable thead th{
+  position:sticky;top:0;background:var(--thead-bg);backdrop-filter:blur(8px);
+  font-size:.72rem;text-transform:uppercase;letter-spacing:.06em;color:var(--muted);font-weight:600;
+}
+table.vtable td.num,table.vtable th.num{text-align:right;font-variant-numeric:tabular-nums}
+table.vtable tbody tr:last-child td{border-bottom:none}
+table.vtable tbody tr:hover{background:rgba(255,255,255,.025)}
+body.a11y-light table.vtable tbody tr:hover{background:rgba(31,27,22,.03)}
+.cell-strong{font-weight:600}
+.cell-muted{color:var(--muted);font-size:.8rem}
+.cell-clip{max-width:230px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+
+.v-empty{text-align:center;padding:3.5rem 1.5rem;color:var(--muted)}
+.v-empty .icon{font-size:2.4rem;margin-bottom:.9rem;opacity:.6}
+.v-empty h4{font-family:'Fraunces',serif;font-size:1.15rem;color:var(--text);margin-bottom:.45rem;font-weight:700}
+.v-empty p{font-size:.9rem;max-width:38ch;margin:0 auto 1.2rem;line-height:1.6}
+.skeleton{color:var(--muted);font-size:.88rem;padding:1.5rem 0}
+
+/* ---------- Foco visível (nunca remover contorno sem substituto) ---------- */
+.seg button:focus-visible,.link-btn:focus-visible,.chart-body svg:focus-visible,
+.skip-link:focus-visible{
+  outline:2px solid var(--accent2);outline-offset:3px;border-radius:8px;
+}
+.skip-link{
+  position:absolute;left:-9999px;top:0;z-index:400;background:var(--accent);color:#fff;
+  padding:.6rem 1rem;border-radius:0 0 8px 0;font-size:.85rem;font-weight:600;
+}
+.skip-link:focus{left:0}
+.hitbox{fill:transparent;cursor:pointer}
+
+@media(prefers-reduced-motion:reduce){
+  .peak-glow,.vtip,.seg button,.link-btn{transition:none}
+}
+
+@media(max-width:980px){
+  .chart-grid{grid-template-columns:1fr}
+}
+@media(max-width:768px){
+  .hero-panel{padding:1.3rem 1.2rem .9rem}
+  .chart-card{padding:1.15rem 1.1rem 1rem}
+  .v-ambient{filter:blur(70px);opacity:.34}
+  .cell-clip{max-width:130px}
+}

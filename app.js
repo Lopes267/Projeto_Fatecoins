@@ -315,7 +315,11 @@ const DB = {
   async clearCart() {
     const res = await fetch(`${API_URL}/api/cart`, {
       method: 'DELETE',
-      headers: { ...this._authHeaders() }
+      headers: { ...this._authHeaders() },
+      // O carrinho é esvaziado na tela de sucesso, onde o cliente costuma sair
+      // logo em seguida. Sem keepalive o navegador cancela a requisição ao
+      // navegar, e ele voltava ao marketplace com os itens já comprados no carrinho.
+      keepalive: true
     });
     return await res.json();
   },
@@ -376,16 +380,25 @@ const DB = {
 
   // ---------- entregas ----------
   // Pedidos comprados por outras pessoas que ainda esperam um entregador.
-  // Passando a posição atual, a lista vem ordenada do mais perto para o mais longe.
-  async getAvailableDeliveries(pos = null) {
-    const qs = pos ? `?lat=${pos.lat}&lng=${pos.lng}` : '';
+  // Passando a posição atual, a lista vem ordenada do mais perto para o mais longe;
+  // raioKm corta os que estão longe demais para valer a viagem.
+  async getAvailableDeliveries(pos = null, raioKm = null, soCabe = false) {
+    const q = new URLSearchParams();
+    if (pos) { q.set('lat', pos.lat); q.set('lng', pos.lng); }
+    if (pos && raioKm) q.set('raio_km', raioKm);
+    if (soCabe) q.set('so_cabe', '1');
+    const qs = q.toString() ? `?${q}` : '';
     const res = await fetch(`${API_URL}/api/deliveries/available${qs}`, { headers: { ...this._authHeaders() } });
     return await res.json();
   },
 
-  async acceptDelivery(pedidoId) {
+  // A posição de quem aceita vira a distância inicial do trajeto no painel de
+  // desempenho — por isso vai junto quando o GPS está ligado.
+  async acceptDelivery(pedidoId, pos = null) {
     const res = await fetch(`${API_URL}/api/deliveries/${pedidoId}/accept`, {
-      method: 'POST', headers: { ...this._authHeaders() }
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', ...this._authHeaders() },
+      body: JSON.stringify(pos ? { lat: pos.lat, lng: pos.lng } : {})
     });
     return await res.json();
   },
@@ -412,11 +425,45 @@ const DB = {
     return await res.json();
   },
 
-  async setDeliveryStatus(pedidoId, status) {
+  // Avança o status. Para finalizar ('entregue') o servidor exige o código que
+  // o cliente dita na porta e o destino do dinheiro ('carteira' ou 'saque').
+  async setDeliveryStatus(pedidoId, status, { codigo = null, destino = 'carteira' } = {}) {
     const res = await fetch(`${API_URL}/api/deliveries/${pedidoId}/status`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', ...this._authHeaders() },
-      body: JSON.stringify({ status })
+      body: JSON.stringify({ status, codigo, destino })
+    });
+    return await res.json();
+  },
+
+  // ---------- capacidade do veículo ----------
+  async getCapacity() {
+    const res = await fetch(`${API_URL}/api/couriers/capacity`, { headers: { ...this._authHeaders() } });
+    return await res.json();
+  },
+
+  // cap = { comprimento, largura, altura, peso_max, categoria } ou { limpar:true }
+  async saveCapacity(cap) {
+    const res = await fetch(`${API_URL}/api/couriers/capacity`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json', ...this._authHeaders() },
+      body: JSON.stringify(cap)
+    });
+    return await res.json();
+  },
+
+  // ---------- carteira do entregador ----------
+  async getWallet() {
+    const res = await fetch(`${API_URL}/api/wallet`, { headers: { ...this._authHeaders() } });
+    return await res.json();
+  },
+
+  // Sem valor, saca o saldo inteiro
+  async withdraw(valor = null) {
+    const res = await fetch(`${API_URL}/api/wallet/withdraw`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', ...this._authHeaders() },
+      body: JSON.stringify(valor != null ? { valor } : {})
     });
     return await res.json();
   },
@@ -452,20 +499,34 @@ function entregaLabel(status) {
 // Quão confiável é o pino do cliente no mapa. Só o GPS do próprio cliente (ou o
 // endereço achado com número) aponta a porta; CEP e cidade caem no meio da região.
 const PRECISAO_ENTREGA = {
-  gps:    { exato: true,  texto: 'Ponto confirmado pelo GPS do cliente' },
-  exata:  { exato: true,  texto: 'Endereço localizado com número' },
-  rua:    { exato: false, texto: 'Ponto aproximado: rua encontrada, sem o número' },
-  bairro: { exato: false, texto: 'Ponto aproximado: centro do bairro' },
-  cep:    { exato: false, texto: 'Ponto aproximado: centro do CEP' },
-  cidade: { exato: false, texto: 'Ponto MUITO impreciso: centro da cidade — guie-se pelo endereço escrito' }
+  gps:       { exato: true,  texto: 'Ponto confirmado pelo cliente no mapa' },
+  exata:     { exato: true,  texto: 'Endereço localizado com número' },
+  gps_aprox: { exato: false, texto: 'Ponto do celular do cliente, com margem de erro' },
+  rua:       { exato: false, texto: 'Ponto aproximado: rua encontrada, sem o número' },
+  bairro:    { exato: false, texto: 'Ponto aproximado: centro do bairro' },
+  cep:       { exato: false, texto: 'Ponto aproximado: centro do CEP' },
+  cidade:    { exato: false, texto: 'Ponto MUITO impreciso: centro da cidade — guie-se pelo endereço escrito' }
 };
 
 function precisaoEntrega(entrega) {
   if (!entrega || entrega.lat == null) {
     return { exato: false, texto: 'Sem ponto no mapa — use o endereço escrito', semMapa: true };
   }
-  return PRECISAO_ENTREGA[entrega.precisao] ||
-         { exato: false, texto: 'Ponto aproximado' };
+  const base = PRECISAO_ENTREGA[entrega.precisao] || { exato: false, texto: 'Ponto aproximado' };
+  // Quando a margem de erro é conhecida, dizê-la em metros vale mais do que o
+  // adjetivo: "±380 m" o entregador entende, "aproximado" não.
+  if (entrega.precisao_m) {
+    return { ...base, texto: `${base.texto} (±${formatarMetros(entrega.precisao_m)})` };
+  }
+  return base;
+}
+
+// "820 m" / "1,4 km" — margem de erro numa unidade que se lê de relance
+function formatarMetros(m) {
+  if (m == null) return '—';
+  return m >= 1000
+    ? new Intl.NumberFormat('pt-BR', { maximumFractionDigits: 1 }).format(m / 1000) + ' km'
+    : Math.round(m) + ' m';
 }
 
 function formatEndereco(e) {
@@ -474,6 +535,48 @@ function formatEndereco(e) {
   const linha2 = [e.bairro, e.cidade, e.uf].filter(Boolean).join(' · ');
   const cep    = e.cep ? `CEP ${String(e.cep).replace(/(\d{5})(\d{3})/, '$1-$2')}` : '';
   return [linha1, e.complemento, linha2, cep].filter(Boolean).join(' — ') || 'Endereço não informado';
+}
+
+// ============================================================
+//  MEDIDAS — presets de embalagem e de veículo
+//
+//  Ninguém quer digitar 3 números para cada produto, nem medir o baú com trena.
+//  Os presets cobrem o caso comum com um clique; os campos continuam editáveis
+//  para quem tem uma medida de verdade.
+// ============================================================
+
+// Embalagens do lojista (C × L × A em cm) — nomes que ele reconhece na prateleira
+const EMBALAGENS = [
+  { id:'envelope', nome:'📩 Envelope',      c:35, l:25, a:2,  ex:'documentos, roupa fina' },
+  { id:'pequena',  nome:'📦 Caixa pequena', c:20, l:15, a:10, ex:'cosméticos, eletrônicos pequenos' },
+  { id:'media',    nome:'📦 Caixa média',   c:35, l:25, a:20, ex:'tênis, panela, livro grande' },
+  { id:'grande',   nome:'📦 Caixa grande',  c:50, l:40, a:35, ex:'liquidificador, jogo de panelas' },
+  { id:'sacola',   nome:'🛍️ Sacola de mercado', c:40, l:25, a:35, ex:'compras do dia' }
+];
+
+// Veículos do entregador — medidas do COMPARTIMENTO, não do carro
+const VEICULOS = [
+  { id:'bicicleta',  nome:'🚲 Bicicleta (mochila)', c:35, l:30, a:40, peso:8,
+    nota:'Mochila de entrega comum' },
+  { id:'moto',       nome:'🛵 Moto (baú 80 L)',     c:45, l:45, a:40, peso:25,
+    nota:'Baú padrão exigido pelas plataformas' },
+  { id:'carro',      nome:'🚗 Carro (porta-malas)', c:100, l:80, a:45, peso:120,
+    nota:'Porta-malas de hatch/sedã médio' },
+  { id:'utilitario', nome:'🚐 Utilitário / van',    c:180, l:120, a:110, peso:600,
+    nota:'Furgão pequeno' }
+];
+
+const APROVEITAMENTO_CARGA = 0.75;   // o mesmo desconto de "ar entre as caixas" do servidor
+
+function volumeUtilLitros(c, l, a){
+  if(!(c > 0 && l > 0 && a > 0)) return null;
+  return Math.round((c * l * a / 1000) * APROVEITAMENTO_CARGA);
+}
+
+// "45 × 45 × 40 cm" — como as medidas aparecem em qualquer tela
+function formatarMedidas(c, l, a){
+  if(!(c && l && a)) return 'sem medidas';
+  return `${c} × ${l} × ${a} cm`;
 }
 
 // "há 12s" / "há 3 min" — mostra se a posição do entregador está fresca

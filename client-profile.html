@@ -196,6 +196,43 @@
     .track-fresh{font-size:.74rem;color:var(--muted);margin-left:auto}
     .track-map{height:260px;border-radius:12px;border:1px solid var(--border);margin-top:.8rem;background:var(--card)}
     .leaflet-container{background:#1a1a1a}
+
+    /* Código de entrega — o elemento mais importante do card enquanto o pedido
+       está a caminho, por isso é o de maior peso visual. */
+    .track-codigo{margin-top:.9rem;padding:1rem 1.1rem;border-radius:12px;
+      background:linear-gradient(150deg,rgba(93,207,160,.13),rgba(93,207,160,.03));
+      border:1px solid rgba(93,207,160,.35)}
+    .track-codigo-lbl{font-size:.74rem;color:var(--muted);text-transform:uppercase;
+      letter-spacing:.06em;font-weight:600}
+    .track-codigo-num{font-family:'Fraunces',serif;font-size:2.4rem;font-weight:700;
+      color:var(--green);letter-spacing:.32em;text-indent:.32em;line-height:1.25;
+      font-variant-numeric:tabular-nums}
+    .track-codigo-aviso{font-size:.76rem;color:var(--muted);line-height:1.55;margin-top:.3rem}
+
+    /* Código sobre o mapa. É enquanto assiste o entregador chegar que o cliente
+       precisa do número — e o bloco lá em cima já saiu da tela por causa da
+       rolagem. Nasce escondido (••••) para o código não ficar exposto a quem
+       estiver olhando por cima do ombro num ônibus. */
+    .track-map-wrap{position:relative}
+    .mapa-codigo{
+      position:absolute;top:10px;right:10px;z-index:500;
+      display:flex;flex-direction:column;align-items:center;gap:.1rem;
+      padding:.5rem .8rem;border-radius:11px;cursor:pointer;
+      background:rgba(13,13,13,.88);border:1px solid rgba(93,207,160,.5);
+      -webkit-backdrop-filter:blur(8px);backdrop-filter:blur(8px);
+      font-family:'DM Sans',sans-serif;transition:border-color .2s,background .2s;
+    }
+    .mapa-codigo:hover{background:rgba(13,13,13,.95);border-color:var(--green)}
+    .mapa-codigo:focus-visible{outline:2px solid var(--accent2);outline-offset:2px}
+    .mapa-codigo-lbl{font-size:.62rem;color:var(--muted);text-transform:uppercase;
+      letter-spacing:.1em;font-weight:600;line-height:1}
+    .mapa-codigo-num{font-family:'Fraunces',serif;font-size:1.35rem;font-weight:700;
+      color:var(--green);letter-spacing:.2em;text-indent:.2em;line-height:1.15;
+      font-variant-numeric:tabular-nums}
+    @media(max-width:520px){
+      .mapa-codigo{top:8px;right:8px;padding:.4rem .65rem}
+      .mapa-codigo-num{font-size:1.15rem}
+    }
     .track-dist{font-size:.8rem;color:var(--accent2);margin-top:.5rem}
     .track-aprox{font-size:.78rem;color:var(--accent2);margin:.3rem 0 .1rem;line-height:1.5}
   </style>
@@ -369,6 +406,8 @@ document.addEventListener('DOMContentLoaded', async ()=>{
   document.getElementById('client-cidade').value = currentUser.cidade || '';
   document.getElementById('client-estado').value = currentUser.estado || '';
   document.getElementById('client-cep').value = currentUser.cep || '';
+
+  aplicarAbaDaURL();     // ?tab=entregas — vindo do checkout, cai direto no rastreio
 });
 
 // ---- SALVAR PERFIL ----
@@ -507,13 +546,25 @@ async function deleteAccount(){
 let comprasLoaded = false, avaliacoesLoaded = false;
 const pickedStars = {};
 
+const ABAS_PERFIL = ['perfil','compras','entregas','avaliacoes'];
+
 function switchTab(name){
   document.querySelectorAll('#profile-tabs .tab').forEach(t => t.classList.toggle('active', t.dataset.tab === name));
   document.querySelectorAll('.tab-panel').forEach(p => p.hidden = (p.id !== 'tab-' + name));
+  // Guarda a aba na URL: é o que permite ao checkout mandar o cliente direto
+  // para o rastreio, e o que faz o link ser compartilhável.
+  const u = new URL(location); u.searchParams.set('tab', name); history.replaceState({}, '', u);
   if(name === 'compras'    && !comprasLoaded)    loadCompras();
   if(name === 'avaliacoes' && !avaliacoesLoaded) loadAvaliacoes();
   if(name === 'entregas')                        abrirEntregas();
   else                                           pararPollingEntregas();
+}
+
+// Abre a aba pedida no link (?tab=entregas). Sem isso o cliente vindo do
+// checkout caía em "Meu Perfil" e tinha que achar o rastreio sozinho.
+function aplicarAbaDaURL(){
+  const t = new URLSearchParams(location.search).get('tab');
+  if(ABAS_PERFIL.includes(t) && t !== 'perfil') switchTab(t);
 }
 
 // ============================================================
@@ -547,20 +598,30 @@ async function loadEntregas(){
     return;
   }
 
-  // Só reconstrói os cards quando algo mudou de verdade (status, entregador, distância).
-  // A posição do entregador é atualizada direto no marcador, sem recriar o mapa.
+  // Só reconstrói os cards quando algo estrutural muda (status, entregador).
+  // A DISTÂNCIA ficava aqui e mudava a cada leitura de GPS — o card inteiro era
+  // refeito a cada 15s, recriando o mapa e fechando o código que o cliente
+  // tinha acabado de revelar. Agora ela é atualizada no lugar, como texto.
   const assinatura = pedidos.map(p =>
-    `${p.id}:${p.status}:${p.entregador ? p.entregador.id : ''}:${p.distancia_km}`).join('|');
+    `${p.id}:${p.status}:${p.entregador ? p.entregador.id : ''}`).join('|');
   if(assinatura !== assinaturaEntregas){
     assinaturaEntregas = assinatura;
     el.innerHTML = pedidos.map(cardRastreio).join('');
-  } else {
-    // mantém fresco o "posição há X" sem mexer no resto
-    pedidos.forEach(p=>{
-      const badge = document.querySelector(`#track-fresh-${p.id}`);
-      if(badge && p.entregador_local) badge.textContent = `posição ${tempoRelativo(p.entregador_local.atualizado_em)}`;
-    });
   }
+
+  // O que muda toda hora é atualizado sem tocar no HTML do card
+  pedidos.forEach(p=>{
+    const badge = document.getElementById(`track-fresh-${p.id}`);
+    if(badge && p.entregador_local) badge.textContent = `posição ${tempoRelativo(p.entregador_local.atualizado_em)}`;
+
+    const dist = document.getElementById(`track-dist-${p.id}`);
+    if(dist){
+      const mostra = p.distancia_km != null && p.status !== 'entregue';
+      dist.hidden = !mostra;
+      if(mostra) dist.textContent = `📍 O entregador está a cerca de ${p.distancia_km} km de você.`;
+    }
+  });
+
   pedidos.forEach(desenharMapaEntrega);
 }
 
@@ -597,8 +658,24 @@ function cardRastreio(p){
     </div>` : '';
 
   const temMapa = local || (p.entrega && p.entrega.lat != null);
-  const dist = (p.distancia_km != null && p.status !== 'entregue')
-    ? `<div class="track-dist">📍 O entregador está a cerca de ${p.distancia_km} km de você.</div>` : '';
+  // Nasce no HTML com id fixo e é preenchido por loadEntregas — assim a distância
+  // muda sem reconstruir o card (e sem recriar o mapa a cada 15 s).
+  const mostraDist = p.distancia_km != null && p.status !== 'entregue';
+  const dist = `<div class="track-dist" id="track-dist-${p.id}" ${mostraDist ? '' : 'hidden'}>${
+    mostraDist ? `📍 O entregador está a cerca de ${p.distancia_km} km de você.` : ''}</div>`;
+
+  // O código é a sua garantia: sem ele o entregador não finaliza e não recebe.
+  // Some depois de entregue — código usado não serve para mais nada e, exposto,
+  // só ensina que ele fica na tela para sempre.
+  const blocoCodigo = (p.codigo && p.status !== 'entregue') ? `
+    <div class="track-codigo">
+      <div class="track-codigo-lbl">Código de entrega — informe só ao entregador, na porta</div>
+      <div class="track-codigo-num">${escapeHtmlCli(p.codigo)}</div>
+      <div class="track-codigo-aviso">
+        Nunca passe este código por telefone ou mensagem antes de receber o pedido.
+        A entrega só é finalizada — e o entregador só recebe — depois que ele digitar o código.
+      </div>
+    </div>` : '';
 
   return `
     <div class="track-card">
@@ -615,10 +692,33 @@ function cardRastreio(p){
       <div class="track-itens">📦 ${itens || 'Itens do pedido'}</div>
       <div class="track-itens">🏠 Entregar em: ${escapeHtmlCli(formatEndereco(p.entrega))}</div>
       ${prec.exato ? '' : `<div class="track-aprox">⚠️ ${escapeHtmlCli(prec.texto)}. O entregador usa o endereço escrito para chegar até você.</div>`}
+      ${blocoCodigo}
       ${blocoEntregador}
       ${dist}
-      ${temMapa ? `<div class="track-map" id="map-${p.id}"></div>` : ''}
+      ${temMapa ? `
+        <div class="track-map-wrap">
+          <div class="track-map" id="map-${p.id}"></div>
+          ${(p.codigo && p.status !== 'entregue') ? `
+            <button type="button" class="mapa-codigo" id="mapa-codigo-${p.id}"
+                    aria-expanded="false" onclick="alternarCodigoMapa('${p.id}')"
+                    title="Mostrar o código de entrega">
+              <span class="mapa-codigo-lbl">código</span>
+              <span class="mapa-codigo-num" data-codigo="${escapeHtmlCli(p.codigo)}">••••</span>
+            </button>` : ''}
+        </div>` : ''}
     </div>`;
+}
+
+// Revela/esconde o código no canto do mapa. O número já veio no HTML (em
+// data-codigo) — o toque só troca a máscara, sem ida ao servidor.
+function alternarCodigoMapa(pedidoId){
+  const btn = document.getElementById('mapa-codigo-' + pedidoId);
+  if(!btn) return;
+  const el = btn.querySelector('.mapa-codigo-num');
+  const aberto = btn.getAttribute('aria-expanded') === 'true';
+  btn.setAttribute('aria-expanded', String(!aberto));
+  el.textContent = aberto ? '••••' : el.dataset.codigo;
+  btn.title = aberto ? 'Mostrar o código de entrega' : 'Ocultar o código';
 }
 
 // Cria (ou reaproveita) o mapa do pedido e move o marcador do entregador
