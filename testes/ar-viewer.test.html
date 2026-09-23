@@ -1,0 +1,74 @@
+<!DOCTYPE html><html lang="pt-BR"><head><meta charset="UTF-8"/>
+<script type="importmap">
+{"imports":{"three":"https://unpkg.com/three@0.161.0/build/three.module.js","three/addons/":"https://unpkg.com/three@0.161.0/examples/jsm/"}}
+</script>
+<style>:root{--bg:#0d0d0d;--card:#161616;--card2:#1c1c1c;--border:#2a2a2a;--text:#f0ece3;--muted:#888;--accent:#e8854a;--accent2:#f4c56a}
+body{margin:0;background:#0d0d0d;font:12px monospace;color:#bbb}
+#diag{position:fixed;left:0;top:0;z-index:99999;background:#000d;padding:6px;max-width:100%;white-space:pre-wrap}</style>
+</head><body><div id="diag">TESTE DO AR-VIEWER</div>
+<script src="../ar-viewer.js"></script>
+<script type="module">
+import * as THREE from 'three';
+const d=document.getElementById('diag');
+const log=m=>{d.textContent+='\n'+m;};
+window.onerror=e=>log('ERRO '+e);
+window.toast=m=>log('toast: '+m);
+
+// câmera falsa
+const cv=document.createElement('canvas'); cv.width=640; cv.height=480;
+const cx=cv.getContext('2d');
+(function p(){ cx.fillStyle='#3a6ea5'; cx.fillRect(0,0,640,480);
+  cx.fillStyle='#8a6d3b'; cx.fillRect(0,300,640,180); requestAnimationFrame(p); })();
+navigator.mediaDevices.getUserMedia=()=>Promise.resolve(cv.captureStream(30));
+
+const v = ARViewer.open({
+  id:'t1', nome:'Mesa de Teste', categoria:'Casa & Decoração',
+  imagem_url:null, largura:120, altura:75, comprimento:60
+});
+const esperar=ms=>new Promise(r=>setTimeout(r,ms));
+await esperar(3000);
+log('1) abriu. modo='+v.modo+' objeto visivel='+v.objeto.visible);
+
+// --- modo camera ---
+v.trocarModo('foto');
+await esperar(2500);
+log('2) modo='+v.modo+' cam.pos=('+v.camera.position.toArray().map(n=>n.toFixed(2))+')'
+    +' obj=('+v.objeto.position.toArray().map(n=>n.toFixed(2))+')');
+
+const btn=[...document.querySelectorAll('.arv-mini')].find(b=>b.textContent.indexOf('Ancorar')>=0);
+log('3) botao bussola presente='+!!btn);
+if(btn){
+  const posAntes=v.objeto.position.clone();
+  const qAntes=v.camera.quaternion.clone();
+  btn.click();
+  // espera o handler async terminar, sem depender de um tempo fixo
+  for(let i=0;i<40 && !v.bussola;i++) await esperar(25);
+  log('4) bussola ligada='+v.bussola);
+
+  // primeira leitura = calibracao (nao deve mexer na camera)
+  window.dispatchEvent(new DeviceOrientationEvent('deviceorientation',{alpha:0,beta:90,gamma:0}));
+  await esperar(60);
+  const qCalib=v.camera.quaternion.clone();
+  log('5) apos calibrar: camera girou '+(qAntes.angleTo(qCalib)*180/Math.PI).toFixed(2)+'° (esperado 0)');
+
+  // agora gira o "celular" 40° em alpha
+  window.dispatchEvent(new DeviceOrientationEvent('deviceorientation',{alpha:40,beta:90,gamma:0}));
+  await esperar(60);
+  const ang=qAntes.angleTo(v.camera.quaternion)*180/Math.PI;
+  const moveu=v.objeto.position.distanceTo(posAntes);
+  log('6) girou celular 40°: camera girou '+ang.toFixed(1)+'°, produto andou '+moveu.toFixed(4)+'m (esperado 0)');
+  log('   '+(ang>25&&ang<55?'OK — camera acompanha':'FORA — esperava ~40°')
+      +' / '+(moveu<0.001?'OK — produto ancorado':'FORA — produto se moveu'));
+
+  // desligar
+  btn.click(); await esperar(200);
+  log('7) desligou bussola='+v.bussola);
+  window.dispatchEvent(new DeviceOrientationEvent('deviceorientation',{alpha:180,beta:90,gamma:0}));
+  await esperar(60);
+  log('   apos desligar, evento novo nao deve mexer: '+
+      (Math.abs(v.camera.quaternion.angleTo(qAntes))<0.01?'OK':'FORA'));
+}
+v.trocarModo('sala'); await esperar(1500);
+log('8) voltou para sala. modo='+v.modo);
+document.title='PRONTO';
+</script></body></html>

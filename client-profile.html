@@ -4,15 +4,18 @@
   <meta charset="UTF-8"/>
   <meta name="viewport" content="width=device-width,initial-scale=1"/>
   <title>Meu Perfil – Mercado Local</title>
-  <link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,700&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet"/>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Merriweather:ital,wght@0,300;0,400;0,700;1,400;1,700&display=swap" rel="stylesheet"/>
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
   <style>
     *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
     :root{
+  --font-titulo:'Merriweather',Georgia,serif;--font-texto:'Inter',Arial,sans-serif;
       --bg:#0d0d0d;--card:#161616;--card2:#1c1c1c;--border:#2a2a2a;
-      --text:#f0ece3;--muted:#888;--accent:#e8854a;--accent2:#f4c56a;
+      --text:#f0ece3;--muted:#888;--accent:#e8854a;--accent-rgb:232,133,74;--accent-hover:#d9733c;--accent2:#f4c56a;
       --green:#5dcfa0;--red:#e85a5a;
     }
-    body{background:var(--bg);color:var(--text);font-family:'DM Sans',sans-serif;min-height:100vh}
+    body{background:var(--bg);color:var(--text);font-family:var(--font-texto);min-height:100vh}
     body::before{content:'';position:fixed;inset:0;pointer-events:none;z-index:50;
       background-image:url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.04'/%3E%3C/svg%3E");opacity:.4}
 
@@ -23,28 +26,28 @@
       border-bottom:1px solid var(--border);padding:1rem 2.5rem;
       display:flex;align-items:center;gap:1rem;
     }
-    .logo{font-family:'Fraunces',serif;font-size:1.4rem;color:var(--accent);text-decoration:none;flex-shrink:0}
+    .logo{font-family:var(--font-titulo);font-size:1.4rem;color:var(--accent);text-decoration:none;flex-shrink:0}
     .logo span{color:var(--text)}
     .nav-right{display:flex;align-items:center;gap:.8rem;margin-left:auto}
     .btn{
       display:inline-flex;align-items:center;gap:.5rem;
-      padding:.55rem 1.1rem;border-radius:8px;font-weight:600;font-size:.85rem;
-      cursor:pointer;border:none;font-family:'DM Sans',sans-serif;transition:all .2s;text-decoration:none;
+      padding:.6rem 1.25rem;border-radius:10px;font-weight:600;font-size:.9375rem;
+      cursor:pointer;border:none;font-family:var(--font-texto);transition:all .2s;text-decoration:none;
     }
     .btn-ghost{background:transparent;border:1px solid var(--border);color:var(--text)}
     .btn-ghost:hover{border-color:var(--accent);color:var(--accent)}
 
     /* MAIN */
-    .main{max-width:900px;margin:0 auto;padding:2.5rem;display:flex;flex-direction:column;gap:2rem}
+    .main{max-width:calc(var(--container) + 2 * var(--gutter));margin:0 auto;padding:2.5rem var(--gutter);display:flex;flex-direction:column;gap:2rem}
 
     /* TOPBAR */
     .topbar{display:flex;align-items:center;justify-content:space-between;margin-bottom:2rem}
-    .page-title{font-family:'Fraunces',serif;font-size:1.8rem;font-weight:700}
-    .page-sub{color:var(--muted);font-size:.9rem;margin-top:.2rem}
+    .page-title{font-family:var(--font-titulo);font-size:1.8rem;font-weight:700}
+    .page-sub{color:var(--muted);font-size:.9375rem;margin-top:.2rem}
     .back-btn{
       background:transparent;border:1px solid var(--border);color:var(--muted);
-      padding:.5rem 1rem;border-radius:8px;cursor:pointer;font-size:.9rem;
-      font-family:'DM Sans',sans-serif;transition:all .2s;text-decoration:none;
+      padding:.5rem 1rem;border-radius:8px;cursor:pointer;font-size:.9375rem;
+      font-family:var(--font-texto);transition:all .2s;text-decoration:none;
       display:inline-flex;align-items:center;gap:.4rem;
     }
     .back-btn:hover{border-color:var(--accent);color:var(--accent)}
@@ -62,29 +65,29 @@
       background-size:cover;background-position:center;background-repeat:no-repeat;
       border:3px solid var(--border);
     }
-    .profile-info h2{font-family:'Fraunces',serif;font-size:1.5rem;margin-bottom:.4rem}
-    .profile-info p{color:var(--muted);font-size:.95rem}
+    .profile-info h2{font-family:var(--font-titulo);font-size:1.5rem;margin-bottom:.4rem}
+    .profile-info p{color:var(--muted);font-size:1rem}
 
     /* FORM CARD */
     .form-card{background:var(--card);border:1px solid var(--border);border-radius:16px;padding:2rem;margin-bottom:2rem}
-    .form-card h3{font-family:'Fraunces',serif;font-size:1.2rem;font-weight:700;margin-bottom:1.5rem}
+    .form-card h3{font-family:var(--font-titulo);font-size:1.2rem;font-weight:700;margin-bottom:1.5rem}
     .form-grid{display:grid;grid-template-columns:1fr 1fr;gap:1rem}
     .form-grid.full{grid-template-columns:1fr}
     .form-group{display:flex;flex-direction:column;gap:.4rem}
     .form-group.span2{grid-column:span 2}
-    label{font-size:.78rem;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.04em}
+    label{font-size:.8125rem;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.04em}
     input,select,textarea{
       padding:.7rem 1rem;background:var(--bg);border:1px solid var(--border);
-      border-radius:9px;color:var(--text);font-family:'DM Sans',sans-serif;font-size:.92rem;
+      border-radius:9px;color:var(--text);font-family:var(--font-texto);font-size:.9375rem;
       outline:none;transition:border-color .2s,box-shadow .2s;
     }
-    input:focus,select:focus,textarea:focus{border-color:var(--accent);box-shadow:0 0 0 3px rgba(232,133,74,.1)}
+    input:focus,select:focus,textarea:focus{border-color:var(--accent);box-shadow:0 0 0 3px rgba(var(--accent-rgb),.1)}
     textarea{resize:vertical;min-height:80px}
     select option{background:var(--bg)}
 
     /* BUTTONS */
     .btn-primary{background:var(--accent);color:#fff}
-    .btn-primary:hover{background:#d9733c}
+    .btn-primary:hover{background:var(--accent-hover)}
     .btn-primary:disabled{background:var(--muted);cursor:not-allowed;opacity:.6}
     .btn-danger{background:transparent;border:1px solid rgba(232,90,90,.3);color:var(--red)}
     .btn-danger:hover{background:rgba(232,90,90,.1)}
@@ -94,7 +97,7 @@
     .toast{
       position:fixed;bottom:2rem;right:2rem;z-index:300;
       background:var(--card);border:1px solid var(--border);border-radius:10px;
-      padding:.75rem 1.2rem;font-size:.9rem;transform:translateY(20px);opacity:0;
+      padding:.75rem 1.2rem;font-size:.9375rem;transform:translateY(20px);opacity:0;
       transition:all .3s;pointer-events:none;
     }
     .toast.show{transform:translateY(0);opacity:1}
@@ -112,6 +115,7 @@
       .form-group.span2{grid-column:span 1}
     }
   </style>
+<link rel="stylesheet" href="site.css"/>
 </head>
 <body>
 
@@ -139,39 +143,107 @@
     <div class="profile-info">
       <h2 id="profile-name">Carregando…</h2>
       <p id="profile-email" style="margin-bottom:.5rem">email@exemplo.com</p>
-      <p style="color:var(--accent);font-size:.85rem">🛒 Cliente</p>
-      <button class="btn btn-ghost" style="margin-top:1rem;font-size:.8rem;padding:.3rem .8rem" onclick="document.getElementById('image-upload-client').click()">📷 Alterar foto</button>
+      <p style="color:var(--accent);font-size:.875rem">🛒 Cliente</p>
+      <button class="btn btn-ghost" style="margin-top:1rem;font-size:.875rem;padding:.3rem .8rem" onclick="document.getElementById('image-upload-client').click()">📷 Alterar foto</button>
       <input type="file" id="image-upload-client" style="display:none" accept="image/*" onchange="uploadProfileImage(event, 'client')"/>
     </div>
   </div>
 
   <style>
     .tabs{display:flex;gap:.4rem;margin-bottom:1.6rem;border-bottom:1px solid var(--border);flex-wrap:wrap}
-    .tab{background:none;border:none;color:var(--muted);font-family:'DM Sans',sans-serif;font-size:.9rem;font-weight:600;padding:.7rem 1rem;cursor:pointer;border-bottom:2px solid transparent;transition:all .2s}
+    .tab{background:none;border:none;color:var(--muted);font-family:var(--font-texto);font-size:.9375rem;font-weight:600;padding:.7rem 1rem;cursor:pointer;border-bottom:2px solid transparent;transition:all .2s}
     .tab:hover{color:var(--text)}
     .tab.active{color:var(--accent);border-bottom-color:var(--accent)}
     .tab-panel[hidden]{display:none}
     .rev-item{background:var(--card);border:1px solid var(--border);border-radius:14px;padding:1.1rem 1.3rem;margin-bottom:1rem}
     .rev-top{display:flex;justify-content:space-between;align-items:center;gap:1rem;flex-wrap:wrap}
     .rev-name{font-weight:600}
-    .rev-stars{color:var(--accent2);font-size:.95rem}
-    .rev-comment{color:var(--muted);font-size:.88rem;margin-top:.5rem;white-space:pre-wrap}
+    .rev-stars{color:var(--accent2);font-size:1rem}
+    .rev-comment{color:var(--muted);font-size:.9375rem;margin-top:.5rem;white-space:pre-wrap}
     .rev-actions{display:flex;gap:.5rem;margin-top:.7rem;flex-wrap:wrap}
-    .rev-btn{font-size:.8rem;padding:.4rem .8rem;border-radius:8px;border:1px solid var(--border);background:var(--card2);color:var(--text);cursor:pointer;font-family:'DM Sans',sans-serif;transition:all .2s}
+    .rev-btn{font-size:.875rem;padding:.4rem .8rem;border-radius:8px;border:1px solid var(--border);background:var(--card2);color:var(--text);cursor:pointer;font-family:var(--font-texto);transition:all .2s}
     .rev-btn:hover{border-color:var(--accent);color:var(--accent)}
     .rev-btn.danger:hover{border-color:var(--red);color:var(--red)}
     .rev-empty{color:var(--muted);text-align:center;padding:2.5rem}
     .star-row{margin:.6rem 0 .4rem;font-size:1.7rem;line-height:1}
     .star-pick{color:var(--border);cursor:pointer;user-select:none;transition:color .15s}
     .star-pick.on{color:var(--accent2)}
-    textarea.rev-input{width:100%;background:var(--card2);border:1px solid var(--border);border-radius:8px;color:var(--text);font-family:'DM Sans',sans-serif;padding:.6rem;font-size:.9rem;resize:vertical;min-height:60px;outline:none}
+    textarea.rev-input{width:100%;background:var(--card2);border:1px solid var(--border);border-radius:8px;color:var(--text);font-family:var(--font-texto);padding:.6rem;font-size:.9375rem;resize:vertical;min-height:60px;outline:none}
     textarea.rev-input:focus{border-color:var(--accent)}
+
+    /* ---- RASTREIO DE ENTREGA ---- */
+    .track-card{background:var(--card2);border:1px solid var(--border);border-radius:14px;
+      padding:1.1rem;margin-bottom:1rem}
+    .track-head{display:flex;align-items:flex-start;gap:.8rem;flex-wrap:wrap;margin-bottom:.8rem}
+    .track-id{font-family:var(--font-titulo);font-size:1rem}
+    .track-sub{color:var(--muted);font-size:.8125rem;margin-top:.2rem}
+    .track-total{margin-left:auto;font-family:var(--font-titulo);color:var(--accent2);font-size:1.1rem}
+    .track-status{display:inline-flex;align-items:center;gap:.35rem;padding:.28rem .65rem;
+      border-radius:20px;font-size:.8125rem;font-weight:600;border:1px solid currentColor}
+    /* barra de progresso da entrega */
+    .track-steps{display:flex;align-items:center;gap:.25rem;margin:1rem 0 .6rem}
+    .track-step{flex:1;text-align:center;font-size:.75rem;color:var(--muted);line-height:1.3}
+    .track-step .bola{width:15px;height:15px;border-radius:50%;background:var(--border);
+      margin:0 auto .32rem;border:2px solid var(--border);transition:all .3s}
+    .track-step.on .bola{background:var(--accent);border-color:var(--accent)}
+    .track-step.on{color:var(--text)}
+    .track-step.atual .bola{box-shadow:0 0 0 4px rgba(var(--accent-rgb),.2)}
+    .track-linha{height:2px;flex:1;background:var(--border);margin-bottom:1rem}
+    .track-linha.on{background:var(--accent)}
+    .track-itens{font-size:.875rem;color:var(--muted);line-height:1.6;margin:.5rem 0}
+    .track-entregador{display:flex;align-items:center;gap:.6rem;padding:.7rem .85rem;
+      background:rgba(var(--accent-rgb),.08);border:1px solid rgba(var(--accent-rgb),.25);
+      border-radius:10px;font-size:.875rem;margin-top:.6rem;flex-wrap:wrap}
+    .track-entregador a{color:var(--accent);text-decoration:none}
+    .track-fresh{font-size:.75rem;color:var(--muted);margin-left:auto}
+    .track-map{height:260px;border-radius:12px;border:1px solid var(--border);margin-top:.8rem;background:var(--card)}
+    .leaflet-container{background:#1a1a1a}
+
+    /* Código de entrega — o elemento mais importante do card enquanto o pedido
+       está a caminho, por isso é o de maior peso visual. */
+    .track-codigo{margin-top:.9rem;padding:1rem 1.1rem;border-radius:12px;
+      background:linear-gradient(150deg,rgba(93,207,160,.13),rgba(93,207,160,.03));
+      border:1px solid rgba(93,207,160,.35)}
+    .track-codigo-lbl{font-size:.75rem;color:var(--muted);text-transform:uppercase;
+      letter-spacing:.06em;font-weight:600}
+    .track-codigo-num{font-family:var(--font-titulo);font-size:2.4rem;font-weight:700;
+      color:var(--green);letter-spacing:.32em;text-indent:.32em;line-height:1.25;
+      font-variant-numeric:tabular-nums}
+    .track-codigo-aviso{font-size:.8125rem;color:var(--muted);line-height:1.55;margin-top:.3rem}
+
+    /* Código sobre o mapa. É enquanto assiste o entregador chegar que o cliente
+       precisa do número — e o bloco lá em cima já saiu da tela por causa da
+       rolagem. Nasce escondido (••••) para o código não ficar exposto a quem
+       estiver olhando por cima do ombro num ônibus. */
+    .track-map-wrap{position:relative}
+    .mapa-codigo{
+      position:absolute;top:10px;right:10px;z-index:500;
+      display:flex;flex-direction:column;align-items:center;gap:.1rem;
+      padding:.5rem .8rem;border-radius:11px;cursor:pointer;
+      background:rgba(13,13,13,.88);border:1px solid rgba(93,207,160,.5);
+      -webkit-backdrop-filter:blur(8px);backdrop-filter:blur(8px);
+      font-family:var(--font-texto);transition:border-color .2s,background .2s;
+    }
+    .mapa-codigo:hover{background:rgba(13,13,13,.95);border-color:var(--green)}
+    .mapa-codigo:focus-visible{outline:2px solid var(--accent2);outline-offset:2px}
+    .mapa-codigo-lbl{font-size:.75rem;color:var(--muted);text-transform:uppercase;
+      letter-spacing:.1em;font-weight:600;line-height:1}
+    .mapa-codigo-num{font-family:var(--font-titulo);font-size:1.35rem;font-weight:700;
+      color:var(--green);letter-spacing:.2em;text-indent:.2em;line-height:1.15;
+      font-variant-numeric:tabular-nums}
+    @media(max-width:520px){
+      .mapa-codigo{top:8px;right:8px;padding:.4rem .65rem}
+      .mapa-codigo-num{font-size:1.15rem}
+    }
+    .track-dist{font-size:.875rem;color:var(--accent2);margin-top:.5rem}
+    .track-aprox{font-size:.8125rem;color:var(--accent2);margin:.3rem 0 .1rem;line-height:1.5}
   </style>
 
   <!-- ABAS -->
   <div class="tabs" id="profile-tabs">
     <button class="tab active" data-tab="perfil" onclick="switchTab('perfil')">📋 Meu Perfil</button>
     <button class="tab" data-tab="compras" onclick="switchTab('compras')">🛒 Minhas Compras</button>
+    <button class="tab" data-tab="entregas" onclick="switchTab('entregas')">🛵 Rastrear Entregas</button>
     <button class="tab" data-tab="avaliacoes" onclick="switchTab('avaliacoes')">⭐ Minhas Avaliações</button>
   </div>
 
@@ -188,7 +260,7 @@
       <div class="form-group span2">
         <label>Email *</label>
         <input type="email" id="client-email" placeholder="seu@email.com" readonly style="opacity:.6;cursor:not-allowed;"/>
-        <small style="color:var(--muted);font-size:.75rem;margin-top:.3rem">Email não pode ser alterado</small>
+        <small style="color:var(--muted);font-size:.8125rem;margin-top:.3rem">Email não pode ser alterado</small>
       </div>
       <div class="form-group">
         <label>Telefone</label>
@@ -257,7 +329,7 @@
   <!-- DELETAR CONTA -->
   <div class="form-card" style="border-color:rgba(232,90,90,.3);background:rgba(232,90,90,.03)">
     <h3>⚠️ Zona de Risco</h3>
-    <p style="color:var(--muted);font-size:.92rem;margin-bottom:1.5rem">Esta ação não pode ser desfeita. Sua conta e todos os dados associados serão permanentemente deletados.</p>
+    <p style="color:var(--muted);font-size:.9375rem;margin-bottom:1.5rem">Esta ação não pode ser desfeita. Sua conta e todos os dados associados serão permanentemente deletados.</p>
     <div class="action-btns">
       <button class="btn btn-danger" onclick="deleteAccount()">Deletar minha conta</button>
     </div>
@@ -269,8 +341,19 @@
   <div id="tab-compras" class="tab-panel" hidden>
     <div class="form-card">
       <h3>🛒 Minhas Compras</h3>
-      <p style="color:var(--muted);font-size:.9rem;margin-bottom:1.2rem">Avalie os produtos que você comprou. Dê uma nota de 1 a 5 estrelas e, se quiser, deixe um comentário.</p>
+      <p style="color:var(--muted);font-size:.9375rem;margin-bottom:1.2rem">Avalie os produtos que você comprou. Dê uma nota de 1 a 5 estrelas e, se quiser, deixe um comentário.</p>
       <div id="compras-list"><p style="color:var(--muted)">Carregando…</p></div>
+    </div>
+  </div>
+
+  <!-- ABA: RASTREAR ENTREGAS -->
+  <div id="tab-entregas" class="tab-panel" hidden>
+    <div class="form-card">
+      <h3>🛵 Rastrear Entregas</h3>
+      <p style="color:var(--muted);font-size:.9375rem;margin-bottom:1.2rem">
+        Acompanhe seus pedidos: assim que um entregador aceitar, você vê o nome dele e a posição no mapa em tempo real.
+      </p>
+      <div id="entregas-list"><p style="color:var(--muted)">Carregando…</p></div>
     </div>
   </div>
 
@@ -278,7 +361,7 @@
   <div id="tab-avaliacoes" class="tab-panel" hidden>
     <div class="form-card">
       <h3>⭐ Minhas Avaliações</h3>
-      <p style="color:var(--muted);font-size:.9rem;margin-bottom:1.2rem">Todas as avaliações que você já fez.</p>
+      <p style="color:var(--muted);font-size:.9375rem;margin-bottom:1.2rem">Todas as avaliações que você já fez.</p>
       <div id="avaliacoes-list"><p style="color:var(--muted)">Carregando…</p></div>
     </div>
   </div>
@@ -298,7 +381,7 @@ document.addEventListener('DOMContentLoaded', async ()=>{
   
   // Verificar se é cliente
   if(currentUser.tipo !== 'cliente'){
-    window.location.href = 'profile.html';
+    window.location.href = currentUser.tipo === 'entregador' ? 'entregas.html' : 'profile.html';
     return;
   }
   
@@ -325,6 +408,8 @@ document.addEventListener('DOMContentLoaded', async ()=>{
   document.getElementById('client-cidade').value = currentUser.cidade || '';
   document.getElementById('client-estado').value = currentUser.estado || '';
   document.getElementById('client-cep').value = currentUser.cep || '';
+
+  aplicarAbaDaURL();     // ?tab=entregas — vindo do checkout, cai direto no rastreio
 });
 
 // ---- SALVAR PERFIL ----
@@ -463,11 +548,232 @@ async function deleteAccount(){
 let comprasLoaded = false, avaliacoesLoaded = false;
 const pickedStars = {};
 
+const ABAS_PERFIL = ['perfil','compras','entregas','avaliacoes'];
+
 function switchTab(name){
   document.querySelectorAll('#profile-tabs .tab').forEach(t => t.classList.toggle('active', t.dataset.tab === name));
   document.querySelectorAll('.tab-panel').forEach(p => p.hidden = (p.id !== 'tab-' + name));
+  // Guarda a aba na URL: é o que permite ao checkout mandar o cliente direto
+  // para o rastreio, e o que faz o link ser compartilhável.
+  const u = new URL(location); u.searchParams.set('tab', name); history.replaceState({}, '', u);
   if(name === 'compras'    && !comprasLoaded)    loadCompras();
   if(name === 'avaliacoes' && !avaliacoesLoaded) loadAvaliacoes();
+  if(name === 'entregas')                        abrirEntregas();
+  else                                           pararPollingEntregas();
+}
+
+// Abre a aba pedida no link (?tab=entregas). Sem isso o cliente vindo do
+// checkout caía em "Meu Perfil" e tinha que achar o rastreio sozinho.
+function aplicarAbaDaURL(){
+  const t = new URLSearchParams(location.search).get('tab');
+  if(ABAS_PERFIL.includes(t) && t !== 'perfil') switchTab(t);
+}
+
+// ============================================================
+//  RASTREIO DE ENTREGAS (lado do comprador)
+//  Enquanto a aba está aberta, consulta o servidor a cada 15s e move
+//  o marcador do entregador no mapa.
+// ============================================================
+
+let pollEntregas = null;
+let assinaturaEntregas = '';   // evita reescrever o HTML (e recriar os mapas) sem necessidade
+const mapasEntrega = {};       // pedidoId → { mapa, entregador, destino, linha }
+
+function abrirEntregas(){
+  loadEntregas();
+  if(!pollEntregas) pollEntregas = setInterval(()=>{ if(!document.hidden) loadEntregas(); }, 15000);
+}
+
+function pararPollingEntregas(){
+  if(pollEntregas){ clearInterval(pollEntregas); pollEntregas = null; }
+}
+
+async function loadEntregas(){
+  const el = document.getElementById('entregas-list');
+  let pedidos = [];
+  try { pedidos = await DB.getMyTracking(); }
+  catch { el.innerHTML = '<p style="color:var(--red)">Não foi possível carregar suas entregas.</p>'; return; }
+
+  if(!pedidos.length){
+    el.innerHTML = `<p style="color:var(--muted)">Você ainda não tem pedidos para rastrear.
+      Suas compras aparecem aqui assim que o pedido é criado.</p>`;
+    return;
+  }
+
+  // Só reconstrói os cards quando algo estrutural muda (status, entregador).
+  // A DISTÂNCIA ficava aqui e mudava a cada leitura de GPS — o card inteiro era
+  // refeito a cada 15s, recriando o mapa e fechando o código que o cliente
+  // tinha acabado de revelar. Agora ela é atualizada no lugar, como texto.
+  const assinatura = pedidos.map(p =>
+    `${p.id}:${p.status}:${p.entregador ? p.entregador.id : ''}`).join('|');
+  if(assinatura !== assinaturaEntregas){
+    assinaturaEntregas = assinatura;
+    el.innerHTML = pedidos.map(cardRastreio).join('');
+  }
+
+  // O que muda toda hora é atualizado sem tocar no HTML do card
+  pedidos.forEach(p=>{
+    const badge = document.getElementById(`track-fresh-${p.id}`);
+    if(badge && p.entregador_local) badge.textContent = `posição ${tempoRelativo(p.entregador_local.atualizado_em)}`;
+
+    const dist = document.getElementById(`track-dist-${p.id}`);
+    if(dist){
+      const mostra = p.distancia_km != null && p.status !== 'entregue';
+      dist.hidden = !mostra;
+      if(mostra) dist.textContent = `📍 O entregador está a cerca de ${p.distancia_km} km de você.`;
+    }
+  });
+
+  pedidos.forEach(desenharMapaEntrega);
+}
+
+function cardRastreio(p){
+  const st = entregaLabel(p.status);
+  const etapas = [
+    { k:'aguardando', txt:'Pedido feito' },
+    { k:'aceito',     txt:'Entregador designado' },
+    { k:'a_caminho',  txt:'Saiu para entrega' },
+    { k:'entregue',   txt:'Entregue' }
+  ];
+  const idx = etapas.findIndex(e => e.k === p.status);
+
+  const passos = etapas.map((e,i)=>`
+    ${i ? `<div class="track-linha ${i <= idx ? 'on' : ''}"></div>` : ''}
+    <div class="track-step ${i <= idx ? 'on' : ''} ${i === idx ? 'atual' : ''}">
+      <div class="bola"></div>${e.txt}
+    </div>`).join('');
+
+  const itens = (p.itens || [])
+    .map(i => `${i.qty}× ${escapeHtmlCli(i.nome)}`).join(' · ');
+
+  const prec = precisaoEntrega(p.entrega);
+  const ent = p.entregador;
+  const local = p.entregador_local;
+  const blocoEntregador = ent ? `
+    <div class="track-entregador">
+      <span>🛵</span>
+      <div>
+        <b>${escapeHtmlCli(ent.nome || 'Entregador')}</b> está cuidando da sua entrega
+        ${ent.telefone ? `<div><a href="tel:${escapeHtmlCli(ent.telefone)}">${escapeHtmlCli(ent.telefone)}</a></div>` : ''}
+      </div>
+      ${local ? `<span class="track-fresh" id="track-fresh-${p.id}">posição ${tempoRelativo(local.atualizado_em)}</span>` : ''}
+    </div>` : '';
+
+  const temMapa = local || (p.entrega && p.entrega.lat != null);
+  // Nasce no HTML com id fixo e é preenchido por loadEntregas — assim a distância
+  // muda sem reconstruir o card (e sem recriar o mapa a cada 15 s).
+  const mostraDist = p.distancia_km != null && p.status !== 'entregue';
+  const dist = `<div class="track-dist" id="track-dist-${p.id}" ${mostraDist ? '' : 'hidden'}>${
+    mostraDist ? `📍 O entregador está a cerca de ${p.distancia_km} km de você.` : ''}</div>`;
+
+  // O código é a sua garantia: sem ele o entregador não finaliza e não recebe.
+  // Some depois de entregue — código usado não serve para mais nada e, exposto,
+  // só ensina que ele fica na tela para sempre.
+  const blocoCodigo = (p.codigo && p.status !== 'entregue') ? `
+    <div class="track-codigo">
+      <div class="track-codigo-lbl">Código de entrega — informe só ao entregador, na porta</div>
+      <div class="track-codigo-num">${escapeHtmlCli(p.codigo)}</div>
+      <div class="track-codigo-aviso">
+        Nunca passe este código por telefone ou mensagem antes de receber o pedido.
+        A entrega só é finalizada — e o entregador só recebe — depois que ele digitar o código.
+      </div>
+    </div>` : '';
+
+  return `
+    <div class="track-card">
+      <div class="track-head">
+        <div>
+          <div class="track-id">Pedido #${p.id.slice(0,6).toUpperCase()}</div>
+          <div class="track-sub">${p.criado_em ? new Date(p.criado_em).toLocaleString('pt-BR') : ''}</div>
+          <div style="margin-top:.5rem"><span class="track-status" style="color:${st.cor}">${st.icone} ${st.texto}</span></div>
+        </div>
+        <div class="track-total">${formatPrice(p.total)}</div>
+      </div>
+
+      <div class="track-steps">${passos}</div>
+      <div class="track-itens">📦 ${itens || 'Itens do pedido'}</div>
+      <div class="track-itens">🏠 Entregar em: ${escapeHtmlCli(formatEndereco(p.entrega))}</div>
+      ${prec.exato ? '' : `<div class="track-aprox">⚠️ ${escapeHtmlCli(prec.texto)}. O entregador usa o endereço escrito para chegar até você.</div>`}
+      ${blocoCodigo}
+      ${blocoEntregador}
+      ${dist}
+      ${temMapa ? `
+        <div class="track-map-wrap">
+          <div class="track-map" id="map-${p.id}"></div>
+          ${(p.codigo && p.status !== 'entregue') ? `
+            <button type="button" class="mapa-codigo" id="mapa-codigo-${p.id}"
+                    aria-expanded="false" onclick="alternarCodigoMapa('${p.id}')"
+                    title="Mostrar o código de entrega">
+              <span class="mapa-codigo-lbl">código</span>
+              <span class="mapa-codigo-num" data-codigo="${escapeHtmlCli(p.codigo)}">••••</span>
+            </button>` : ''}
+        </div>` : ''}
+    </div>`;
+}
+
+// Revela/esconde o código no canto do mapa. O número já veio no HTML (em
+// data-codigo) — o toque só troca a máscara, sem ida ao servidor.
+function alternarCodigoMapa(pedidoId){
+  const btn = document.getElementById('mapa-codigo-' + pedidoId);
+  if(!btn) return;
+  const el = btn.querySelector('.mapa-codigo-num');
+  const aberto = btn.getAttribute('aria-expanded') === 'true';
+  btn.setAttribute('aria-expanded', String(!aberto));
+  el.textContent = aberto ? '••••' : el.dataset.codigo;
+  btn.title = aberto ? 'Mostrar o código de entrega' : 'Ocultar o código';
+}
+
+// Cria (ou reaproveita) o mapa do pedido e move o marcador do entregador
+function desenharMapaEntrega(p){
+  const el = document.getElementById('map-' + p.id);
+  if(!el || typeof L === 'undefined') return;
+
+  const destino = (p.entrega && p.entrega.lat != null)
+    ? { lat: p.entrega.lat, lng: p.entrega.lng } : null;
+  const ent = p.entregador_local;
+  if(!destino && !ent) return;
+
+  // O innerHTML foi reescrito no refresh: o mapa antigo perdeu o container
+  let ref = mapasEntrega[p.id];
+  if(ref && ref.mapa.getContainer() !== el){ ref.mapa.remove(); ref = null; }
+
+  if(!ref){
+    const centro = ent || destino;
+    const mapa = L.map(el, { zoomControl:true, scrollWheelZoom:false }).setView([centro.lat, centro.lng], 14);
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+      attribution:'© OpenStreetMap', maxZoom:19
+    }).addTo(mapa);
+    ref = mapasEntrega[p.id] = { mapa, entregador:null, destino:null, linha:null };
+  }
+
+  if(destino){
+    if(!ref.destino){
+      ref.destino = L.circleMarker([destino.lat, destino.lng], {
+        radius:9, color:'#5dcfa0', fillColor:'#5dcfa0', fillOpacity:.9, weight:3
+      }).addTo(ref.mapa).bindPopup('Seu endereço');
+    } else ref.destino.setLatLng([destino.lat, destino.lng]);
+  }
+
+  if(ent){
+    if(!ref.entregador){
+      ref.entregador = L.circleMarker([ent.lat, ent.lng], {
+        radius:9, color:'#e8854a', fillColor:'#e8854a', fillOpacity:.9, weight:3
+      }).addTo(ref.mapa).bindPopup('Entregador');
+    } else ref.entregador.setLatLng([ent.lat, ent.lng]);
+  }
+
+  if(ent && destino){
+    const pontos = [[ent.lat, ent.lng],[destino.lat, destino.lng]];
+    if(!ref.linha) ref.linha = L.polyline(pontos, { color:'#f4c56a', weight:2, dashArray:'6 6' }).addTo(ref.mapa);
+    else ref.linha.setLatLngs(pontos);
+    ref.mapa.fitBounds(pontos, { padding:[35,35], maxZoom:16 });
+  }
+  ref.mapa.invalidateSize();
+}
+
+function escapeHtmlCli(s){
+  return String(s ?? '').replace(/[&<>"']/g, c =>
+    ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 }
 
 function starRow(pid, val){
@@ -524,7 +830,7 @@ async function loadAvaliacoes(){
     <div class="rev-item">
       <div class="rev-top">
         <div class="rev-name">${r.produto_nome || 'Produto'}</div>
-        <div class="rev-stars">${starsText(r.nota)} <span style="color:var(--muted);font-size:.8rem">${(r.nota||0).toFixed(1)}</span></div>
+        <div class="rev-stars">${starsText(r.nota)} <span style="color:var(--muted);font-size:.875rem">${(r.nota||0).toFixed(1)}</span></div>
       </div>
       ${r.comentario ? `<div class="rev-comment">${r.comentario}</div>` : ''}
       <div class="rev-actions"><button class="rev-btn danger" onclick="removeReview('${r.produto_id}')">Remover</button></div>

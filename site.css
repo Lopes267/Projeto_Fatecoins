@@ -1,0 +1,97 @@
+/* ============================================================
+   site.css — padrão visual comum a todas as páginas
+   Carregado por ÚLTIMO no <head>: sobrescreve o <style> de cada
+   página só no que precisa ser igual em todo o site.
+
+   • Container: conteúdo limitado a 1140px e centralizado. Faixas
+     (nav, seções) continuam com fundo na largura toda; só o recuo
+     lateral cresce — use padding-inline:var(--pad-faixa).
+   • Botões: cor sólida própria (--btn-bg), separada do --accent.
+     O laranja da marca (#e8854a) é ótimo como TEXTO no fundo escuro
+     (7,3:1), mas com texto branco em cima dá só 2,7:1. O botão usa
+     um laranja queimado que passa no WCAG AA (4,9:1; hover 6,5:1).
+   ============================================================ */
+
+:root{
+  --container:1140px;
+  --gutter:2rem;
+  /* Recuo de uma faixa de largura total: nunca menor que o gutter,
+     e grande o bastante para o conteúdo ficar em 1140px */
+  --pad-faixa:max(var(--gutter), calc((100% - var(--container)) / 2));
+
+  --btn-bg:#b8521a;
+  --btn-bg-hover:#9c4413;
+  --btn-fg:#fff;
+}
+/* No modo claro a marca é verde; o verde do botão também passa no AA (5,4:1) */
+body.a11y-light{
+  --btn-bg:#1a7a43;
+  --btn-bg-hover:#146236;
+}
+/* No claro o --green escurece (ver accessibility.js): letra preta em cima deixa de ler */
+body.a11y-light .btn-green{color:#fff}
+@media(max-width:768px){
+  :root{--gutter:1.25rem}
+}
+
+/* ---------- Container ---------- */
+nav{padding-left:var(--pad-faixa);padding-right:var(--pad-faixa)}
+
+/* ---------- Barra de navegação ----------
+   O fundo era um preto fixo em cada página e não acompanhava o modo claro:
+   a letra escurecia e sumia na barra escura. Agora o fundo vem do tema.
+   No claro a barra é branca, destacada do bege da página, e a letra é
+   quase preta (16:1). */
+:root{
+  --nav-bg:rgba(13,13,13,.9);
+  --nav-bg-leve:rgba(10,10,10,.7);     /* home antes de rolar */
+  --nav-hover:rgba(255,255,255,.05);
+}
+body.a11y-light{
+  --nav-bg:rgba(255,255,255,.94);
+  --nav-bg-leve:rgba(255,255,255,.8);
+  --nav-hover:rgba(31,27,22,.05);
+}
+nav,nav.scrolled{background:var(--nav-bg)}
+#main-nav:not(.scrolled){background:var(--nav-bg-leve)}
+body.a11y-light nav{border-bottom-color:var(--border);box-shadow:0 1px 10px rgba(64,50,35,.06)}
+.nav-links a:hover{background:var(--nav-hover)}
+/* Campo de busca: no claro ganha o bege da página para não se fundir com a barra branca */
+body.a11y-light .search-bar{background:var(--bg)}
+body.a11y-light .search-bar:focus-within{background:var(--card)}
+
+/* Outros painéis com fundo escuro fixo e texto do tema (que escurece no claro) */
+body.a11y-light .summary-panel{background:rgba(255,255,255,.55)}          /* checkout: resumo */
+body.a11y-light .processing-overlay{background:rgba(244,241,234,.96)}    /* checkout: processando */
+body.a11y-light .mapa-codigo{background:rgba(255,255,255,.92)}           /* perfil: código no mapa */
+body.a11y-light .mapa-codigo:hover{background:rgba(255,255,255,.98)}
+
+/* ---------- Tipografia ----------
+   Escala única: 12 · 13 · 14 · 15 · 16px para texto; títulos abaixo. */
+body{-webkit-text-size-adjust:100%;text-size-adjust:100%}
+.logo{font-size:1.4rem}
+.page-title,.page-head h1{font-size:2rem;line-height:1.2}
+.page-sub,.page-head p{font-size:1rem}
+.form-card h3,.products-header h3{font-size:1.25rem}
+input,select,textarea{font-size:1rem}   /* 16px também evita o zoom automático do iOS */
+
+/* ---------- Botões principais ---------- */
+.btn-primary,.btn-pay,.btn-checkout,.btn-buy,.ship-btn,.search-bar button,
+.btn-back:not(.btn-back-ghost){
+  background-color:var(--btn-bg);color:var(--btn-fg);
+}
+.btn-buy{border-color:var(--btn-bg)}
+.btn-primary:hover,.btn-pay:hover,.btn-checkout:hover,.btn-buy:hover,.ship-btn:hover,
+.search-bar button:hover,.btn-back:not(.btn-back-ghost):hover{
+  background-color:var(--btn-bg-hover);
+}
+.btn-buy:hover{border-color:var(--btn-bg-hover)}
+
+/* Botões de contorno que se preenchem no hover */
+.copy-btn:hover,.frete-detail-btn:hover{
+  background-color:var(--btn-bg);border-color:var(--btn-bg);color:var(--btn-fg);
+}
+
+/* Selos e avatares com letra branca sobre a cor da marca.
+   Só background-color: o avatar pode ter foto em background-image. */
+.cart-badge,.avatar,.avatar-sm,.profile-avatar{background-color:var(--btn-bg);color:var(--btn-fg)}

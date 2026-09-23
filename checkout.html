@@ -4,15 +4,19 @@
 <meta charset="UTF-8"/>
 <meta name="viewport" content="width=device-width,initial-scale=1"/>
 <title>Checkout – Mercado Local</title>
-<link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,700&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Merriweather:ital,wght@0,300;0,400;0,700;1,400;1,700&display=swap" rel="stylesheet"/>
+<!-- Mapa de confirmação do endereço de entrega -->
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 <style>
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
 :root{
+  --font-titulo:'Merriweather',Georgia,serif;--font-texto:'Inter',Arial,sans-serif;
   --bg:#0d0d0d;--card:#161616;--card2:#1c1c1c;--border:#2a2a2a;
-  --text:#f0ece3;--muted:#888;--accent:#e8854a;--accent2:#f4c56a;
+  --text:#f0ece3;--muted:#888;--accent:#e8854a;--accent-rgb:232,133,74;--accent-hover:#d9733c;--accent2:#f4c56a;
   --green:#5dcfa0;--red:#e85a5a;
 }
-body{background:var(--bg);color:var(--text);font-family:'DM Sans',sans-serif;min-height:100vh}
+body{background:var(--bg);color:var(--text);font-family:var(--font-texto);min-height:100vh}
 body::before{content:'';position:fixed;inset:0;pointer-events:none;z-index:0;
   background-image:url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.04'/%3E%3C/svg%3E");opacity:.4}
 
@@ -23,21 +27,26 @@ nav{
   border-bottom:1px solid var(--border);padding:1rem 2.5rem;
   display:flex;align-items:center;justify-content:space-between;
 }
-.logo{font-family:'Fraunces',serif;font-size:1.4rem;color:var(--accent);text-decoration:none}
+.logo{font-family:var(--font-titulo);font-size:1.4rem;color:var(--accent);text-decoration:none}
 .logo span{color:var(--text)}
-.nav-steps{display:flex;align-items:center;gap:.5rem;font-size:.82rem}
+.nav-steps{display:flex;align-items:center;gap:.5rem;font-size:.875rem}
 .step{
   padding:.3rem .75rem;border-radius:50px;border:1px solid var(--border);
   color:var(--muted);transition:all .2s;
 }
-.step.active{border-color:var(--accent);color:var(--accent);background:rgba(232,133,74,.08)}
+.step.active{border-color:var(--accent);color:var(--accent);background:rgba(var(--accent-rgb),.08)}
 .step.done{border-color:rgba(93,207,160,.35);color:var(--green);background:rgba(93,207,160,.05)}
-.step-sep{color:var(--border);font-size:.75rem;margin:0 .1rem}
+.step-sep{color:var(--border);font-size:.8125rem;margin:0 .1rem}
 
 /* LAYOUT */
 .checkout-layout{
   display:grid;grid-template-columns:420px 1fr;min-height:calc(100vh - 65px);
   position:relative;z-index:1;
+  max-width:var(--container);margin:0 auto;
+}
+/* Com sobra de tela, as bordas laterais fecham a coluna de 1140px */
+@media(min-width:1141px){
+  .checkout-layout{border-left:1px solid var(--border);border-right:1px solid var(--border)}
 }
 
 /* ORDER SUMMARY */
@@ -46,7 +55,7 @@ nav{
   background:rgba(16,16,16,.6);
 }
 .panel-label{
-  font-size:.7rem;font-weight:700;color:var(--muted);text-transform:uppercase;
+  font-size:.75rem;font-weight:700;color:var(--muted);text-transform:uppercase;
   letter-spacing:.12em;margin-bottom:1.5rem;
 }
 .summary-items{display:flex;flex-direction:column;gap:.7rem;margin-bottom:2rem}
@@ -55,73 +64,106 @@ nav{
   padding:.85rem;background:var(--card);border:1px solid var(--border);border-radius:12px;
   transition:border-color .2s;
 }
-.summary-item:hover{border-color:rgba(232,133,74,.2)}
+.summary-item:hover{border-color:rgba(var(--accent-rgb),.2)}
 .summary-item-img{
   width:50px;height:50px;border-radius:8px;background:var(--card2);
   overflow:hidden;flex-shrink:0;display:flex;align-items:center;justify-content:center;font-size:1.4rem;
 }
 .summary-item-info{flex:1;min-width:0}
-.summary-item-name{font-weight:600;font-size:.88rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.summary-item-qty{font-size:.75rem;color:var(--muted);margin-top:.15rem}
-.summary-item-price{font-family:'Fraunces',serif;color:var(--accent2);font-size:.95rem;flex-shrink:0}
+.summary-item-name{font-weight:600;font-size:.9375rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.summary-item-qty{font-size:.8125rem;color:var(--muted);margin-top:.15rem}
+.summary-item-price{font-family:var(--font-titulo);color:var(--accent2);font-size:1rem;flex-shrink:0}
 .summary-rows{margin-top:1.5rem;padding-top:1.5rem;border-top:1px solid var(--border)}
 .summary-row{
   display:flex;justify-content:space-between;align-items:center;
-  font-size:.88rem;margin-bottom:.6rem;
+  font-size:.9375rem;margin-bottom:.6rem;
 }
 .summary-row .lbl{color:var(--muted)}
 .summary-row.total{
   padding-top:1rem;margin-top:.4rem;border-top:1px solid var(--border);
   font-size:1rem;font-weight:700;
 }
-.summary-row.total .val{font-family:'Fraunces',serif;font-size:1.4rem;color:var(--accent2)}
-.free-tag{color:var(--green);font-weight:600;font-size:.82rem}
+.summary-row.total .val{font-family:var(--font-titulo);font-size:1.4rem;color:var(--accent2)}
+.free-tag{color:var(--green);font-weight:600;font-size:.875rem}
 
 /* FRETE / CEP */
 .ship-box{
   margin-top:1.5rem;padding:1.1rem;background:var(--card);
   border:1px solid var(--border);border-radius:12px;
 }
-.ship-label{font-size:.82rem;font-weight:600;margin-bottom:.7rem;display:flex;align-items:center;gap:.4rem}
+.ship-label{font-size:.875rem;font-weight:600;margin-bottom:.7rem;display:flex;align-items:center;gap:.4rem}
 .ship-input-row{display:flex;gap:.5rem}
 .ship-input-row input{
   flex:1;padding:.6rem .8rem;background:var(--card2);border:1px solid var(--border);
-  border-radius:8px;color:var(--text);font-family:'DM Sans',sans-serif;font-size:.9rem;
+  border-radius:8px;color:var(--text);font-family:var(--font-texto);font-size:.9375rem;
   outline:none;transition:border-color .2s;letter-spacing:.04em;
 }
 .ship-input-row input:focus{border-color:var(--accent)}
 .ship-input-row input::placeholder{color:rgba(136,136,136,.6)}
 .ship-btn{
   padding:.6rem 1.1rem;background:var(--accent);border:none;color:#fff;
-  border-radius:8px;font-family:'DM Sans',sans-serif;font-size:.85rem;font-weight:600;
+  border-radius:8px;font-family:var(--font-texto);font-size:.875rem;font-weight:600;
   cursor:pointer;transition:all .2s;flex-shrink:0;
 }
-.ship-btn:hover{background:#d9733c}
+.ship-btn:hover{background:var(--accent-hover)}
 .ship-btn:disabled{opacity:.6;cursor:wait}
 .ship-cep-link{
-  display:inline-block;margin-top:.5rem;font-size:.74rem;color:var(--muted);
+  display:inline-block;margin-top:.5rem;font-size:.75rem;color:var(--muted);
   text-decoration:underline;text-underline-offset:2px;
 }
 .ship-cep-link:hover{color:var(--accent)}
-.ship-result{margin-top:.85rem;font-size:.82rem;line-height:1.6;display:none}
+.ship-result{margin-top:.85rem;font-size:.875rem;line-height:1.6;display:none}
 .ship-result.show{display:block;animation:fadeUp .25s ease}
 .ship-result .ship-addr{color:var(--text);font-weight:600}
 .ship-result .ship-region{color:var(--muted)}
 .ship-result .ship-free{color:var(--green);font-weight:600}
-.ship-result .ship-eta{color:var(--muted);font-size:.78rem;margin-top:.2rem}
+.ship-result .ship-eta{color:var(--muted);font-size:.8125rem;margin-top:.2rem}
 .ship-progress{
   margin-top:.6rem;height:6px;border-radius:50px;background:var(--card2);
   border:1px solid var(--border);overflow:hidden;
 }
 .ship-progress > div{height:100%;background:linear-gradient(90deg,var(--accent),var(--accent2));transition:width .4s ease}
-.ship-hint{font-size:.76rem;color:var(--accent2);margin-top:.4rem}
-.ship-err{color:var(--red);font-size:.8rem}
+.ship-hint{font-size:.8125rem;color:var(--accent2);margin-top:.4rem}
+.ship-err{color:var(--red);font-size:.875rem}
+
+/* ENDEREÇO DE ENTREGA (o que o entregador enxerga) */
+.addr-box{margin-top:1rem;padding-top:1rem;border-top:1px dashed var(--border)}
+.addr-label{font-size:.875rem;font-weight:600;margin-bottom:.7rem}
+.addr-grid{display:grid;grid-template-columns:100px 1fr;gap:.5rem;margin-bottom:.5rem}
+.addr-box > input{margin-bottom:.5rem}
+.addr-hint{font-size:.75rem;color:var(--muted);line-height:1.5;margin-top:.15rem}
+.addr-box input{
+  width:100%;padding:.6rem .8rem;background:var(--card2);border:1px solid var(--border);
+  border-radius:8px;color:var(--text);font-family:var(--font-texto);font-size:.9375rem;
+  outline:none;transition:border-color .2s;
+}
+.addr-box input:focus{border-color:var(--accent)}
+.addr-box input::placeholder{color:rgba(136,136,136,.6)}
+.addr-gps-btn{
+  width:100%;margin-top:.55rem;padding:.55rem .8rem;background:transparent;
+  border:1px dashed var(--border);color:var(--muted);border-radius:8px;
+  font-family:var(--font-texto);font-size:.8125rem;cursor:pointer;transition:all .2s;text-align:left;
+}
+.addr-gps-btn:hover{border-color:var(--accent);color:var(--accent)}
+.addr-gps-status{font-size:.8125rem;margin-top:.4rem;color:var(--green)}
+.addr-gps-status.err{color:var(--red)}
+.addr-gps-status.warn{color:var(--accent2)}
+
+/* Mapa de confirmação do endereço */
+#addr-mapa{height:190px;border-radius:10px;border:1px solid var(--border);
+  margin-top:.6rem;background:var(--card2)}
+#addr-mapa .leaflet-container{background:#1a1a1a}
+.addr-mapa-dica{font-size:.75rem;color:var(--muted);margin-top:.4rem;line-height:1.5;
+  display:flex;align-items:center;gap:.5rem;flex-wrap:wrap}
+.addr-mini-btn{background:none;border:1px solid var(--border);border-radius:6px;
+  color:var(--muted);font:500 .75rem var(--font-texto);padding:.25rem .5rem;cursor:pointer}
+.addr-mini-btn:hover{border-color:var(--red);color:var(--red)}
 
 /* BOTÃO "POR LOJA" + POPUP DE FRETE */
 .frete-detail-btn{
   margin-left:.4rem;padding:.12rem .5rem;background:transparent;
   border:1px solid var(--accent);color:var(--accent);border-radius:50px;
-  font-family:'DM Sans',sans-serif;font-size:.7rem;font-weight:600;cursor:pointer;
+  font-family:var(--font-texto);font-size:.75rem;font-weight:600;cursor:pointer;
   transition:all .15s;vertical-align:middle;
 }
 .frete-detail-btn:hover{background:var(--accent);color:#fff}
@@ -141,10 +183,10 @@ nav{
   display:flex;align-items:center;justify-content:space-between;
   padding:1.2rem 1.4rem;border-bottom:1px solid var(--border);
 }
-.frete-modal-head h3{font-family:'Fraunces',serif;font-size:1.2rem;font-weight:700}
+.frete-modal-head h3{font-family:var(--font-titulo);font-size:1.2rem;font-weight:700}
 .frete-modal-close{
   background:var(--card2);border:1px solid var(--border);color:var(--muted);cursor:pointer;
-  width:30px;height:30px;border-radius:8px;font-size:.9rem;line-height:1;transition:all .2s;
+  width:30px;height:30px;border-radius:8px;font-size:.9375rem;line-height:1;transition:all .2s;
 }
 .frete-modal-close:hover{color:var(--text);border-color:var(--muted)}
 .frete-modal-body{padding:.6rem 1.4rem;max-height:50vh;overflow-y:auto}
@@ -153,31 +195,31 @@ nav{
   padding:.9rem 0;border-bottom:1px solid var(--border);
 }
 .frete-loja-row:last-child{border-bottom:none}
-.frete-loja-nome{font-weight:600;font-size:.92rem}
-.frete-loja-sub{font-size:.76rem;color:var(--muted);margin-top:.2rem}
-.frete-loja-hint{font-size:.74rem;color:var(--accent2);margin-top:.25rem}
-.frete-loja-val{font-family:'Fraunces',serif;color:var(--accent2);font-size:1.05rem;white-space:nowrap;flex-shrink:0}
+.frete-loja-nome{font-weight:600;font-size:.9375rem}
+.frete-loja-sub{font-size:.8125rem;color:var(--muted);margin-top:.2rem}
+.frete-loja-hint{font-size:.75rem;color:var(--accent2);margin-top:.25rem}
+.frete-loja-val{font-family:var(--font-titulo);color:var(--accent2);font-size:1.05rem;white-space:nowrap;flex-shrink:0}
 .frete-modal-total{
   display:flex;align-items:center;justify-content:space-between;
   padding:1.1rem 1.4rem;border-top:1px solid var(--border);background:var(--card2);
   font-weight:700;
 }
-.frete-modal-total span:last-child{font-family:'Fraunces',serif;font-size:1.25rem;color:var(--text)}
+.frete-modal-total span:last-child{font-family:var(--font-titulo);font-size:1.25rem;color:var(--text)}
 
 /* PAYMENT PANEL */
 .payment-panel{padding:2.5rem 3rem}
-.payment-panel h2{font-family:'Fraunces',serif;font-size:1.9rem;font-weight:700;letter-spacing:-.02em;margin-bottom:.3rem}
-.payment-panel .sub{color:var(--muted);font-size:.9rem;margin-bottom:2rem}
+.payment-panel h2{font-family:var(--font-titulo);font-size:1.9rem;font-weight:700;letter-spacing:-.02em;margin-bottom:.3rem}
+.payment-panel .sub{color:var(--muted);font-size:.9375rem;margin-bottom:2rem}
 
 /* PAYMENT TABS */
 .pay-tabs{display:flex;gap:.6rem;margin-bottom:2rem}
 .pay-tab{
   flex:1;padding:.7rem .5rem;border-radius:10px;border:1px solid var(--border);
-  background:transparent;color:var(--muted);cursor:pointer;font-family:'DM Sans',sans-serif;
-  font-size:.85rem;font-weight:600;transition:all .2s;text-align:center;
+  background:transparent;color:var(--muted);cursor:pointer;font-family:var(--font-texto);
+  font-size:.875rem;font-weight:600;transition:all .2s;text-align:center;
 }
 .pay-tab:hover{border-color:rgba(240,236,227,.25);color:var(--text)}
-.pay-tab.active{border-color:var(--accent);color:var(--accent);background:rgba(232,133,74,.07)}
+.pay-tab.active{border-color:var(--accent);color:var(--accent);background:rgba(var(--accent-rgb),.07)}
 
 /* PAYMENT CONTENT */
 .pay-content{display:none;animation:fadeUp .25s ease}
@@ -188,7 +230,7 @@ nav{
 .pix-timer{
   display:inline-flex;align-items:center;gap:.5rem;margin-bottom:1.5rem;
   background:rgba(244,197,106,.07);border:1px solid rgba(244,197,106,.2);
-  border-radius:50px;padding:.4rem 1.1rem;font-size:.82rem;color:var(--accent2);font-weight:600;
+  border-radius:50px;padding:.4rem 1.1rem;font-size:.875rem;color:var(--accent2);font-weight:600;
 }
 .qr-box{
   width:190px;height:190px;background:var(--card);border:1px solid var(--border);border-radius:16px;
@@ -201,26 +243,26 @@ nav{
   width:100%;max-width:360px;background:var(--card);border:1px solid var(--border);
   border-radius:10px;padding:.75rem 1rem;display:flex;align-items:center;gap:.8rem;margin-bottom:1rem;
 }
-.pix-key-txt{flex:1;font-size:.75rem;color:var(--muted);word-break:break-all;text-align:left;line-height:1.4}
+.pix-key-txt{flex:1;font-size:.8125rem;color:var(--muted);word-break:break-all;text-align:left;line-height:1.4}
 .copy-btn{
   padding:.4rem .85rem;background:transparent;border:1px solid var(--accent);
-  color:var(--accent);border-radius:6px;font-size:.78rem;font-weight:600;
-  cursor:pointer;font-family:'DM Sans',sans-serif;transition:all .15s;white-space:nowrap;flex-shrink:0;
+  color:var(--accent);border-radius:6px;font-size:.8125rem;font-weight:600;
+  cursor:pointer;font-family:var(--font-texto);transition:all .15s;white-space:nowrap;flex-shrink:0;
 }
 .copy-btn:hover{background:var(--accent);color:#fff}
-.pix-note{font-size:.78rem;color:var(--muted);text-align:center;max-width:320px;line-height:1.6}
+.pix-note{font-size:.8125rem;color:var(--muted);text-align:center;max-width:320px;line-height:1.6}
 
 /* CARD */
 .card-visual{
   background:linear-gradient(135deg,#1a1a2e 0%,#2a2a45 50%,#1e1e35 100%);
-  border:1px solid rgba(232,133,74,.12);border-radius:18px;
+  border:1px solid rgba(var(--accent-rgb),.12);border-radius:18px;
   padding:1.5rem 1.8rem;margin-bottom:2rem;
   position:relative;overflow:hidden;
   box-shadow:0 12px 40px rgba(0,0,0,.5);
 }
 .card-visual::before{
   content:'';position:absolute;top:-50px;right:-50px;
-  width:160px;height:160px;border-radius:50%;background:rgba(232,133,74,.06);
+  width:160px;height:160px;border-radius:50%;background:rgba(var(--accent-rgb),.06);
 }
 .card-visual::after{
   content:'';position:absolute;bottom:-40px;left:10px;
@@ -238,22 +280,22 @@ nav{
 .card-num-disp{
   font-size:1.3rem;letter-spacing:.2em;font-weight:600;
   margin-bottom:1.3rem;position:relative;z-index:1;
-  font-family:'DM Sans',sans-serif;color:#e0dbd0;
+  font-family:var(--font-texto);color:#e0dbd0;
 }
 .card-btm{display:flex;justify-content:space-between;position:relative;z-index:1}
-.card-lbl{font-size:.6rem;text-transform:uppercase;letter-spacing:.1em;color:rgba(240,236,227,.4);margin-bottom:.25rem}
-.card-val{font-size:.88rem;font-weight:600;text-transform:uppercase;letter-spacing:.05em;color:#e0dbd0}
+.card-lbl{font-size:.75rem;text-transform:uppercase;letter-spacing:.1em;color:rgba(240,236,227,.4);margin-bottom:.25rem}
+.card-val{font-size:.9375rem;font-weight:600;text-transform:uppercase;letter-spacing:.05em;color:#e0dbd0}
 
 .form-grid{display:grid;grid-template-columns:1fr 1fr;gap:1rem}
 .form-grid.full{grid-template-columns:1fr}
 .form-group{margin-bottom:1rem}
 .form-group label{
-  display:block;font-size:.72rem;font-weight:700;color:var(--muted);
+  display:block;font-size:.75rem;font-weight:700;color:var(--muted);
   margin-bottom:.4rem;text-transform:uppercase;letter-spacing:.07em;
 }
 .form-group input,.form-group select{
   width:100%;padding:.7rem .9rem;background:var(--card);border:1px solid var(--border);
-  border-radius:8px;color:var(--text);font-family:'DM Sans',sans-serif;font-size:.9rem;
+  border-radius:8px;color:var(--text);font-family:var(--font-texto);font-size:.9375rem;
   transition:border-color .2s;outline:none;
 }
 .form-group input::placeholder{color:rgba(136,136,136,.6)}
@@ -274,17 +316,17 @@ nav{
   height:64px;display:flex;gap:1.5px;align-items:stretch;
   margin-bottom:.9rem;justify-content:center;overflow:hidden;border-radius:3px;
 }
-.barcode-num-txt{font-size:.72rem;color:var(--muted);letter-spacing:.04em;font-family:monospace;line-height:1.8}
+.barcode-num-txt{font-size:.75rem;color:var(--muted);letter-spacing:.04em;font-family:monospace;line-height:1.8}
 .boleto-meta{
   display:grid;grid-template-columns:1fr 1fr;gap:.8rem;margin-bottom:1.5rem;
 }
 .boleto-field{
   background:var(--card);border:1px solid var(--border);border-radius:10px;padding:.85rem 1rem;
 }
-.boleto-field .bf-lbl{font-size:.7rem;color:var(--muted);text-transform:uppercase;letter-spacing:.07em;margin-bottom:.3rem}
-.boleto-field .bf-val{font-weight:600;font-size:.92rem}
+.boleto-field .bf-lbl{font-size:.75rem;color:var(--muted);text-transform:uppercase;letter-spacing:.07em;margin-bottom:.3rem}
+.boleto-field .bf-val{font-weight:600;font-size:.9375rem}
 .boleto-warn{
-  font-size:.79rem;color:rgba(244,197,106,.8);line-height:1.6;
+  font-size:.8125rem;color:rgba(244,197,106,.8);line-height:1.6;
   padding:.85rem 1rem;background:rgba(244,197,106,.05);
   border:1px solid rgba(244,197,106,.12);border-radius:9px;
 }
@@ -294,15 +336,15 @@ nav{
 .pay-btn-wrap{margin-top:2rem;border-top:1px solid var(--border);padding-top:1.5rem}
 .btn-pay{
   width:100%;padding:1rem;background:var(--accent);color:#fff;
-  border:none;border-radius:12px;font-family:'DM Sans',sans-serif;
+  border:none;border-radius:12px;font-family:var(--font-texto);
   font-size:1rem;font-weight:700;cursor:pointer;transition:all .2s;
   display:flex;align-items:center;justify-content:center;gap:.6rem;
   letter-spacing:.01em;
 }
-.btn-pay:hover{background:#d9733c;transform:translateY(-1px);box-shadow:0 6px 20px rgba(232,133,74,.3)}
+.btn-pay:hover{background:var(--accent-hover);transform:translateY(-1px);box-shadow:0 6px 20px rgba(var(--accent-rgb),.3)}
 .btn-pay:active{transform:translateY(0)}
 .safe-note{
-  text-align:center;font-size:.75rem;color:var(--muted);
+  text-align:center;font-size:.8125rem;color:var(--muted);
   margin-top:.8rem;display:flex;align-items:center;justify-content:center;gap:.4rem;
 }
 
@@ -320,8 +362,8 @@ nav{
   animation:spin .75s linear infinite;
 }
 @keyframes spin{to{transform:rotate(360deg)}}
-.proc-title{font-family:'Fraunces',serif;font-size:1.5rem}
-.proc-sub{color:var(--muted);font-size:.9rem}
+.proc-title{font-family:var(--font-titulo);font-size:1.5rem}
+.proc-sub{color:var(--muted);font-size:.9375rem}
 .proc-dots span{animation:blink 1.2s infinite;opacity:0}
 .proc-dots span:nth-child(1){animation-delay:0s}
 .proc-dots span:nth-child(2){animation-delay:.2s}
@@ -344,20 +386,39 @@ nav{
   animation:popIn .55s cubic-bezier(.34,1.56,.64,1) both;
 }
 @keyframes popIn{from{transform:scale(.2);opacity:0}to{transform:scale(1);opacity:1}}
-.success-title{font-family:'Fraunces',serif;font-size:2.2rem;color:var(--green);letter-spacing:-.02em}
-.success-txt{color:var(--muted);max-width:400px;line-height:1.7;font-size:.95rem}
+.success-title{font-family:var(--font-titulo);font-size:2.2rem;color:var(--green);letter-spacing:-.02em}
+.success-txt{color:var(--muted);max-width:400px;line-height:1.7;font-size:1rem}
 .order-chip{
   background:var(--card);border:1px solid var(--border);border-radius:10px;
-  padding:.75rem 1.6rem;font-family:monospace;font-size:.9rem;letter-spacing:.12em;
+  padding:.75rem 1.6rem;font-family:monospace;font-size:.9375rem;letter-spacing:.12em;
   color:var(--accent2);
 }
 .btn-back{
   padding:.75rem 2.2rem;background:var(--accent);color:#fff;
-  border:none;border-radius:10px;font-family:'DM Sans',sans-serif;
-  font-size:.95rem;font-weight:700;cursor:pointer;transition:all .2s;
+  border:none;border-radius:10px;font-family:var(--font-texto);
+  font-size:1rem;font-weight:700;cursor:pointer;transition:all .2s;
   text-decoration:none;display:inline-block;margin-top:.5rem;
 }
-.btn-back:hover{background:#d9733c;transform:translateY(-1px)}
+.btn-back:hover{background:var(--accent-hover);transform:translateY(-1px)}
+.btn-back-ghost{background:transparent;border:1px solid var(--border);color:var(--muted)}
+.btn-back-ghost:hover{background:transparent;border-color:var(--muted);color:var(--text)}
+.sucesso-acoes{display:flex;gap:.8rem;flex-wrap:wrap;justify-content:center;margin-top:1.4rem}
+
+/* Código de entrega na tela de sucesso — é a informação mais acionável do
+   momento, então tem o maior peso visual depois do "pagamento confirmado". */
+.sucesso-codigo{
+  margin:1.6rem auto 0;max-width:400px;padding:1.3rem 1.4rem;border-radius:16px;
+  background:linear-gradient(150deg,rgba(93,207,160,.15),rgba(93,207,160,.04));
+  border:1px solid rgba(93,207,160,.4);text-align:center;
+}
+.sucesso-codigo-lbl{font-size:.8125rem;color:var(--muted);text-transform:uppercase;
+  letter-spacing:.07em;font-weight:600}
+.sucesso-codigo-num{
+  font-family:var(--font-titulo);font-size:3rem;font-weight:700;color:var(--green);
+  letter-spacing:.3em;text-indent:.3em;line-height:1.3;font-variant-numeric:tabular-nums;
+}
+.sucesso-codigo-txt{font-size:.8125rem;color:var(--muted);line-height:1.6;margin-top:.4rem}
+.sucesso-codigo-txt b{color:var(--text)}
 .success-confetti{position:absolute;inset:0;pointer-events:none;overflow:hidden}
 .confetti-piece{
   position:absolute;width:8px;height:8px;border-radius:50%;
@@ -367,11 +428,17 @@ nav{
   0%{transform:translateY(-20px) rotate(0);opacity:1}
   100%{transform:translateY(110vh) rotate(720deg);opacity:0}
 }
+/* Aviso para quem ainda não entrou na conta */
+.login-aviso{
+  margin:-1.2rem 0 1.6rem;padding:.8rem 1rem;border-radius:10px;
+  background:rgba(var(--accent-rgb),.07);border:1px solid rgba(var(--accent-rgb),.22);
+  font-size:.9375rem;line-height:1.55;color:var(--text);
+}
 /* TOAST */
 .toast{
   position:fixed;bottom:2rem;right:2rem;z-index:600;
   background:var(--card);border:1px solid var(--border);border-radius:10px;
-  padding:.75rem 1.2rem;font-size:.9rem;transform:translateY(20px);opacity:0;
+  padding:.75rem 1.2rem;font-size:.9375rem;transform:translateY(20px);opacity:0;
   transition:all .3s;pointer-events:none;
 }
 .toast.show{transform:translateY(0);opacity:1}
@@ -381,7 +448,7 @@ nav{
 @keyframes fadeUp{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:translateY(0)}}
 
 @media(max-width:900px){
-  .checkout-layout{grid-template-columns:1fr}
+  .checkout-layout{grid-template-columns:minmax(0,1fr)}
   .summary-panel{border-right:none;border-bottom:1px solid var(--border)}
 }
 @media(max-width:640px){
@@ -392,6 +459,7 @@ nav{
   .boleto-meta{grid-template-columns:1fr}
 }
 </style>
+<link rel="stylesheet" href="site.css"/>
 </head>
 <body>
 
@@ -423,6 +491,37 @@ nav{
       <a class="ship-cep-link" href="https://buscacepinter.correios.com.br/app/endereco/index.php"
          target="_blank" rel="noopener">Não sei meu CEP</a>
       <div class="ship-result" id="ship-result"></div>
+
+      <!-- Endereço exato: é o que o entregador vai ver e para onde ele leva o pedido -->
+      <div class="addr-box">
+        <div class="addr-label">🏠 Onde o entregador deve entregar</div>
+        <input id="addr-logradouro" placeholder="Rua / Avenida" maxlength="90"/>
+        <div class="addr-grid">
+          <input id="addr-numero" placeholder="Número" maxlength="10"/>
+          <input id="addr-complemento" placeholder="Complemento (apto, bloco)" maxlength="60"/>
+        </div>
+        <input id="addr-bairro" placeholder="Bairro" maxlength="60"/>
+        <input id="addr-referencia" placeholder="Ponto de referência (opcional)" maxlength="80"/>
+        <div class="addr-hint" id="addr-hint">
+          Preenchemos rua e bairro pelo CEP — corrija se estiver diferente. O bairro é o que
+          mais ajuda o entregador a chegar perto.
+        </div>
+        <button type="button" class="addr-gps-btn" id="addr-gps-btn" onclick="usarMinhaLocalizacao()">
+          📍 Usar minha localização atual (deixa o mapa do entregador mais preciso)
+        </button>
+        <div class="addr-gps-status" id="addr-gps-status"></div>
+
+        <!-- Confirmação no mapa: só aparece quando há um ponto para confirmar.
+             É aqui que o cliente corrige um GPS que caiu na esquina errada. -->
+        <div id="addr-mapa-bloco" hidden>
+          <div id="addr-mapa"></div>
+          <div class="addr-mapa-dica">
+            Arraste o mapa ou toque nele para marcar exatamente a porta da sua casa.
+            <button type="button" class="addr-mini-btn" id="addr-mapa-limpar"
+                    onclick="descartarLocalizacao()">Não usar este ponto</button>
+          </div>
+        </div>
+      </div>
     </div>
 
     <div class="summary-rows">
@@ -439,6 +538,10 @@ nav{
   <div class="payment-panel">
     <h2>Pagamento</h2>
     <p class="sub">Escolha como deseja pagar</p>
+    <p class="login-aviso" id="login-aviso" hidden>
+      Você pode preencher tudo sem conta. Ao confirmar a compra, pedimos para entrar ou
+      criar sua conta — o carrinho e o endereço continuam aqui.
+    </p>
 
     <div class="pay-tabs">
       <button class="pay-tab active" onclick="switchPayTab('pix',this)">⚡ Pix</button>
@@ -515,7 +618,7 @@ nav{
           <option value="12">12× com juros (1,99%/mês)</option>
         </select>
       </div>
-      <div style="font-size:.8rem;color:var(--muted);text-align:right;margin-top:-.5rem" id="installment-note"></div>
+      <div style="font-size:.875rem;color:var(--muted);text-align:right;margin-top:-.5rem" id="installment-note"></div>
 
       <div class="pay-btn-wrap">
         <button class="btn-pay" onclick="processPayment()">💳 Pagar Agora</button>
@@ -579,29 +682,110 @@ nav{
   <div class="success-confetti" id="success-confetti"></div>
   <div class="success-ring">✓</div>
   <div class="success-title">Pagamento Confirmado!</div>
-  <p class="success-txt">Seu pedido foi recebido e está sendo preparado. Você receberá atualizações por e-mail.</p>
+  <p class="success-txt">Seu pedido foi recebido e está sendo preparado.</p>
   <div class="order-chip" id="order-chip">PEDIDO #000000</div>
-  <a href="marketplace.html" class="btn-back" onclick="clearCart()">← Continuar Comprando</a>
+
+  <!-- O código aparece aqui, no único momento em que temos a atenção total do
+       cliente. Antes ele só existia numa aba do perfil: o entregador chegava na
+       porta e ninguém sabia que havia um código. -->
+  <div class="sucesso-codigo" id="sucesso-codigo" hidden>
+    <div class="sucesso-codigo-lbl">Seu código de entrega</div>
+    <div class="sucesso-codigo-num" id="sucesso-codigo-num">····</div>
+    <p class="sucesso-codigo-txt">
+      <b>Anote ou tire um print.</b> Na hora da entrega, informe estes 4 dígitos
+      ao entregador — só com eles o pedido é finalizado. Nunca passe o código
+      antes de receber a mercadoria.
+    </p>
+    <p class="sucesso-codigo-txt" style="opacity:.75">
+      Ele fica sempre disponível em <b>Rastrear Entregas</b>, junto com o mapa do entregador.
+    </p>
+  </div>
+
+  <div class="sucesso-acoes">
+    <a href="client-profile.html?tab=entregas" class="btn-back">🛵 Acompanhar entrega</a>
+    <a href="marketplace.html" class="btn-back btn-back-ghost" onclick="clearCart()">← Continuar comprando</a>
+  </div>
 </div>
 
 <script src="app.js"></script>
 <script>
-let _cartItems = [];                  // cache em memória (espelho do Firebase)
+let _cartItems = [];                  // cache em memória
 function getCart(){ return _cartItems; }
 
-// Carrega o carrinho consultando o Firebase. Exige login (sem localStorage).
+// O checkout abre sem login: o cliente preenche CEP e endereço e vê o total.
+// A conta só é pedida no botão final (processPayment).
 async function loadCart(){
   if(!DB.currentUser()){
-    window.location.href = 'login.html';   // precisa estar logado p/ ver o carrinho
-    return [];
+    _cartItems = CarrinhoVisitante.get();
+    return _cartItems;
   }
-  try{ _cartItems = await DB.getCart(); }catch{ _cartItems = []; }
+  try{
+    await DB.juntarCarrinhoVisitante();   // itens escolhidos antes de entrar na conta
+    _cartItems = await DB.getCart();
+  }catch{ _cartItems = []; }
   return _cartItems;
 }
 
 function clearCart(){
   _cartItems = [];
+  CarrinhoVisitante.limpar();
   if(DB.currentUser()){ DB.clearCart().catch(()=>{}); }
+}
+
+// ---- Ida ao login no meio da compra ----
+// O que o cliente já digitou fica nesta aba enquanto ele entra na conta, e volta
+// preenchido. Dados do cartão nunca são guardados: ele digita de novo.
+const RASCUNHO_CHECKOUT = 'mp_checkout_rascunho';
+const ABAS_PAGAMENTO = ['pix','card','boleto'];
+
+function salvarRascunhoCheckout(){
+  const aba = document.querySelector('.pay-content.active');
+  const rascunho = {
+    ...getEnderecoEntrega(),
+    coords: coordsCliente,
+    aba: aba ? aba.id.replace('pay-','') : 'pix'
+  };
+  try{ sessionStorage.setItem(RASCUNHO_CHECKOUT, JSON.stringify(rascunho)); }catch{}
+}
+
+async function restaurarRascunhoCheckout(){
+  let r = null;
+  try{ r = JSON.parse(sessionStorage.getItem(RASCUNHO_CHECKOUT) || 'null'); }catch{}
+  if(!r) return;
+  try{ sessionStorage.removeItem(RASCUNHO_CHECKOUT); }catch{}
+
+  const preencher = (id, v) => { if(v) document.getElementById(id).value = v; };
+  preencher('addr-logradouro', r.logradouro);
+  preencher('addr-bairro', r.bairro);
+  preencher('addr-numero', r.numero);
+  preencher('addr-complemento', r.complemento);
+  preencher('addr-referencia', r.referencia);
+
+  if(r.coords){
+    coordsCliente = r.coords;
+    mostrarMapaEndereco();
+    const st = document.getElementById('addr-gps-status');
+    st.className = 'addr-gps-status';
+    st.textContent = '✓ Mantivemos o ponto que você marcou no mapa.';
+  }
+
+  const i = ABAS_PAGAMENTO.indexOf(r.aba);
+  if(i > 0) switchPayTab(r.aba, document.querySelectorAll('.pay-tab')[i]);
+
+  if(r.cep && r.cep.length === 8){
+    const cep = document.getElementById('cep-input');
+    cep.value = r.cep;
+    onCepInput(cep);
+    await calcularFrete();
+  }
+
+  if(DB.currentUser()){
+    toast(r.aba === 'card'
+      ? 'Conta conectada. Por segurança, digite os dados do cartão de novo.'
+      : 'Conta conectada. Confira o total e confirme a compra.');
+    document.querySelector('.pay-content.active .btn-pay')
+      ?.scrollIntoView({ behavior:'smooth', block:'center' });
+  }
 }
 
 function catEmoji(cat){
@@ -665,7 +849,7 @@ function updateTotals(){
 
   const freteEl = document.getElementById('frete-val');
   if(freteAtual === null){
-    freteEl.innerHTML = '<span style="color:var(--muted);font-size:.82rem">Calcule com seu CEP</span>';
+    freteEl.innerHTML = '<span style="color:var(--muted);font-size:.875rem">Calcule com seu CEP</span>';
   } else {
     const valTxt = freteAtual === 0 ? '<span class="free-tag">Grátis</span>' : formatPrice(freteAtual);
     // botão de detalhamento aparece quando há mais de uma loja no pedido
@@ -706,10 +890,40 @@ function closeFreteBreakdown(e){
 }
 
 // Máscara de CEP: 00000-000
+let cepPreenchido = '';   // último CEP já buscado, para não repetir a consulta
+
 function onCepInput(input){
   let v = input.value.replace(/\D/g,'').slice(0,8);
   if(v.length>5) v = v.slice(0,5)+'-'+v.slice(5);
   input.value = v;
+  // Mudou o CEP → invalida o frete já calculado (obriga a recalcular para o novo CEP)
+  if(freteAtual !== null){
+    freteAtual = null; freteBreakdown = null;
+    updateTotals();
+    const resultEl = document.getElementById('ship-result');
+    if(resultEl){ resultEl.className = 'ship-result'; resultEl.innerHTML = ''; }
+  }
+  const limpo = v.replace(/\D/g,'');
+  if(limpo.length === 8 && limpo !== cepPreenchido) preencherEndereco(limpo);
+}
+
+// Busca rua/bairro do CEP e preenche os campos — que continuam editáveis.
+// Só sobrescreve o que o cliente ainda não digitou.
+async function preencherEndereco(cep){
+  cepPreenchido = cep;
+  try{
+    const res = await fetch(`${API_URL}/api/cep/${cep}`);
+    const d = await res.json();
+    if(!d.ok) return;
+
+    const rua = document.getElementById('addr-logradouro');
+    const bairro = document.getElementById('addr-bairro');
+    if(d.logradouro && !rua.value.trim())    rua.value = d.logradouro;
+    if(d.bairro     && !bairro.value.trim()) bairro.value = d.bairro;
+
+    document.getElementById('addr-hint').textContent =
+      `${d.cidade || ''}${d.uf ? ' - ' + d.uf : ''} · confira a rua e o bairro; corrija se estiver diferente.`;
+  }catch{ /* sem internet: o cliente digita à mão */ }
 }
 
 async function calcularFrete(){
@@ -882,6 +1096,31 @@ function setBoletoDate(){
 
 // Process payment
 function processPayment(){
+  // Trava: exige CEP válido e frete calculado antes de finalizar a compra
+  const cep = document.getElementById('cep-input').value.replace(/\D/g,'');
+  if(cep.length !== 8 || freteAtual === null){
+    const resultEl = document.getElementById('ship-result');
+    resultEl.className = 'ship-result show';
+    resultEl.innerHTML = '<span class="ship-err">Informe seu CEP e clique em <strong>Calcular</strong> para ver o frete antes de finalizar a compra.</span>';
+    document.getElementById('cep-input').focus();
+    document.getElementById('cep-input').scrollIntoView({ behavior:'smooth', block:'center' });
+    toast('Calcule o frete com seu CEP antes de finalizar a compra.', 'error');
+    return;
+  }
+  // Sem número não há como o entregador achar o endereço
+  const numero = document.getElementById('addr-numero');
+  if(!numero.value.trim()){
+    toast('Informe o número do endereço para a entrega.', 'error');
+    numero.focus();
+    numero.scrollIntoView({ behavior:'smooth', block:'center' });
+    return;
+  }
+  // Tudo preenchido e o total calculado: só agora a compra precisa de uma conta
+  if(!DB.currentUser()){
+    salvarRascunhoCheckout();
+    window.location.href = 'login.html?voltar=checkout.html';
+    return;
+  }
   const overlay = document.getElementById('processing-overlay');
   overlay.classList.add('active');
   clearInterval(timerInterval);
@@ -891,17 +1130,192 @@ function processPayment(){
   }, 2200);
 }
 
-function showSuccess(){
-  const orderNum = 'PEDIDO #' + Math.floor(100000+Math.random()*900000);
-  document.getElementById('order-chip').textContent = orderNum;
-  document.getElementById('success-screen').classList.add('active');
-  // Registra a compra (libera a avaliação desses produtos) e então esvazia o carrinho
-  const itensComprados = getCart();
-  if (DB.currentUser() && itensComprados.length) {
-    DB.createOrder(itensComprados).catch(()=>{});
+// ============================================================
+//  Localização do cliente
+//
+//  Um navegador de computador não tem GPS: ele estima pela rede/IP e erra de
+//  centenas de metros a dezenas de quilômetros. Antes, essa estimativa era
+//  enviada como "ponto exato" e o servidor confiava nela mais do que no CEP —
+//  ou seja, clicar em "usar minha localização" no PC PIORAVA a entrega.
+//
+//  Agora toda leitura carrega a margem de erro (accuracy), o mapa mostra esse
+//  raio, e o cliente pode tocar no mapa para marcar a porta de casa. Um ponto
+//  posto a dedo vale mais que qualquer GPS.
+// ============================================================
+const GPS_BOM_M  = 100;    // até 100 m: celular com GPS, ponto confiável
+const GPS_RUIM_M = 1000;   // acima de 1 km: não vale como localização
+
+// { lat, lng, precisao_m, origem:'gps'|'manual' }
+let coordsCliente = null;
+let mapaAddr = null, pinoAddr = null, raioAddr = null;
+
+function usarMinhaLocalizacao(){
+  const el = document.getElementById('addr-gps-status');
+  if(!navigator.geolocation){
+    el.className = 'addr-gps-status err';
+    el.textContent = 'Seu navegador não suporta geolocalização. Usaremos o endereço do CEP.';
+    return;
   }
-  clearCart();   // pedido concluído → esvazia o carrinho do cliente no servidor
+  el.className = 'addr-gps-status';
+  el.textContent = 'Buscando sua localização…';
+  navigator.geolocation.getCurrentPosition(
+    (pos)=>{
+      const m = pos.coords.accuracy ? Math.round(pos.coords.accuracy) : null;
+      coordsCliente = {
+        lat: pos.coords.latitude, lng: pos.coords.longitude,
+        precisao_m: m, origem: 'gps'
+      };
+      if(m !== null && m > GPS_RUIM_M){
+        // Não descartamos calado: mostramos no mapa e explicamos por que não serve
+        el.className = 'addr-gps-status err';
+        el.textContent = `Localização imprecisa (margem de ±${fmtM(m)}) — provavelmente veio da internet, `
+          + 'não do GPS. Toque no mapa abaixo para marcar sua casa, ou deixe que usaremos o endereço do CEP.';
+      } else if(m !== null && m > GPS_BOM_M){
+        el.className = 'addr-gps-status warn';
+        el.textContent = `Localização registrada com margem de ±${fmtM(m)}. `
+          + 'Confira no mapa e ajuste se o ponto não estiver na sua casa.';
+      } else {
+        el.className = 'addr-gps-status';
+        el.textContent = '✓ Localização registrada' + (m !== null ? ` (±${fmtM(m)})` : '')
+          + ' — confirme no mapa se o ponto está certo.';
+      }
+      mostrarMapaEndereco();
+    },
+    (err)=>{
+      el.className = 'addr-gps-status err';
+      el.textContent = err.code === 1
+        ? 'Permissão negada. Sem problema: usaremos o endereço do CEP.'
+        : 'Não foi possível obter sua localização. Usaremos o endereço do CEP.';
+    },
+    // maximumAge:0 evita reaproveitar uma posição antiga e errada que o navegador guardou
+    { enableHighAccuracy: true, maximumAge: 0, timeout: 15000 }
+  );
+}
+
+const fmtM = m => m >= 1000
+  ? new Intl.NumberFormat('pt-BR',{maximumFractionDigits:1}).format(m/1000) + ' km'
+  : Math.round(m) + ' m';
+
+function mostrarMapaEndereco(){
+  if(!coordsCliente || typeof L === 'undefined') return;
+  const bloco = document.getElementById('addr-mapa-bloco');
+  bloco.hidden = false;
+
+  if(!mapaAddr){
+    mapaAddr = L.map('addr-mapa', { zoomControl:true, attributionControl:false })
+                .setView([coordsCliente.lat, coordsCliente.lng], 16);
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', { maxZoom:19 }).addTo(mapaAddr);
+    // Tocar no mapa fixa o ponto à mão — a saída definitiva quando o navegador erra
+    mapaAddr.on('click', e => marcarPontoManual(e.latlng));
+  }
+  mapaAddr.invalidateSize();
+  mapaAddr.setView([coordsCliente.lat, coordsCliente.lng], mapaAddr.getZoom() < 15 ? 16 : mapaAddr.getZoom());
+
+  if(!pinoAddr){
+    pinoAddr = L.circleMarker([coordsCliente.lat, coordsCliente.lng], {
+      radius:9, color:'#e8854a', fillColor:'#e8854a', fillOpacity:.9, weight:3
+    }).addTo(mapaAddr);
+  } else {
+    pinoAddr.setLatLng([coordsCliente.lat, coordsCliente.lng]);
+  }
+  pinoAddr.bindPopup(coordsCliente.origem === 'manual'
+    ? 'Ponto marcado por você'
+    : 'Onde o navegador acha que você está');
+
+  // O círculo é a margem de erro desenhada: se cobre meio bairro, dá para ver
+  // na hora que o ponto não serve e corrigir com um toque.
+  const raio = coordsCliente.origem === 'manual' ? 0 : (coordsCliente.precisao_m || 0);
+  if(raio > 30){
+    if(!raioAddr){
+      raioAddr = L.circle([coordsCliente.lat, coordsCliente.lng], {
+        radius:raio, color:'#e8854a', weight:1, fillColor:'#e8854a', fillOpacity:.08
+      }).addTo(mapaAddr);
+    } else {
+      raioAddr.setLatLng([coordsCliente.lat, coordsCliente.lng]).setRadius(raio);
+    }
+  } else if(raioAddr){
+    mapaAddr.removeLayer(raioAddr); raioAddr = null;
+  }
+}
+
+function marcarPontoManual(latlng){
+  coordsCliente = { lat: latlng.lat, lng: latlng.lng, precisao_m: null, origem: 'manual' };
+  const el = document.getElementById('addr-gps-status');
+  el.className = 'addr-gps-status';
+  el.textContent = '✓ Ponto marcado por você — é exatamente aqui que o entregador vai chegar.';
+  mostrarMapaEndereco();
+}
+
+function descartarLocalizacao(){
+  coordsCliente = null;
+  document.getElementById('addr-mapa-bloco').hidden = true;
+  const el = document.getElementById('addr-gps-status');
+  el.className = 'addr-gps-status';
+  el.textContent = 'Sem ponto no mapa — usaremos o endereço escrito acima para localizar a entrega.';
+}
+
+// Endereço enviado junto com o pedido (o servidor completa o resto pelo CEP e pelo cadastro).
+// precisao_m e origem são o que deixam o servidor decidir entre o GPS e o CEP.
+function getEnderecoEntrega(){
+  return {
+    cep:         document.getElementById('cep-input').value.replace(/\D/g,''),
+    logradouro:  document.getElementById('addr-logradouro').value.trim()  || null,
+    bairro:      document.getElementById('addr-bairro').value.trim()      || null,
+    numero:      document.getElementById('addr-numero').value.trim()      || null,
+    complemento: document.getElementById('addr-complemento').value.trim() || null,
+    referencia:  document.getElementById('addr-referencia').value.trim()  || null,
+    lat:        coordsCliente ? coordsCliente.lat        : null,
+    lng:        coordsCliente ? coordsCliente.lng        : null,
+    precisao_m: coordsCliente ? coordsCliente.precisao_m : null,
+    origem:     coordsCliente ? coordsCliente.origem     : null
+  };
+}
+
+async function showSuccess(){
+  document.getElementById('success-screen').classList.add('active');
   spawnConfetti();
+
+  const itensComprados = getCart();
+
+  // Esvazia o carrinho JÁ, antes de esperar o servidor. A criação do pedido
+  // geocodifica o endereço, e um endereço novo custa vários segundos de consulta
+  // ao Nominatim — se o carrinho só fosse limpo depois disso, quem clicasse em
+  // "Continuar comprando" nesse meio-tempo voltava ao marketplace com os itens
+  // ainda lá. Limpar não depende da resposta, então não deve esperar por ela.
+  clearCart();
+
+  let pedido = null, falhou = false;
+  if (DB.currentUser() && itensComprados.length) {
+    try {
+      const res = await DB.createOrder(itensComprados, getEnderecoEntrega());
+      if (res && res.ok) pedido = res.pedido;
+      else falhou = true;
+    } catch { falhou = true; }
+  }
+
+  // O número do pedido agora é o real, não um aleatório de enfeite: é por ele
+  // que o cliente e o entregador falam do mesmo pedido.
+  document.getElementById('order-chip').textContent =
+    pedido ? 'PEDIDO #' + pedido.id.slice(0,6).toUpperCase() : 'PEDIDO REGISTRADO';
+
+  if (pedido && pedido.codigo) {
+    document.getElementById('sucesso-codigo-num').textContent = pedido.codigo;
+    document.getElementById('sucesso-codigo').hidden = false;
+  } else if (falhou) {
+    // Pagamento passou mas o pedido não foi registrado: dizer isso é melhor do
+    // que deixar o cliente esperando um código que nunca vai aparecer.
+    const box = document.getElementById('sucesso-codigo');
+    box.hidden = false;
+    box.style.borderColor = 'rgba(232,90,90,.45)';
+    box.style.background = 'rgba(232,90,90,.08)';
+    box.innerHTML = `
+      <div class="sucesso-codigo-lbl" style="color:var(--red)">Não conseguimos registrar o pedido</div>
+      <p class="sucesso-codigo-txt" style="margin-top:.5rem">
+        O pagamento foi confirmado, mas houve uma falha ao criar a entrega.
+        Abra <b>Rastrear Entregas</b> no seu perfil — se o pedido não estiver lá,
+        entre em contato antes de comprar de novo.
+      </p>`;
+  }
 }
 
 function spawnConfetti(){
@@ -925,13 +1339,15 @@ function spawnConfetti(){
 }
 
 document.addEventListener('DOMContentLoaded', async ()=>{
-  if(!DB.currentUser()){ window.location.href = 'login.html'; return; }
   await loadCart();
+  if(!getCart().length){ window.location.href = 'marketplace.html'; return; }
+  document.getElementById('login-aviso').hidden = !!DB.currentUser();
   renderSummary();
   generateQR();
   generateBarcode();
   setBoletoDate();
   startPixTimer();
+  await restaurarRascunhoCheckout();
 });
 </script>
 <script src="accessibility.js"></script>

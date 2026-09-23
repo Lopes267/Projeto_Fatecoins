@@ -19,3 +19,6 @@ npm-debug.log*
 # Sistema operacional
 .DS_Store
 Thumbs.db
+
+# Skills do Claude Code (ferramentas locais, nao fazem parte do site)
+.claude/skills/

@@ -15,7 +15,7 @@
 
   // ---------- ESTILOS ----------
   const css = `
-  .a11y-root{position:fixed;right:26px;bottom:26px;z-index:99999;font-family:'DM Sans',system-ui,sans-serif}
+  .a11y-root{position:fixed;right:26px;bottom:26px;z-index:99999;font-family:var(--font-texto,'Inter',system-ui,sans-serif)}
   .a11y-fab{
     position:relative;z-index:2;width:54px;height:54px;border-radius:50%;cursor:pointer;
     border:none;display:flex;align-items:center;justify-content:center;color:#fff;
@@ -62,6 +62,12 @@
   body.a11y-light{
     --bg:#f4f1ea; --card:#ffffff; --card2:#ece7dd;
     --border:#dcd5c8; --text:#1f1b16; --muted:#6f6658;
+    /* No claro a marca é verde, não laranja. Tom escolhido para passar no
+       WCAG AA como texto no fundo (4,8:1) e com texto branco em cima (5,4:1) */
+    --accent:#1a7a43; --accent-rgb:26,122,67; --accent-hover:#146236;
+    /* Dourado, verde e vermelho dos valores: os tons do escuro somem no fundo
+       claro (1,6:1, 1,9:1 e 3,5:1). Estes passam no AA até sobre o card bege. */
+    --accent2:#8a5a00; --green:#0d6b63; --red:#b42318;
   }
   `;
   const style = document.createElement('style');

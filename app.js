@@ -25,6 +25,22 @@ initAPI();
 // O carrinho hoje vive 100% online no Firebase, vinculado ao cliente.
 try { localStorage.removeItem('mp_cart'); } catch {}
 
+// Carrinho de quem ainda não entrou na conta. Fica só nesta aba (sessionStorage):
+// sobrevive à ida ao login e à volta, some ao fechar a aba e não fica no navegador
+// para o próximo usuário. Ao entrar, os itens passam para o carrinho da conta.
+const CarrinhoVisitante = {
+  CHAVE: 'mp_carrinho_visitante',
+  get() {
+    try { return JSON.parse(sessionStorage.getItem(this.CHAVE) || '[]'); } catch { return []; }
+  },
+  set(items) {
+    try { sessionStorage.setItem(this.CHAVE, JSON.stringify(items)); } catch {}
+  },
+  limpar() {
+    try { sessionStorage.removeItem(this.CHAVE); } catch {}
+  }
+};
+
 const DB = {
   // ---------- helpers ----------
   _get: (key) => JSON.parse(localStorage.getItem(key) || '[]'),
@@ -87,6 +103,7 @@ const DB = {
   logout() {
     localStorage.removeItem('mp_session');
     localStorage.removeItem('mp_cart');   // remove qualquer carrinho legado deixado no navegador
+    CarrinhoVisitante.limpar();
   },
 
   currentUser() {
@@ -294,6 +311,29 @@ const DB = {
     return data;
   },
 
+  // ---------- modelo 3D do produto (opcional, .glb/.gltf) ----------
+  // Sem modelo o visualizador ainda funciona: ele monta uma caixa no
+  // tamanho cadastrado usando a foto do produto.
+  async updateProductModel(productId, file) {
+    const formData = new FormData();
+    formData.append('model', file);
+
+    const res = await fetch(`${API_URL}/api/products/${productId}/model`, {
+      method: 'PUT',
+      headers: { 'Authorization': `Bearer ${this._getToken()}` },
+      body: formData
+    });
+    return await res.json();
+  },
+
+  async deleteProductModel(productId) {
+    const res = await fetch(`${API_URL}/api/products/${productId}/model`, {
+      method: 'DELETE',
+      headers: { ...this._authHeaders() }
+    });
+    return await res.json();
+  },
+
   // ---------- cart (carrinho no Firestore, por cliente) ----------
   async getCart() {
     const res = await fetch(`${API_URL}/api/cart`, {
@@ -301,6 +341,29 @@ const DB = {
     });
     const data = await res.json();
     return data.ok ? (data.items || []) : [];
+  },
+
+  // Depois do login: soma o carrinho de visitante ao carrinho da conta.
+  // Lê o carrinho da conta direto da API — se a leitura falhar, não salva nada,
+  // senão os itens que a conta já tinha seriam sobrescritos pelos do visitante.
+  async juntarCarrinhoVisitante() {
+    const visitante = CarrinhoVisitante.get();
+    if (!visitante.length || !this.currentUser()) return;
+    try {
+      const res = await fetch(`${API_URL}/api/cart`, { headers: { ...this._authHeaders() } });
+      const data = await res.json();
+      if (!data.ok) return;
+      const conta = data.items || [];
+      visitante.forEach(v => {
+        const ex = conta.find(i => i.id === v.id);
+        if (ex) ex.qty = (ex.qty || 1) + (v.qty || 1);
+        else conta.push(v);
+      });
+      const salvo = await this.saveCart(conta);
+      if (salvo && salvo.ok) CarrinhoVisitante.limpar();
+    } catch (e) {
+      console.warn('Não foi possível juntar o carrinho de visitante:', e);
+    }
   },
 
   async saveCart(items) {
@@ -315,17 +378,23 @@ const DB = {
   async clearCart() {
     const res = await fetch(`${API_URL}/api/cart`, {
       method: 'DELETE',
-      headers: { ...this._authHeaders() }
+      headers: { ...this._authHeaders() },
+      // O carrinho é esvaziado na tela de sucesso, onde o cliente costuma sair
+      // logo em seguida. Sem keepalive o navegador cancela a requisição ao
+      // navegar, e ele voltava ao marketplace com os itens já comprados no carrinho.
+      keepalive: true
     });
     return await res.json();
   },
 
   // ---------- pedidos (compras) ----------
-  async createOrder(itens) {
+  // entrega: { cep, numero, complemento, referencia, lat, lng } — endereço onde o
+  // entregador vai levar a compra. O servidor completa o que faltar pelo CEP/cadastro.
+  async createOrder(itens, entrega = null) {
     const res = await fetch(`${API_URL}/api/orders`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', ...this._authHeaders() },
-      body: JSON.stringify({ itens })
+      body: JSON.stringify({ itens, entrega })
     });
     return await res.json();
   },
@@ -334,6 +403,13 @@ const DB = {
     const res = await fetch(`${API_URL}/api/orders`, { headers: { ...this._authHeaders() } });
     const data = await res.json();
     return data.ok ? (data.produtos || []) : [];
+  },
+
+  // Vendas da loja do lojista (quem comprou cada produto)
+  async getSales() {
+    const res = await fetch(`${API_URL}/api/sales`, { headers: { ...this._authHeaders() } });
+    const data = await res.json();
+    return data.ok ? data : { vendas: [], total: 0 };
   },
 
   // ---------- avaliações ----------
@@ -363,8 +439,218 @@ const DB = {
     const res = await fetch(`${API_URL}/api/users/${userId}/reviews`, { headers: { ...this._authHeaders() } });
     const data = await res.json();
     return data.ok ? (data.reviews || []) : [];
+  },
+
+  // ---------- entregas ----------
+  // Pedidos comprados por outras pessoas que ainda esperam um entregador.
+  // Passando a posição atual, a lista vem ordenada do mais perto para o mais longe;
+  // raioKm corta os que estão longe demais para valer a viagem.
+  async getAvailableDeliveries(pos = null, raioKm = null, soCabe = false) {
+    const q = new URLSearchParams();
+    if (pos) { q.set('lat', pos.lat); q.set('lng', pos.lng); }
+    if (pos && raioKm) q.set('raio_km', raioKm);
+    if (soCabe) q.set('so_cabe', '1');
+    const qs = q.toString() ? `?${q}` : '';
+    const res = await fetch(`${API_URL}/api/deliveries/available${qs}`, { headers: { ...this._authHeaders() } });
+    return await res.json();
+  },
+
+  // A posição de quem aceita vira a distância inicial do trajeto no painel de
+  // desempenho — por isso vai junto quando o GPS está ligado.
+  async acceptDelivery(pedidoId, pos = null) {
+    const res = await fetch(`${API_URL}/api/deliveries/${pedidoId}/accept`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', ...this._authHeaders() },
+      body: JSON.stringify(pos ? { lat: pos.lat, lng: pos.lng } : {})
+    });
+    return await res.json();
+  },
+
+  async releaseDelivery(pedidoId) {
+    const res = await fetch(`${API_URL}/api/deliveries/${pedidoId}/release`, {
+      method: 'POST', headers: { ...this._authHeaders() }
+    });
+    return await res.json();
+  },
+
+  async getMyDeliveries() {
+    const res = await fetch(`${API_URL}/api/deliveries/mine`, { headers: { ...this._authHeaders() } });
+    return await res.json();
+  },
+
+  // Envia a posição do entregador — é isto que o comprador vê se mexendo no mapa
+  async sendDeliveryLocation(pedidoId, lat, lng, precisao = null) {
+    const res = await fetch(`${API_URL}/api/deliveries/${pedidoId}/location`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', ...this._authHeaders() },
+      body: JSON.stringify({ lat, lng, precisao })
+    });
+    return await res.json();
+  },
+
+  // Avança o status. Para finalizar ('entregue') o servidor exige o código que
+  // o cliente dita na porta e o destino do dinheiro ('carteira' ou 'saque').
+  async setDeliveryStatus(pedidoId, status, { codigo = null, destino = 'carteira' } = {}) {
+    const res = await fetch(`${API_URL}/api/deliveries/${pedidoId}/status`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', ...this._authHeaders() },
+      body: JSON.stringify({ status, codigo, destino })
+    });
+    return await res.json();
+  },
+
+  // ---------- capacidade do veículo ----------
+  async getCapacity() {
+    const res = await fetch(`${API_URL}/api/couriers/capacity`, { headers: { ...this._authHeaders() } });
+    return await res.json();
+  },
+
+  // cap = { comprimento, largura, altura, peso_max, categoria } ou { limpar:true }
+  async saveCapacity(cap) {
+    const res = await fetch(`${API_URL}/api/couriers/capacity`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json', ...this._authHeaders() },
+      body: JSON.stringify(cap)
+    });
+    return await res.json();
+  },
+
+  // ---------- carteira do entregador ----------
+  async getWallet() {
+    const res = await fetch(`${API_URL}/api/wallet`, { headers: { ...this._authHeaders() } });
+    return await res.json();
+  },
+
+  // Sem valor, saca o saldo inteiro
+  async withdraw(valor = null) {
+    const res = await fetch(`${API_URL}/api/wallet/withdraw`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', ...this._authHeaders() },
+      body: JSON.stringify(valor != null ? { valor } : {})
+    });
+    return await res.json();
+  },
+
+  // Rastreio do lado do comprador
+  async getMyTracking() {
+    const res = await fetch(`${API_URL}/api/deliveries/tracking`, { headers: { ...this._authHeaders() } });
+    const data = await res.json();
+    return data.ok ? (data.pedidos || []) : [];
+  },
+
+  async getOrderTracking(pedidoId) {
+    const res = await fetch(`${API_URL}/api/deliveries/${pedidoId}/tracking`, { headers: { ...this._authHeaders() } });
+    return await res.json();
   }
 };
+
+// ============================================================
+//  ENTREGAS – helpers de exibição (usados pelo entregador e pelo comprador)
+// ============================================================
+
+const ENTREGA_LABEL = {
+  aguardando: { texto: 'Aguardando entregador', icone: '🕓', cor: '#f4c56a' },
+  aceito:     { texto: 'Entregador a caminho da loja', icone: '📦', cor: '#7b9ff4' },
+  a_caminho:  { texto: 'Saiu para entrega', icone: '🛵', cor: '#e8854a' },
+  entregue:   { texto: 'Entregue', icone: '✅', cor: '#5dcfa0' }
+};
+
+function entregaLabel(status) {
+  return ENTREGA_LABEL[status] || ENTREGA_LABEL.aguardando;
+}
+
+// Quão confiável é o pino do cliente no mapa. Só o GPS do próprio cliente (ou o
+// endereço achado com número) aponta a porta; CEP e cidade caem no meio da região.
+const PRECISAO_ENTREGA = {
+  gps:       { exato: true,  texto: 'Ponto confirmado pelo cliente no mapa' },
+  exata:     { exato: true,  texto: 'Endereço localizado com número' },
+  gps_aprox: { exato: false, texto: 'Ponto do celular do cliente, com margem de erro' },
+  rua:       { exato: false, texto: 'Ponto aproximado: rua encontrada, sem o número' },
+  bairro:    { exato: false, texto: 'Ponto aproximado: centro do bairro' },
+  cep:       { exato: false, texto: 'Ponto aproximado: centro do CEP' },
+  cidade:    { exato: false, texto: 'Ponto MUITO impreciso: centro da cidade — guie-se pelo endereço escrito' }
+};
+
+function precisaoEntrega(entrega) {
+  if (!entrega || entrega.lat == null) {
+    return { exato: false, texto: 'Sem ponto no mapa — use o endereço escrito', semMapa: true };
+  }
+  const base = PRECISAO_ENTREGA[entrega.precisao] || { exato: false, texto: 'Ponto aproximado' };
+  // Quando a margem de erro é conhecida, dizê-la em metros vale mais do que o
+  // adjetivo: "±380 m" o entregador entende, "aproximado" não.
+  if (entrega.precisao_m) {
+    return { ...base, texto: `${base.texto} (±${formatarMetros(entrega.precisao_m)})` };
+  }
+  return base;
+}
+
+// "820 m" / "1,4 km" — margem de erro numa unidade que se lê de relance
+function formatarMetros(m) {
+  if (m == null) return '—';
+  return m >= 1000
+    ? new Intl.NumberFormat('pt-BR', { maximumFractionDigits: 1 }).format(m / 1000) + ' km'
+    : Math.round(m) + ' m';
+}
+
+function formatEndereco(e) {
+  if (!e) return 'Endereço não informado';
+  const linha1 = [e.logradouro, e.numero].filter(Boolean).join(', ');
+  const linha2 = [e.bairro, e.cidade, e.uf].filter(Boolean).join(' · ');
+  const cep    = e.cep ? `CEP ${String(e.cep).replace(/(\d{5})(\d{3})/, '$1-$2')}` : '';
+  return [linha1, e.complemento, linha2, cep].filter(Boolean).join(' — ') || 'Endereço não informado';
+}
+
+// ============================================================
+//  MEDIDAS — presets de embalagem e de veículo
+//
+//  Ninguém quer digitar 3 números para cada produto, nem medir o baú com trena.
+//  Os presets cobrem o caso comum com um clique; os campos continuam editáveis
+//  para quem tem uma medida de verdade.
+// ============================================================
+
+// Embalagens do lojista (C × L × A em cm) — nomes que ele reconhece na prateleira
+const EMBALAGENS = [
+  { id:'envelope', nome:'📩 Envelope',      c:35, l:25, a:2,  ex:'documentos, roupa fina' },
+  { id:'pequena',  nome:'📦 Caixa pequena', c:20, l:15, a:10, ex:'cosméticos, eletrônicos pequenos' },
+  { id:'media',    nome:'📦 Caixa média',   c:35, l:25, a:20, ex:'tênis, panela, livro grande' },
+  { id:'grande',   nome:'📦 Caixa grande',  c:50, l:40, a:35, ex:'liquidificador, jogo de panelas' },
+  { id:'sacola',   nome:'🛍️ Sacola de mercado', c:40, l:25, a:35, ex:'compras do dia' }
+];
+
+// Veículos do entregador — medidas do COMPARTIMENTO, não do carro
+const VEICULOS = [
+  { id:'bicicleta',  nome:'🚲 Bicicleta (mochila)', c:35, l:30, a:40, peso:8,
+    nota:'Mochila de entrega comum' },
+  { id:'moto',       nome:'🛵 Moto (baú 80 L)',     c:45, l:45, a:40, peso:25,
+    nota:'Baú padrão exigido pelas plataformas' },
+  { id:'carro',      nome:'🚗 Carro (porta-malas)', c:100, l:80, a:45, peso:120,
+    nota:'Porta-malas de hatch/sedã médio' },
+  { id:'utilitario', nome:'🚐 Utilitário / van',    c:180, l:120, a:110, peso:600,
+    nota:'Furgão pequeno' }
+];
+
+const APROVEITAMENTO_CARGA = 0.75;   // o mesmo desconto de "ar entre as caixas" do servidor
+
+function volumeUtilLitros(c, l, a){
+  if(!(c > 0 && l > 0 && a > 0)) return null;
+  return Math.round((c * l * a / 1000) * APROVEITAMENTO_CARGA);
+}
+
+// "45 × 45 × 40 cm" — como as medidas aparecem em qualquer tela
+function formatarMedidas(c, l, a){
+  if(!(c && l && a)) return 'sem medidas';
+  return `${c} × ${l} × ${a} cm`;
+}
+
+// "há 12s" / "há 3 min" — mostra se a posição do entregador está fresca
+function tempoRelativo(iso) {
+  if (!iso) return '—';
+  const seg = Math.floor((Date.now() - new Date(iso).getTime()) / 1000);
+  if (seg < 60)   return `há ${Math.max(0, seg)}s`;
+  if (seg < 3600) return `há ${Math.floor(seg / 60)} min`;
+  if (seg < 86400) return `há ${Math.floor(seg / 3600)}h`;
+  return new Date(iso).toLocaleDateString('pt-BR');
+}
 
 // ============================================================
 //  AUTH HELPERS

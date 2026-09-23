@@ -4,89 +4,97 @@
 <meta charset="UTF-8"/>
 <meta name="viewport" content="width=device-width,initial-scale=1"/>
 <title>Entrar – Mercado Local</title>
-<link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,300;0,9..144,700;1,9..144,400&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Merriweather:ital,wght@0,300;0,400;0,700;1,400;1,700&display=swap" rel="stylesheet"/>
 <script src="app.js"></script>
 <style>
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
 :root{
+  --font-titulo:'Merriweather',Georgia,serif;--font-texto:'Inter',Arial,sans-serif;
   --bg:#0d0d0d;--card:#161616;--border:#2a2a2a;
-  --text:#f0ece3;--muted:#888;--accent:#e8854a;--accent2:#f4c56a;--green:#5dcfa0;
+  --text:#f0ece3;--muted:#888;--accent:#e8854a;--accent-rgb:232,133,74;--accent-hover:#d9733c;--accent2:#f4c56a;--green:#5dcfa0;
   --red:#e85a5a;
 }
-body{background:var(--bg);color:var(--text);font-family:'DM Sans',sans-serif;min-height:100vh;display:flex;flex-direction:column}
+body{background:var(--bg);color:var(--text);font-family:var(--font-texto);min-height:100vh;display:flex;flex-direction:column}
 /* noise */
 body::before{content:'';position:fixed;inset:0;pointer-events:none;z-index:999;
   background-image:url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)' opacity='0.04'/%3E%3C/svg%3E");opacity:.4}
 
 nav{padding:1.2rem 2rem;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:1rem}
-.logo{font-family:'Fraunces',serif;font-size:1.4rem;color:var(--accent);text-decoration:none}
+.logo{font-family:var(--font-titulo);font-size:1.4rem;color:var(--accent);text-decoration:none}
 .logo span{color:var(--text)}
-nav a.back{color:var(--muted);font-size:.85rem;text-decoration:none;margin-left:auto}
+nav a.back{color:var(--muted);font-size:.875rem;text-decoration:none;margin-left:auto}
 nav a.back:hover{color:var(--text)}
 
 main{flex:1;display:flex;align-items:center;justify-content:center;padding:2rem;
-  background:radial-gradient(ellipse 50% 60% at 30% 50%,rgba(232,133,74,.08) 0%,transparent 70%)}
+  background:radial-gradient(ellipse 50% 60% at 30% 50%,rgba(var(--accent-rgb),.08) 0%,transparent 70%)}
 
 .card{
   background:var(--card);border:1px solid var(--border);border-radius:20px;
   padding:2.5rem;width:100%;max-width:440px;animation:fadeUp .5s ease;
 }
-.card h2{font-family:'Fraunces',serif;font-size:2rem;font-weight:700;margin-bottom:.3rem}
-.card .sub{color:var(--muted);font-size:.9rem;margin-bottom:2rem}
+.card h2{font-family:var(--font-titulo);font-size:2rem;font-weight:700;margin-bottom:.3rem}
+.card .sub{color:var(--muted);font-size:.9375rem;margin-bottom:2rem}
 .card .sub a{color:var(--accent);text-decoration:none}
 
 .tabs{display:flex;gap:.3rem;background:var(--bg);border:1px solid var(--border);border-radius:10px;padding:.3rem;margin-bottom:2rem}
-.tab{flex:1;padding:.6rem;text-align:center;border-radius:7px;cursor:pointer;font-weight:500;font-size:.9rem;color:var(--muted);transition:all .2s}
+.tab{flex:1;padding:.6rem;text-align:center;border-radius:7px;cursor:pointer;font-weight:500;font-size:.9375rem;color:var(--muted);transition:all .2s}
 .tab.active{background:var(--card);color:var(--text);box-shadow:0 1px 6px rgba(0,0,0,.4)}
 
 .form-group{margin-bottom:1.2rem}
-label{display:block;font-size:.82rem;font-weight:600;color:var(--muted);margin-bottom:.4rem;letter-spacing:.04em;text-transform:uppercase}
+label{display:block;font-size:.875rem;font-weight:600;color:var(--muted);margin-bottom:.4rem;letter-spacing:.04em;text-transform:uppercase}
 input,select{
   width:100%;padding:.75rem 1rem;background:var(--bg);border:1px solid var(--border);
-  border-radius:10px;color:var(--text);font-family:'DM Sans',sans-serif;font-size:.95rem;
+  border-radius:10px;color:var(--text);font-family:var(--font-texto);font-size:1rem;
   transition:border-color .2s,box-shadow .2s;outline:none;
 }
-input:focus,select:focus{border-color:var(--accent);box-shadow:0 0 0 3px rgba(232,133,74,.12)}
+input:focus,select:focus{border-color:var(--accent);box-shadow:0 0 0 3px rgba(var(--accent-rgb),.12)}
 select option{background:var(--bg)}
 
-.tipo-selector{display:grid;grid-template-columns:1fr 1fr;gap:.8rem;margin-bottom:1.2rem}
+.tipo-selector{display:grid;grid-template-columns:repeat(3,1fr);gap:.6rem;margin-bottom:1.2rem}
 .tipo-btn{
   display:flex;flex-direction:column;align-items:center;gap:.4rem;
-  padding:1rem;border-radius:12px;border:2px solid var(--border);
+  padding:.9rem .5rem;border-radius:12px;border:2px solid var(--border);
   cursor:pointer;transition:all .2s;text-align:center;
 }
 .tipo-btn:hover{border-color:var(--muted)}
-.tipo-btn.active{border-color:var(--accent);background:rgba(232,133,74,.08)}
-.tipo-btn .icon{font-size:1.8rem}
-.tipo-btn .name{font-weight:600;font-size:.9rem}
+.tipo-btn.active{border-color:var(--accent);background:rgba(var(--accent-rgb),.08)}
+.tipo-btn .icon{font-size:1.6rem}
+.tipo-btn .name{font-weight:600;font-size:.875rem}
 .tipo-btn .desc{font-size:.75rem;color:var(--muted)}
 
 .btn{
   display:flex;align-items:center;justify-content:center;gap:.5rem;
   width:100%;padding:.85rem;border-radius:10px;font-weight:600;
   font-size:1rem;cursor:pointer;border:none;
-  transition:all .2s;font-family:'DM Sans',sans-serif;
+  transition:all .2s;font-family:var(--font-texto);
 }
 .btn-primary{background:var(--accent);color:#fff}
-.btn-primary:hover{background:#d9733c;transform:translateY(-1px)}
+.btn-primary:hover{background:var(--accent-hover);transform:translateY(-1px)}
 .btn-primary:disabled{opacity:.5;cursor:default;transform:none}
 
 .error-msg{
   background:rgba(232,90,90,.1);border:1px solid rgba(232,90,90,.3);
-  color:var(--red);border-radius:8px;padding:.75rem 1rem;font-size:.85rem;
+  color:var(--red);border-radius:8px;padding:.75rem 1rem;font-size:.875rem;
   margin-bottom:1rem;display:none;
 }
 .error-msg.show{display:block}
 
+.voltar-aviso{
+  margin-bottom:1.4rem;padding:.85rem 1rem;border-radius:10px;
+  background:rgba(var(--accent-rgb),.07);border:1px solid rgba(var(--accent-rgb),.22);
+  font-size:.9375rem;line-height:1.55;color:var(--text);
+}
+.voltar-aviso strong{display:block;margin-bottom:.15rem}
+
 .divider{
   display:flex;align-items:center;gap:.8rem;margin:1.5rem 0;
-  color:var(--muted);font-size:.8rem;
+  color:var(--muted);font-size:.875rem;
 }
 .divider::before,.divider::after{content:'';flex:1;height:1px;background:var(--border)}
 
 .demo-hint{
   
-  color:var(--green);border-radius:8px;padding:.8rem 1rem;font-size:.82rem;
+  color:var(--green);border-radius:8px;padding:.8rem 1rem;font-size:.875rem;
   line-height:1.5;
 }
 .demo-hint strong{display:block;margin-bottom:.3rem}
@@ -95,7 +103,7 @@ select option{background:var(--bg)}
 .toast{
   position:fixed;bottom:2rem;right:2rem;z-index:1000;
   background:var(--card);border:1px solid var(--border);border-radius:10px;
-  padding:.75rem 1.2rem;font-size:.9rem;transform:translateY(20px);opacity:0;
+  padding:.75rem 1.2rem;font-size:.9375rem;transform:translateY(20px);opacity:0;
   transition:all .3s;max-width:300px;
 }
 .toast.show{transform:translateY(0);opacity:1}
@@ -104,6 +112,7 @@ select option{background:var(--bg)}
 
 @keyframes fadeUp{from{opacity:0;transform:translateY(20px)}to{opacity:1;transform:translateY(0)}}
 </style>
+<link rel="stylesheet" href="site.css"/>
 </head>
 <body>
 <nav>
@@ -113,6 +122,11 @@ select option{background:var(--bg)}
 
 <main>
   <div class="card">
+    <div class="voltar-aviso" id="voltar-aviso" hidden>
+      <strong>Falta só entrar na sua conta.</strong>
+      Seu carrinho e o endereço de entrega continuam salvos — depois de entrar, você volta
+      para confirmar a compra.
+    </div>
     <div class="tabs">
       <div class="tab active" id="tab-login" onclick="switchTab('login')">Entrar</div>
       <div class="tab" id="tab-cadastro" onclick="switchTab('cadastro')">Criar conta</div>
@@ -161,6 +175,11 @@ select option{background:var(--bg)}
             <span class="name">Cliente</span>
             <span class="desc">Quero comprar</span>
           </div>
+          <div class="tipo-btn" id="tipo-entregador" onclick="selectTipo('entregador')">
+            <span class="icon">🛵</span>
+            <span class="name">Entregador</span>
+            <span class="desc">Quero entregar</span>
+          </div>
         </div>
         <input type="hidden" id="cad-tipo" value="lojista"/>
       </div>
@@ -188,6 +207,19 @@ if(params.get('modo')==='cadastro') switchTab('cadastro');
 
 let tipoSelecionado = 'lojista';
 
+// Veio do checkout (ou outra página do site) no meio de uma ação: depois de entrar,
+// volta para lá. Só aceita um arquivo .html deste site, para o link não servir
+// de redirecionamento para fora.
+const voltarPara = /^[a-z0-9-]+\.html$/i.test(params.get('voltar') || '') ? params.get('voltar') : null;
+if(voltarPara === 'checkout.html'){
+  document.getElementById('voltar-aviso').hidden = false;
+  const back = document.querySelector('nav a.back');
+  back.href = voltarPara;
+  back.textContent = '← Voltar à compra';
+  selectTipo('cliente');   // quem cria conta na hora de pagar é cliente, não lojista
+}
+function destinoDepoisDeEntrar(tipo){ return voltarPara || paginaInicial(tipo); }
+
 function switchTab(tab){
   document.getElementById('tab-login').classList.toggle('active', tab==='login');
   document.getElementById('tab-cadastro').classList.toggle('active', tab==='cadastro');
@@ -195,10 +227,18 @@ function switchTab(tab){
   document.getElementById('form-cadastro').style.display = tab==='cadastro'?'':'none';
 }
 
+// Para onde cada tipo de conta vai depois de entrar
+function paginaInicial(tipo){
+  if(tipo === 'lojista')    return 'dashboard.html';
+  if(tipo === 'entregador') return 'entregas.html';
+  return 'marketplace.html';
+}
+
 function selectTipo(tipo){
   tipoSelecionado = tipo;
-  document.getElementById('tipo-lojista').classList.toggle('active', tipo==='lojista');
-  document.getElementById('tipo-cliente').classList.toggle('active', tipo==='cliente');
+  ['lojista','cliente','entregador'].forEach(t=>{
+    document.getElementById('tipo-'+t).classList.toggle('active', tipo===t);
+  });
   document.getElementById('cad-tipo').value = tipo;
 }
 
@@ -220,7 +260,7 @@ function doLogin(){
     if(!res.ok){ showError('login-error', res.msg); return; }
     toast('Login realizado! Redirecionando…');
     setTimeout(()=>{
-      window.location.href = res.user.tipo === 'lojista' ? 'dashboard.html' : 'marketplace.html';
+      window.location.href = destinoDepoisDeEntrar(res.user.tipo);
     }, 800);
   })();
 }
@@ -241,7 +281,7 @@ function doCadastro(){
     if(loginRes.ok) {
       toast('Conta criada com sucesso!');
       setTimeout(()=>{
-        window.location.href = tipo === 'lojista' ? 'dashboard.html' : 'marketplace.html';
+        window.location.href = destinoDepoisDeEntrar(tipo);
       }, 800);
     }
   })();

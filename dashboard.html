@@ -4,48 +4,73 @@
 <meta charset="UTF-8"/>
 <meta name="viewport" content="width=device-width,initial-scale=1"/>
 <title>Painel da Loja – Mercado Local</title>
-<link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,700&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet"/>
+<meta name="theme-color" content="#0d0d0d"/>
+<link rel="preconnect" href="https://fonts.googleapis.com"/>
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin/>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Merriweather:ital,wght@0,300;0,400;0,700;1,400;1,700&display=swap" rel="stylesheet"/>
+<!-- Mapa de módulos do three.js — precisa vir antes de qualquer import.
+     Alimenta o "Ver em 3D", que mostra ao lojista o que o cliente vê. -->
+<script type="importmap">
+{
+  "imports": {
+    "three": "https://unpkg.com/three@0.161.0/build/three.module.js",
+    "three/addons/": "https://unpkg.com/three@0.161.0/examples/jsm/"
+  }
+}
+</script>
+<!-- Sistema visual dos painéis analíticos (vidro, gráficos, tabelas) — compartilhado com entregas.html -->
+<link rel="stylesheet" href="painel.css"/>
 <style>
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
 :root{
+  --font-titulo:'Merriweather',Georgia,serif;--font-texto:'Inter',Arial,sans-serif;
+  color-scheme:dark;
   --bg:#0d0d0d;--card:#161616;--card2:#1c1c1c;--border:#2a2a2a;
-  --text:#f0ece3;--muted:#888;--accent:#e8854a;--accent2:#f4c56a;
+  --text:#f0ece3;--muted:#888;--accent:#e8854a;--accent-rgb:232,133,74;--accent-hover:#d9733c;--accent2:#f4c56a;
   --green:#5dcfa0;--red:#e85a5a;
 }
-body{background:var(--bg);color:var(--text);font-family:'DM Sans',sans-serif;display:flex;min-height:100vh}
+body{background:var(--bg);color:var(--text);font-family:var(--font-texto);display:flex;min-height:100vh;
+  -webkit-tap-highlight-color:rgba(var(--accent-rgb),.2);overflow-x:hidden}
 
 /* SIDEBAR */
 .sidebar{
   width:240px;flex-shrink:0;background:var(--card);border-right:1px solid var(--border);
   display:flex;flex-direction:column;padding:1.5rem;position:sticky;top:0;height:100vh;
 }
-.logo{font-family:'Fraunces',serif;font-size:1.3rem;color:var(--accent);margin-bottom:2rem}
+.logo{font-family:var(--font-titulo);font-size:1.3rem;color:var(--accent);margin-bottom:2rem}
 .logo span{color:var(--text)}
-.nav-section{font-size:.7rem;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);font-weight:600;margin-bottom:.5rem;margin-top:1rem}
+.nav-section{font-size:.75rem;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);font-weight:600;margin-bottom:.5rem;margin-top:1rem}
 .nav-item{
   display:flex;align-items:center;gap:.7rem;padding:.7rem .9rem;border-radius:9px;
-  cursor:pointer;color:var(--muted);font-size:.9rem;font-weight:500;transition:all .2s;
+  cursor:pointer;color:var(--muted);font-size:.9375rem;font-weight:500;
+  transition:background-color .2s,color .2s;
   margin-bottom:.2rem;
+  width:100%;text-align:left;background:transparent;border:none;
+  font-family:var(--font-texto);touch-action:manipulation;
 }
 .nav-item:hover{background:var(--card2);color:var(--text)}
-.nav-item.active{background:rgba(232,133,74,.12);color:var(--accent)}
+.nav-item.active{background:rgba(var(--accent-rgb),.12);color:var(--accent)}
+.nav-item:focus-visible,.user-chip:focus-visible{outline:2px solid var(--accent2);outline-offset:2px}
+a.nav-item{text-decoration:none}
 .nav-item .icon{font-size:1.1rem;width:20px;text-align:center}
 .sidebar-footer{margin-top:auto;padding-top:1.5rem;border-top:1px solid var(--border)}
-.user-chip{display:flex;align-items:center;gap:.7rem;margin-bottom:1rem}
+.user-chip{display:flex;align-items:center;gap:.7rem;margin-bottom:1rem;
+  text-decoration:none;color:inherit}
 .avatar{
   width:34px;height:34px;border-radius:50%;background:var(--accent);
-  display:flex;align-items:center;justify-content:center;font-size:.85rem;font-weight:700;color:#fff;
+  display:flex;align-items:center;justify-content:center;font-size:.875rem;font-weight:700;color:#fff;
   background-size:cover;background-position:center;background-repeat:no-repeat;
 }
 .user-info{flex:1;min-width:0}
-.user-name{font-size:.85rem;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.user-role{font-size:.73rem;color:var(--muted)}
+.user-name{font-size:.875rem;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.user-role{font-size:.75rem;color:var(--muted)}
 .logout-btn{
   width:100%;padding:.6rem;border-radius:8px;background:transparent;
-  border:1px solid var(--border);color:var(--muted);cursor:pointer;font-size:.85rem;
-  font-family:'DM Sans',sans-serif;transition:all .2s;
+  border:1px solid var(--border);color:var(--muted);cursor:pointer;font-size:.875rem;
+  font-family:var(--font-texto);transition:border-color .2s,color .2s;
 }
 .logout-btn:hover{border-color:var(--red);color:var(--red)}
+.logout-btn:focus-visible{outline:2px solid var(--accent2);outline-offset:2px}
 
     /* USER CHIP HOVER */
     .user-chip {
@@ -56,61 +81,65 @@ body{background:var(--bg);color:var(--text);font-family:'DM Sans',sans-serif;dis
       opacity: 0.8;
     }
 /* MAIN */
-.main{flex:1;overflow-y:auto;padding:2.5rem;display:flex;flex-direction:column;gap:2rem}
+.main{flex:1;overflow-y:auto;padding:2.5rem var(--gutter);display:flex;flex-direction:column;gap:2rem}
+/* Conteúdo em até 1140px, centralizado no espaço ao lado da barra lateral */
+.main>*{width:100%;max-width:var(--container);margin-inline:auto}
 .page{display:none}
 .page.active{display:block}
 
 /* TOPBAR */
 .topbar{display:flex;align-items:center;justify-content:space-between;margin-bottom:2rem}
-.page-title{font-family:'Fraunces',serif;font-size:1.8rem;font-weight:700}
-.page-sub{color:var(--muted);font-size:.9rem;margin-top:.2rem}
+.page-title{font-family:var(--font-titulo);font-size:1.8rem;font-weight:700}
+.page-sub{color:var(--muted);font-size:.9375rem;margin-top:.2rem}
 
 /* CARDS */
 .stats-row{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:1rem;margin-bottom:2rem}
 .stat-card{
   background:var(--card);border:1px solid var(--border);border-radius:14px;padding:1.4rem;
 }
-.stat-card .label{font-size:.75rem;color:var(--muted);text-transform:uppercase;letter-spacing:.05em;margin-bottom:.4rem}
-.stat-card .value{font-family:'Fraunces',serif;font-size:2rem;font-weight:700}
+.stat-card .label{font-size:.8125rem;color:var(--muted);text-transform:uppercase;letter-spacing:.05em;margin-bottom:.4rem}
+.stat-card .value{font-family:var(--font-titulo);font-size:2rem;font-weight:700}
 .stat-card .value.o{color:var(--accent)}
 .stat-card .value.g{color:var(--green)}
 .stat-card .value.y{color:var(--accent2)}
 
 /* FORM CARD */
 .form-card{background:var(--card);border:1px solid var(--border);border-radius:16px;padding:2rem}
-.form-card h3{font-family:'Fraunces',serif;font-size:1.2rem;font-weight:700;margin-bottom:1.5rem}
+.form-card h3{font-family:var(--font-titulo);font-size:1.2rem;font-weight:700;margin-bottom:1.5rem}
 .form-grid{display:grid;grid-template-columns:1fr 1fr;gap:1rem}
 .form-grid.full{grid-template-columns:1fr}
 .form-group{display:flex;flex-direction:column;gap:.4rem}
 .form-group.span2{grid-column:span 2}
-label{font-size:.78rem;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.04em}
+label{font-size:.8125rem;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.04em}
 input,select,textarea{
   padding:.7rem 1rem;background:var(--bg);border:1px solid var(--border);
-  border-radius:9px;color:var(--text);font-family:'DM Sans',sans-serif;font-size:.92rem;
+  border-radius:9px;color:var(--text);font-family:var(--font-texto);font-size:.9375rem;
   outline:none;transition:border-color .2s,box-shadow .2s;
 }
-input:focus,select:focus,textarea:focus{border-color:var(--accent);box-shadow:0 0 0 3px rgba(232,133,74,.1)}
+input:focus,select:focus,textarea:focus{border-color:var(--accent);box-shadow:0 0 0 3px rgba(var(--accent-rgb),.1)}
 textarea{resize:vertical;min-height:80px}
 select option{background:var(--bg)}
 
 /* BUTTONS */
 .btn{
   display:inline-flex;align-items:center;gap:.5rem;
-  padding:.65rem 1.4rem;border-radius:9px;font-weight:600;font-size:.9rem;
-  cursor:pointer;border:none;font-family:'DM Sans',sans-serif;transition:all .2s;
+  padding:.6rem 1.25rem;border-radius:10px;font-weight:600;font-size:.9375rem;
+  cursor:pointer;border:none;font-family:var(--font-texto);
+  transition:background-color .2s,border-color .2s,color .2s;touch-action:manipulation;
 }
+.btn:focus-visible{outline:2px solid var(--accent2);outline-offset:2px}
 .btn-primary{background:var(--accent);color:#fff}
-.btn-primary:hover{background:#d9733c}
+.btn-primary:hover{background:var(--accent-hover)}
 .btn-ghost{background:transparent;border:1px solid var(--border);color:var(--text)}
 .btn-ghost:hover{border-color:var(--accent);color:var(--accent)}
-.btn-danger{background:transparent;border:1px solid rgba(232,90,90,.3);color:var(--red);padding:.4rem .8rem;font-size:.8rem}
+.btn-danger{background:transparent;border:1px solid rgba(232,90,90,.3);color:var(--red);padding:.4rem .8rem;font-size:.875rem}
 .btn-danger:hover{background:rgba(232,90,90,.1)}
-.btn-edit{background:transparent;border:1px solid var(--border);color:var(--muted);padding:.4rem .8rem;font-size:.8rem}
+.btn-edit{background:transparent;border:1px solid var(--border);color:var(--muted);padding:.4rem .8rem;font-size:.875rem}
 .btn-edit:hover{border-color:var(--accent);color:var(--accent)}
 
 /* PRODUCTS TABLE */
 .products-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:1.5rem}
-.products-header h3{font-family:'Fraunces',serif;font-size:1.2rem;font-weight:700}
+.products-header h3{font-family:var(--font-titulo);font-size:1.2rem;font-weight:700}
 .product-list{display:flex;flex-direction:column;gap:.7rem}
 .product-item{
   background:var(--card);border:1px solid var(--border);border-radius:12px;
@@ -123,20 +152,35 @@ select option{background:var(--bg)}
   overflow:hidden;
 }
 .prod-info{flex:1;min-width:0}
-.prod-name{font-weight:600;font-size:.95rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.prod-meta{font-size:.78rem;color:var(--muted);margin-top:.2rem}
-.prod-price{font-family:'Fraunces',serif;font-size:1.1rem;color:var(--accent2);font-weight:700;white-space:nowrap}
+.prod-name{font-weight:600;font-size:1rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.prod-meta{font-size:.8125rem;color:var(--muted);margin-top:.2rem}
+.prod-price{font-family:var(--font-titulo);font-size:1.1rem;color:var(--accent2);font-weight:700;white-space:nowrap}
 .prod-actions{display:flex;gap:.5rem}
 .empty-state{text-align:center;padding:3rem 1rem;color:var(--muted)}
 .empty-state .icon{font-size:3rem;margin-bottom:1rem}
-.empty-state p{font-size:.95rem}
+.empty-state p{font-size:1rem}
+
+/* MEDIDAS DA EMBALAGEM */
+/* Os presets existem porque digitar três números por produto é atrito real —
+   um clique resolve o caso comum, e os campos seguem editáveis. */
+.preset-row{display:flex;gap:.4rem;flex-wrap:wrap;margin-bottom:.7rem}
+.preset-btn{padding:.42rem .7rem;border-radius:8px;background:var(--card2);
+  border:1px solid var(--border);color:var(--muted);font:500 .8125rem var(--font-texto);
+  cursor:pointer;transition:border-color .2s,color .2s}
+.preset-btn:hover{border-color:var(--accent);color:var(--accent)}
+.preset-btn[aria-pressed="true"]{border-color:var(--accent);color:var(--accent);
+  background:rgba(var(--accent-rgb),.1)}
+.medidas-grid{display:grid;grid-template-columns:1fr auto 1fr auto 1fr;gap:.4rem;align-items:center}
+.medidas-x{color:var(--muted);font-size:.875rem}
+.medidas-nota{font-size:.75rem;color:var(--muted);margin-top:.45rem;line-height:1.55}
+.medidas-nota.ok{color:var(--green)}
 
 /* BADGE */
 .badge{
-  display:inline-block;padding:.2rem .6rem;border-radius:50px;font-size:.73rem;font-weight:600;
+  display:inline-block;padding:.2rem .6rem;border-radius:50px;font-size:.75rem;font-weight:600;
 }
 .badge-green{background:rgba(93,207,160,.15);color:var(--green)}
-.badge-orange{background:rgba(232,133,74,.15);color:var(--accent)}
+.badge-orange{background:rgba(var(--accent-rgb),.15);color:var(--accent)}
 .badge-red{background:rgba(232,90,90,.15);color:var(--red)}
 
 /* MODAL */
@@ -145,23 +189,53 @@ select option{background:var(--bg)}
   display:none;align-items:center;justify-content:center;padding:1rem;backdrop-filter:blur(4px);
 }
 .overlay.open{display:flex}
+/* Três faixas empilhadas: cabeçalho, corpo que rola e ações.
+   Só o corpo rola, então o "Salvar" nunca some da tela. */
 .modal{
   background:var(--card);border:1px solid var(--border);border-radius:20px;
-  padding:2rem;width:100%;max-width:520px;max-height:90vh;overflow-y:auto;
+  width:100%;max-width:520px;max-height:90vh;
+  display:flex;flex-direction:column;overflow:hidden;
   animation:fadeUp .25s ease;
 }
-.modal-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:1.5rem}
-.modal-head h3{font-family:'Fraunces',serif;font-size:1.3rem;font-weight:700}
+.modal-head{
+  display:flex;align-items:center;justify-content:space-between;
+  padding:1.6rem 2rem 1rem;flex-shrink:0;
+}
+.modal-head h3{font-family:var(--font-titulo);font-size:1.3rem;font-weight:700}
 .modal-close{background:none;border:none;color:var(--muted);font-size:1.3rem;cursor:pointer;padding:.3rem}
 .modal-close:hover{color:var(--text)}
-.modal-actions{display:flex;gap:.8rem;margin-top:1.5rem;justify-content:flex-end}
+.modal-body{flex:1;min-height:0;overflow-y:auto;padding:0 2rem;-webkit-overflow-scrolling:touch}
+.modal-actions{display:flex;gap:.8rem;padding:1.2rem 2rem 1.6rem;justify-content:flex-end;flex-shrink:0}
+/* Salvando: botão travado com indicador, para ninguém clicar de novo e duplicar o produto */
+.btn:disabled{opacity:.7;cursor:not-allowed}
+.btn[aria-busy="true"]{opacity:1;cursor:progress}
+.btn-spinner{width:15px;height:15px;border-radius:50%;flex-shrink:0;
+  border:2px solid rgba(255,255,255,.35);border-top-color:#fff;animation:girar .7s linear infinite}
+@keyframes girar{to{transform:rotate(360deg)}}
+@media(prefers-reduced-motion:reduce){.btn-spinner{animation-duration:2s}}
+
+/* Campo nenhum pode estourar a coluna. Sem esse min-width:0 o item de grid
+   usa a largura mínima do <input type=number>, que é bem maior que a tela
+   de um celular — era isso que empurrava o modal para fora e obrigava a
+   arrastar a página de lado. */
+.form-group{min-width:0}
+.form-group input,.form-group select,.form-group textarea{width:100%;min-width:0;max-width:100%}
+.medidas-grid>*{min-width:0}
+
+/* Fundo não rola enquanto o modal está aberto */
+body.modal-aberto{overflow:hidden}
+
+/* O botão flutuante de acessibilidade nasce com z-index 99999 e ficava
+   em cima do "Salvar produto" no celular. Enquanto o modal está aberto
+   ele vai para trás do overlay; ao fechar, volta ao normal. */
+body.modal-aberto .a11y-root{z-index:100}
 
 /* TOAST */
 .toast{
   position:fixed;bottom:2rem;right:2rem;z-index:300;
   background:var(--card);border:1px solid var(--border);border-radius:10px;
-  padding:.75rem 1.2rem;font-size:.9rem;transform:translateY(20px);opacity:0;
-  transition:all .3s;pointer-events:none;
+  padding:.75rem 1.2rem;font-size:.9375rem;transform:translateY(20px);opacity:0;
+  transition:transform .3s,opacity .3s;pointer-events:none;
 }
 .toast.show{transform:translateY(0);opacity:1}
 .toast-success{border-color:rgba(93,207,160,.4);color:var(--green)}
@@ -169,40 +243,99 @@ select option{background:var(--bg)}
 
 @keyframes fadeUp{from{opacity:0;transform:translateY(16px)}to{opacity:1;transform:translateY(0)}}
 
-/* RESPONSIVE */
+/* O sistema visual do painel (vidro, gráficos, KPI, tabelas, dicas) mora em
+   painel.css — compartilhado com o painel de Desempenho em entregas.html. */
+@media(prefers-reduced-motion:reduce){ .nav-item{transition:none} }
+
+/* RESPONSIVE (o que é do painel está em painel.css) */
 @media(max-width:768px){
   .sidebar{display:none}
   .main{padding:1.2rem}
   .form-grid{grid-template-columns:1fr}
   .form-group.span2{grid-column:span 1}
 }
+
+/* ------------------------------------------------------------
+   MODAL NO CELULAR
+   No computador é um cartão flutuante; no celular vira uma folha
+   que ocupa a tela inteira, sobe de baixo e prende o cabeçalho em
+   cima e os botões embaixo. É o padrão que o lojista já conhece de
+   outros apps, e acaba com a rolagem lateral.
+   ------------------------------------------------------------ */
+@media(max-width:640px){
+  .overlay{padding:0;align-items:stretch;justify-content:stretch}
+
+  .modal{
+    max-width:none;width:100%;
+    height:100vh;height:100dvh;           /* dvh desconta a barra do navegador */
+    max-height:none;
+    border:none;border-radius:0;
+    animation:folhaSobe .28s ease;
+  }
+
+  .modal-head{
+    padding:1rem 1.1rem .85rem;
+    border-bottom:1px solid var(--border);
+    background:var(--card);
+  }
+  .modal-head h3{font-size:1.15rem}
+  .modal-close{font-size:1.5rem;padding:.4rem .5rem;margin:-.4rem -.5rem -.4rem 0}
+
+  .modal-body{padding:1.1rem}
+
+  .modal-actions{
+    padding:.85rem 1.1rem;
+    /* respeita a barra de gestos do iPhone e de alguns Android */
+    padding-bottom:calc(.85rem + env(safe-area-inset-bottom));
+    border-top:1px solid var(--border);
+    background:var(--card);
+  }
+  .modal-actions .btn{flex:1;justify-content:center;padding:.85rem 1rem}
+
+  /* Sem espaço para os "×": as três medidas viram três colunas iguais,
+     e a unidade já está no rótulo do campo. */
+  .medidas-grid{grid-template-columns:1fr 1fr 1fr;gap:.5rem}
+  .medidas-x{display:none}
+
+  /* Alvo de toque maior nos campos */
+  .form-group input,.form-group select,.form-group textarea{font-size:16px;padding:.75rem .9rem}
+}
+
+@keyframes folhaSobe{from{transform:translateY(100%)}to{transform:translateY(0)}}
+
+@media(prefers-reduced-motion:reduce){
+  .modal{animation:none}
+}
 </style>
+<link rel="stylesheet" href="site.css"/>
 </head>
 <body>
+<a class="skip-link" href="#conteudo">Pular para o conteúdo</a>
 
 <!-- SIDEBAR -->
 <aside class="sidebar">
   <div class="logo">mercado<span>local</span></div>
   <div class="nav-section">Minha Loja</div>
-  <div class="nav-item active" onclick="showPage('dashboard')"><span class="icon">📊</span> Visão Geral</div>
-  <div class="nav-item" onclick="showPage('loja')"><span class="icon">🏪</span> Dados da Loja</div>
-  <div class="nav-item" onclick="showPage('produtos')"><span class="icon">📦</span> Produtos</div>
+  <button type="button" class="nav-item active" data-aba="dashboard" onclick="showPage('dashboard',this)"><span class="icon" aria-hidden="true">📊</span> Visão Geral</button>
+  <button type="button" class="nav-item" data-aba="loja" onclick="showPage('loja',this)"><span class="icon" aria-hidden="true">🏪</span> Dados da Loja</button>
+  <button type="button" class="nav-item" data-aba="produtos" onclick="showPage('produtos',this)"><span class="icon" aria-hidden="true">📦</span> Produtos</button>
+  <button type="button" class="nav-item" data-aba="vendas" onclick="showPage('vendas',this)"><span class="icon" aria-hidden="true">🧾</span> Vendas</button>
   <div class="nav-section">Explorar</div>
-  <div class="nav-item" onclick="window.location.href='marketplace.html'"><span class="icon">🔍</span> Marketplace</div>
+  <a class="nav-item" href="marketplace.html"><span class="icon" aria-hidden="true">🔍</span> Marketplace</a>
   <div class="sidebar-footer">
-    <div class="user-chip" onclick="window.location.href='profile.html'" title="Clique para editar perfil">
-      <div class="avatar" id="avatar-letter">?</div>
+    <a class="user-chip" href="profile.html" title="Editar perfil">
+      <div class="avatar" id="avatar-letter" aria-hidden="true">?</div>
       <div class="user-info">
         <div class="user-name" id="user-name-display">Carregando…</div>
         <div class="user-role">Lojista</div>
       </div>
-    </div>
+    </a>
     <button class="logout-btn" onclick="doLogout()">Sair da conta</button>
   </div>
 </aside>
 
 <!-- MAIN -->
-<main class="main">
+<main class="main" id="conteudo" tabindex="-1">
 
   <!-- DASHBOARD PAGE -->
   <div class="page active" id="page-dashboard">
@@ -225,7 +358,7 @@ select option{background:var(--bg)}
         <button class="btn btn-ghost" onclick="window.location.href='marketplace.html'">Ver marketplace</button>
       </div>
     </div>
-    <div>
+    <div style="margin-top:2.5rem">
       <div class="products-header"><h3>Últimos produtos</h3></div>
       <div class="product-list" id="dash-product-list"></div>
     </div>
@@ -278,7 +411,7 @@ select option{background:var(--bg)}
         <div class="form-group">
           <label>CEP de origem *</label>
           <input type="text" id="loja-cep" placeholder="00000-000" maxlength="9" oninput="onCepLojaInput(this)"/>
-          <p style="font-size:.72rem;color:var(--muted);margin-top:.3rem">CEP de onde os produtos são enviados. Usado para calcular o frete.</p>
+          <p style="font-size:.75rem;color:var(--muted);margin-top:.3rem">CEP de onde os produtos são enviados. Usado para calcular o frete.</p>
         </div>
       </div>
       <div style="margin-top:1.5rem;display:flex;gap:.8rem">
@@ -298,8 +431,8 @@ select option{background:var(--bg)}
             </div>
             <div>
               <input type="file" id="store-logo-input" style="display:none" accept="image/*" onchange="handleStoreLogoUpload(currentStore?.id)"/>
-              <button class="btn btn-ghost" style="font-size:.8rem" onclick="document.getElementById('store-logo-input').click()">📷 Escolher logo</button>
-              <p style="font-size:.75rem;color:var(--muted);margin-top:.3rem">Formato: JPG, PNG, GIF (máx 5MB)</p>
+              <button class="btn btn-ghost" style="font-size:.875rem" onclick="document.getElementById('store-logo-input').click()">📷 Escolher logo</button>
+              <p style="font-size:.8125rem;color:var(--muted);margin-top:.3rem">Formato: JPG, PNG, GIF (máx 5MB)</p>
             </div>
           </div>
         </div>
@@ -311,8 +444,8 @@ select option{background:var(--bg)}
             </div>
             <div>
               <input type="file" id="store-banner-input" style="display:none" accept="image/*" onchange="handleStoreBannerUpload(currentStore?.id)"/>
-              <button class="btn btn-ghost" style="font-size:.8rem" onclick="document.getElementById('store-banner-input').click()">📷 Escolher banner</button>
-              <p style="font-size:.75rem;color:var(--muted);margin-top:.3rem">Formato: JPG, PNG, GIF (máx 5MB)</p>
+              <button class="btn btn-ghost" style="font-size:.875rem" onclick="document.getElementById('store-banner-input').click()">📷 Escolher banner</button>
+              <p style="font-size:.8125rem;color:var(--muted);margin-top:.3rem">Formato: JPG, PNG, GIF (máx 5MB)</p>
             </div>
           </div>
         </div>
@@ -332,6 +465,89 @@ select option{background:var(--bg)}
     <div class="product-list" id="full-product-list"></div>
   </div>
 
+  <!-- VENDAS PAGE -->
+  <div class="page v-page" id="page-vendas">
+    <div class="v-ambient" aria-hidden="true"></div>
+
+    <div class="v-stack">
+      <div class="topbar" style="margin-bottom:0">
+        <div>
+          <h1 class="page-title">Vendas</h1>
+          <p class="page-sub">O que a sua loja vendeu, e para quem</p>
+        </div>
+      </div>
+
+      <!-- FILTRO: uma linha só, acima de tudo que ela filtra -->
+      <div class="v-filters">
+        <div class="seg" role="group" aria-label="Período das vendas">
+          <button type="button" data-periodo="7"   aria-pressed="false">7 dias</button>
+          <button type="button" data-periodo="30"  aria-pressed="true">30 dias</button>
+          <button type="button" data-periodo="90"  aria-pressed="false">90 dias</button>
+          <button type="button" data-periodo="all" aria-pressed="false">Tudo</button>
+        </div>
+        <p class="v-note" id="v-range" aria-live="polite"></p>
+      </div>
+
+      <!-- HERÓI: uma figura, e o gráfico dentro do vidro -->
+      <section class="glass hero-panel" aria-labelledby="hero-lbl">
+        <div class="hero-head">
+          <div>
+            <p class="eyebrow" id="hero-lbl">Receita no período</p>
+            <p class="hero-figure" id="hero-receita" aria-live="polite">—</p>
+          </div>
+          <div style="display:flex;align-items:center;gap:.6rem;flex-wrap:wrap">
+            <span class="delta delta-flat" id="hero-delta">—</span>
+            <button type="button" class="link-btn" id="toggle-serie"
+                    aria-pressed="false" aria-controls="serie-body">Ver tabela</button>
+          </div>
+        </div>
+        <div class="chart-body" id="serie-body" style="margin-top:.4rem"></div>
+      </section>
+
+      <!-- INDICADORES -->
+      <div class="kpi-row" id="kpi-row"></div>
+
+      <!-- GRÁFICOS -->
+      <div class="chart-grid">
+        <section class="glass chart-card" aria-labelledby="top-lbl">
+          <div class="chart-head">
+            <div>
+              <h2 class="chart-title" id="top-lbl">Produtos que mais faturam</h2>
+              <p class="chart-sub">Receita por produto no período</p>
+            </div>
+            <button type="button" class="link-btn" id="toggle-top"
+                    aria-pressed="false" aria-controls="top-body">Ver tabela</button>
+          </div>
+          <div class="chart-body" id="top-body"></div>
+        </section>
+
+        <section class="glass chart-card" aria-labelledby="dow-lbl">
+          <div class="chart-head">
+            <div>
+              <h2 class="chart-title" id="dow-lbl">Quando o bairro compra</h2>
+              <p class="chart-sub">Receita por dia da semana</p>
+            </div>
+            <button type="button" class="link-btn" id="toggle-dow"
+                    aria-pressed="false" aria-controls="dow-body">Ver tabela</button>
+          </div>
+          <div class="chart-body" id="dow-body"></div>
+        </section>
+      </div>
+
+      <!-- REGISTRO -->
+      <section class="glass chart-card" aria-labelledby="reg-lbl">
+        <div class="chart-head">
+          <div>
+            <h2 class="chart-title" id="reg-lbl">Compras recebidas</h2>
+            <!-- Só o resumo é anunciado: reler a tabela inteira a cada filtro é ruído -->
+            <p class="chart-sub" id="reg-count" aria-live="polite">Cada item vendido, do mais recente ao mais antigo</p>
+          </div>
+        </div>
+        <div id="sales-list"><p class="skeleton">Carregando…</p></div>
+      </section>
+    </div>
+  </div>
+
 </main>
 
 <!-- ADD/EDIT MODAL -->
@@ -339,8 +555,11 @@ select option{background:var(--bg)}
   <div class="modal">
     <div class="modal-head">
       <h3 id="modal-title">Novo Produto</h3>
-      <button class="modal-close" onclick="closeModal()">✕</button>
+      <button class="modal-close" onclick="closeModal()" aria-label="Fechar">✕</button>
     </div>
+    <!-- Só esta parte rola. No celular o cabeçalho fica preso em cima e os
+         botões presos embaixo, para o lojista nunca perder o "Salvar". -->
+    <div class="modal-body">
     <div class="form-grid">
       <div class="form-group span2">
         <label>Nome do Produto *</label>
@@ -357,7 +576,23 @@ select option{background:var(--bg)}
       <div class="form-group">
         <label>Peso (kg)</label>
         <input type="number" id="p-peso" placeholder="0.5" min="0" step="0.01"/>
-        <p style="font-size:.72rem;color:var(--muted);margin-top:.3rem">Usado apenas para calcular o frete. Não aparece para o cliente.</p>
+      </div>
+      <div class="form-group span2">
+        <label>Tamanho da embalagem (cm)</label>
+        <div class="preset-row" id="preset-embalagens"></div>
+        <div class="medidas-grid">
+          <input type="number" id="p-comprimento" placeholder="Compr." min="0" step="0.5"/>
+          <span class="medidas-x">×</span>
+          <input type="number" id="p-largura" placeholder="Larg." min="0" step="0.5"/>
+          <span class="medidas-x">×</span>
+          <input type="number" id="p-altura" placeholder="Alt." min="0" step="0.5"/>
+        </div>
+        <p class="medidas-nota" id="medidas-nota">
+          O peso não aparece para o cliente. As medidas servem para calcular o frete e para o
+          entregador saber se o pedido cabe no veículo dele — sem elas, seu produto pode ficar
+          de fora da fila de quem entrega de moto — e são elas que dão a escala real no
+          “Ver no meu espaço”, onde o cliente confere o tamanho antes de comprar.
+        </p>
       </div>
       <div class="form-group span2">
         <label>Categoria</label>
@@ -374,32 +609,59 @@ select option{background:var(--bg)}
       </div>
       <div class="form-group span2">
         <label>Imagem do Produto</label>
-        <div style="display:flex;align-items:center;gap:1rem">
+        <div style="display:flex;align-items:center;gap:1rem;flex-wrap:wrap">
           <div id="product-image-preview" style="width:80px;height:80px;border:1px solid var(--border);border-radius:8px;display:flex;align-items:center;justify-content:center;background:var(--card2)">
             <span style="font-size:2rem">📦</span>
           </div>
           <div>
             <input type="file" id="product-image-input" style="display:none" accept="image/*" onchange="onProductImageSelected(this)"/>
-            <button class="btn btn-ghost" style="font-size:.8rem" onclick="document.getElementById('product-image-input').click()">📷 Escolher imagem</button>
-            <p style="font-size:.75rem;color:var(--muted);margin-top:.3rem">Formato: JPG, PNG, GIF (máx 5MB)</p>
+            <button class="btn btn-ghost" style="font-size:.875rem" onclick="document.getElementById('product-image-input').click()">📷 Escolher imagem</button>
+            <p style="font-size:.8125rem;color:var(--muted);margin-top:.3rem">Formato: JPG, PNG, GIF (máx 5MB)</p>
           </div>
         </div>
       </div>
+      <div class="form-group span2">
+        <label>Modelo 3D <span style="color:var(--muted);font-weight:400">(opcional)</span></label>
+        <div style="display:flex;align-items:center;gap:1rem;flex-wrap:wrap">
+          <div id="product-model-thumb" style="width:56px;height:56px;border:1px solid var(--border);border-radius:8px;display:none;overflow:hidden;background:var(--card2);flex-shrink:0"></div>
+          <div>
+            <button class="btn btn-primary" style="font-size:.875rem" onclick="abrirScanner3D()">📷 Escanear com a câmera</button>
+            <input type="file" id="product-model-input" style="display:none" accept=".glb,.gltf" onchange="onProductModelSelected(this)"/>
+            <button class="btn btn-ghost" style="font-size:.875rem" onclick="document.getElementById('product-model-input').click()">🧊 Enviar .glb</button>
+            <button class="btn btn-ghost" id="btn-remover-modelo" style="font-size:.875rem;display:none" onclick="removerModelo3D()">Remover</button>
+          </div>
+          <span id="product-model-status" style="font-size:.8125rem;color:var(--muted)">Nenhum modelo enviado</span>
+        </div>
+        <p style="font-size:.8125rem;color:var(--muted);margin-top:.4rem;line-height:1.5">
+          <strong>Escanear</strong> gira o produto na frente da câmera e monta o modelo 3D aqui mesmo,
+          sem enviar nada para fora. Funciona bem em produto “cheio” (caixa, garrafa, tênis, panela);
+          objeto vazado, fino, transparente ou espelhado não sai bem.
+          <strong>Preencha as medidas acima antes</strong> — é delas que sai o tamanho real da peça.
+          Sem modelo nenhum o “Ver no meu espaço” ainda funciona: montamos uma caixa no tamanho
+          cadastrado com a foto do produto.
+        </p>
+      </div>
     </div>
     <input type="hidden" id="p-edit-id"/>
+    </div><!-- /modal-body -->
     <div class="modal-actions">
-      <button class="btn btn-ghost" onclick="closeModal()">Cancelar</button>
-      <button class="btn btn-primary" onclick="saveProduct()">Salvar produto</button>
+      <button class="btn btn-ghost" id="btn-cancelar-produto" onclick="closeModal()">Cancelar</button>
+      <button class="btn btn-primary" id="btn-salvar-produto" onclick="saveProduct()">Salvar produto</button>
     </div>
   </div>
 </div>
 
 <script src="app.js"></script>
+<script src="charts.js"></script>
+<script src="ar-viewer.js"></script>
+<script src="scanner-3d.js"></script>
 <script>
 let currentUser = null;
 let currentStore = null;
 let currentEditingProductId = null;
 let pendingProductImage = null;   // imagem escolhida antes do produto existir (upload no salvar)
+let pendingProductModel = null;   // modelo .glb escolhido, enviado junto no salvar
+let modeloAtualUrl = null;        // modelo já salvo no produto que está sendo editado
 
 // ---- INIT ----
 document.addEventListener('DOMContentLoaded', async ()=>{
@@ -421,17 +683,295 @@ document.addEventListener('DOMContentLoaded', async ()=>{
   
   currentStore = await DB.getMyStore(currentUser.id);
   loadLojaForm();
-  await loadStats();
-  await renderProductList('dash-product-list', true);
+  montarPresets();
+  ligarControlesVendas();
+
+  // Restaura a aba do link — o filtro de período só é compartilhável se a aba voltar junto.
+  // Aceita ?page= também: é o parâmetro que os links antigos de outras páginas usam.
+  const q = new URLSearchParams(location.search);
+  const aba = q.get('aba') || q.get('page');
+  if(['dashboard','loja','produtos','vendas'].includes(aba) && aba !== 'dashboard'){
+    await showPage(aba, null);
+  } else {
+    await loadStats();
+    await renderProductList('dash-product-list', true);
+  }
 });
 
-async function showPage(name){
+async function showPage(name, origem){
   document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));
   document.querySelectorAll('.nav-item').forEach(n=>n.classList.remove('active'));
   document.getElementById('page-'+name).classList.add('active');
-  event?.currentTarget?.classList.add('active');
+  const nav = origem || document.querySelector(`.nav-item[data-aba="${name}"]`);
+  nav?.classList.add('active');
+  const u = new URL(location); u.searchParams.set('aba', name); history.replaceState({}, '', u);
   if(name==='produtos') await renderProductList('full-product-list', false);
+  if(name==='vendas') await renderSales();
   if(name==='dashboard'){ await loadStats(); await renderProductList('dash-product-list', true); }
+}
+
+// ============================================================
+//  VENDAS — painel analítico
+//  Toda marca de dado usa UMA matiz (--data). O par laranja+dourado da
+//  marca reprova no teste de daltonismo, então a distinção vem de
+//  posição e rótulo, nunca de cor.
+// ============================================================
+const V = { raw:null, carregado:false, periodo:'30', vista:{serie:'chart',top:'chart',dow:'chart'} };
+
+// Formatação, janelas de tempo, agrupamento, dicas e tabelas vêm de charts.js —
+// as mesmas primitivas que o painel de Desempenho do entregador usa.
+const variacaoVendas = (a,b) => variacao(a,b,'Primeiras vendas');
+
+function metricas(vendas){
+  const pedidos = new Set(), clientes = new Set();
+  let receita = 0, itens = 0;
+  vendas.forEach(v=>{
+    receita += +v.subtotal||0;
+    itens   += +v.qty||0;
+    if(v.pedido_id) pedidos.add(v.pedido_id);
+    clientes.add(v.comprador_email || v.comprador || '—');
+  });
+  return { receita, itens, pedidos:pedidos.size, clientes:clientes.size,
+           ticket: pedidos.size ? receita/pedidos.size : 0 };
+}
+
+// Receita e itens por dia/semana/mês, no formato que charts.js desenha
+const serieVendas = (vendas, ini, fim) => agruparNoTempo(vendas, ini, fim, {
+  zero:  () => ({ valor:0, itens:0 }),
+  somar: (b,v) => { b.valor += +v.subtotal||0; b.itens += +v.qty||0; }
+});
+
+// ============================================================
+//  Renderização
+// ============================================================
+async function renderSales(){
+  aplicarPeriodoDaURL();
+  if(!V.carregado){
+    const data = await DB.getSales();
+    V.raw = (data.vendas || []).slice();
+    V.carregado = true;
+  }
+  desenharVendas();
+}
+
+function aplicarPeriodoDaURL(){
+  const p = new URLSearchParams(location.search).get('periodo');
+  if(['7','30','90','all'].includes(p)) V.periodo = p;
+  document.querySelectorAll('.seg [data-periodo]').forEach(b=>
+    b.setAttribute('aria-pressed', String(b.dataset.periodo === V.periodo)));
+}
+
+function desenharVendas(){
+  const todas = V.raw || [];
+  const j = janela(V.periodo, todas);
+  const atuais = j.tudo ? todas : todas.filter(v=>noIntervalo(v,j.ini,j.fim));
+  const antes  = j.tudo ? [] : todas.filter(v=>noIntervalo(v,j.prevIni,j.prevFim));
+  const m = metricas(atuais), mAntes = metricas(antes);
+  const semData = todas.filter(v=>!v.data).length;
+
+  // Intervalo em texto
+  const range = document.getElementById('v-range');
+  // Vendas sem data entram nos totais mas não na linha do tempo — a diferença é dita, nunca silenciosa
+  const notaSemData = semData
+    ? ` · ${semData} ${semData===1?'venda sem data registrada fica de fora':'vendas sem data registrada ficam de fora'} dos gráficos por tempo`
+    : '';
+  if(!todas.length){ range.textContent = ''; }
+  else if(j.tudo){
+    range.textContent = `Desde ${fmtData(j.ini,{day:'2-digit',month:'long',year:'numeric'})}` + notaSemData;
+  } else {
+    range.textContent = `${fmtData(j.ini,{day:'2-digit',month:'short'})} – ${fmtData(j.fim,{day:'2-digit',month:'short'})}`
+      + (semData ? ` · ${semData} ${semData===1?'venda sem data aparece':'vendas sem data aparecem'} só em “Tudo”` : '');
+  }
+
+  // Estado vazio: convite para agir, não um beco sem saída
+  if(!todas.length){
+    document.getElementById('hero-receita').textContent = formatPrice(0);
+    document.getElementById('hero-delta').className = 'delta delta-flat';
+    document.getElementById('hero-delta').textContent = 'Sem histórico';
+    document.getElementById('serie-body').innerHTML = '';
+    document.getElementById('kpi-row').innerHTML = '';
+    ['top-body','dow-body'].forEach(id=>document.getElementById(id).innerHTML =
+      '<p class="skeleton" style="text-align:center">Sem dados no período</p>');
+    document.getElementById('reg-count').textContent = 'Cada item vendido, do mais recente ao mais antigo';
+    document.getElementById('sales-list').innerHTML = `
+      <div class="v-empty">
+        <div class="icon" aria-hidden="true">🧾</div>
+        <h4>Nenhuma venda ainda</h4>
+        <p>Assim que alguém comprar um produto da sua loja, a compra aparece aqui com o nome de quem comprou — e os gráficos acima começam a se preencher.</p>
+        <button type="button" class="btn btn-primary" onclick="showPage('produtos',null)">Publicar um produto</button>
+      </div>`;
+    return;
+  }
+
+  // Herói
+  document.getElementById('hero-receita').textContent = formatPrice(m.receita);
+  const dv = j.tudo ? {dir:'flat',txt:'Período completo'} : variacaoVendas(m.receita, mAntes.receita);
+  const elDelta = document.getElementById('hero-delta');
+  elDelta.className = 'delta delta-'+dv.dir;
+  elDelta.innerHTML = `${esc(dv.txt)}${j.tudo?'':' <small>vs. período anterior</small>'}`;
+
+  // Indicadores
+  const tiles = [
+    { rot:'Pedidos',      val:fmtInt(m.pedidos),        d:j.tudo?null:variacaoVendas(m.pedidos,mAntes.pedidos) },
+    { rot:'Ticket médio', val:formatPrice(m.ticket),    d:j.tudo?null:variacaoVendas(m.ticket,mAntes.ticket) },
+    { rot:'Itens vendidos',val:fmtInt(m.itens),         d:j.tudo?null:variacaoVendas(m.itens,mAntes.itens) },
+    { rot:'Clientes',     val:fmtInt(m.clientes),       d:j.tudo?null:variacaoVendas(m.clientes,mAntes.clientes) },
+  ];
+  document.getElementById('kpi-row').innerHTML = tiles.map(t=>`
+    <div class="glass kpi">
+      <p class="kpi-label">${t.rot}</p>
+      <p class="kpi-value" title="${esc(t.val)}">${esc(t.val)}</p>
+      <div class="kpi-foot">${t.d?`<span class="delta delta-${t.d.dir}">${esc(t.d.txt)}</span>`:'<span></span>'}</div>
+    </div>`).join('');
+
+  // Gráficos
+  const serie = serieVendas(atuais, j.ini, j.fim);
+  V.dados = { serie, atuais, m };
+  pintarSerie(); pintarTop(); pintarDow();
+  pintarRegistro(atuais);
+}
+
+// ---- 1. Receita ao longo do tempo (área + linha, série única) ----
+function pintarSerie(){
+  const box = document.getElementById('serie-body');
+  const { baldes, gran } = V.dados.serie;
+  if(V.vista.serie === 'table'){
+    box.innerHTML = tabela(
+      'Receita por período',
+      [{t:'Período'},{t:'Itens',num:true},{t:'Receita',num:true}],
+      baldes.map(b=>[ rotuloBalde(b,gran), fmtInt(b.itens), formatPrice(b.valor) ])
+    );
+    return;
+  }
+  const iMax = baldes.reduce((m,b,i)=> b.valor > baldes[m].valor ? i : m, 0);
+  desenharLinha(box, {
+    baldes, gran, id:'serie',
+    valorDe:  b => b.valor,
+    fmtValor: fmtMoedaEixo,
+    tipHtml:  b => `<b>${formatPrice(b.valor)}</b><br><span>${rotuloBalde(b,gran)} · ${fmtInt(b.itens)} ${b.itens===1?'item':'itens'}</span>`,
+    resumo: `Receita por ${gran}, de ${rotuloBalde(baldes[0],gran)} a ${rotuloBalde(baldes[baldes.length-1],gran)}. `
+          + `Pico de ${fmtMoedaEixo(baldes[iMax].valor)} em ${rotuloBalde(baldes[iMax],gran)}.`
+  });
+}
+
+// ---- 2. Produtos que mais faturam (barras horizontais, matiz única) ----
+function pintarTop(){
+  const box = document.getElementById('top-body');
+  const mapa = new Map();
+  V.dados.atuais.forEach(v=>{
+    const k = v.produto_nome || 'Sem nome';
+    const a = mapa.get(k) || { nome:k, receita:0, qty:0 };
+    a.receita += +v.subtotal||0; a.qty += +v.qty||0; mapa.set(k,a);
+  });
+  const itens = [...mapa.values()].sort((a,b)=>b.receita-a.receita).slice(0,6);
+  if(!itens.length){ box.innerHTML = '<p class="skeleton" style="text-align:center">Sem vendas no período</p>'; return; }
+
+  if(V.vista.top === 'table'){
+    box.innerHTML = tabela('Receita por produto',
+      [{t:'Produto'},{t:'Qtd',num:true},{t:'Receita',num:true}],
+      itens.map(i=>[i.nome, fmtInt(i.qty), formatPrice(i.receita)]));
+    return;
+  }
+  desenharBarrasH(box, {
+    itens, id:'top',
+    rotuloDe: it => it.nome,
+    valorDe:  it => it.receita,
+    fmtValor: fmtMoedaEixo,
+    tipHtml:  it => `<b>${formatPrice(it.receita)}</b><br><span>${esc(it.nome)} · ${fmtInt(it.qty)} ${it.qty===1?'unidade':'unidades'}</span>`,
+    resumo: 'Receita por produto. ' + itens.map(i=>`${i.nome}: ${fmtMoedaEixo(i.receita)}`).join('; ') + '.'
+  });
+}
+
+// ---- 3. Receita por dia da semana (colunas, categorias ordenadas) ----
+function pintarDow(){
+  const box = document.getElementById('dow-body');
+  const acc = DIAS.map((d,i)=>({ dia:d, i, receita:0, qty:0 }));
+  let comData = 0;
+  V.dados.atuais.forEach(v=>{
+    if(!v.data) return;
+    comData++;
+    const d = acc[new Date(v.data).getDay()];
+    d.receita += +v.subtotal||0; d.qty += +v.qty||0;
+  });
+  if(!comData){ box.innerHTML = '<p class="skeleton" style="text-align:center">Sem vendas com data no período</p>'; return; }
+
+  if(V.vista.dow === 'table'){
+    box.innerHTML = tabela('Receita por dia da semana',
+      [{t:'Dia'},{t:'Itens',num:true},{t:'Receita',num:true}],
+      acc.map(d=>[d.dia, fmtInt(d.qty), formatPrice(d.receita)]));
+    return;
+  }
+  const iMax = acc.reduce((b,d,i)=> d.receita > acc[b].receita ? i : b, 0);
+  desenharColunas(box, {
+    itens: acc, id:'dow',
+    rotuloDe: d => d.dia,
+    valorDe:  d => d.receita,
+    fmtValor: fmtMoedaEixo,
+    tipHtml:  d => `<b>${formatPrice(d.receita)}</b><br><span>${d.dia} · ${fmtInt(d.qty)} ${d.qty===1?'item':'itens'}</span>`,
+    resumo: 'Receita por dia da semana. ' + acc.map(d=>`${d.dia}: ${fmtMoedaEixo(d.receita)}`).join('; ')
+          + `. Melhor dia: ${acc[iMax].dia}.`
+  });
+}
+
+// ---- 4. Registro de compras (a tabela é a leitura primária, não um fallback) ----
+function pintarRegistro(atuais){
+  const el = document.getElementById('sales-list');
+  document.getElementById('reg-count').textContent =
+    `${fmtInt(atuais.length)} ${atuais.length===1?'item vendido':'itens vendidos'} no período, do mais recente ao mais antigo`;
+  if(!atuais.length){
+    el.innerHTML = `<div class="v-empty"><div class="icon" aria-hidden="true">🗓️</div>
+      <h4>Nenhuma venda neste período</h4>
+      <p>Sua loja já vendeu antes — experimente um intervalo maior no filtro acima.</p></div>`;
+    return;
+  }
+  el.innerHTML = `<div class="vtable-wrap"><table class="vtable">
+    <caption>Compras recebidas no período selecionado</caption>
+    <thead><tr>
+      <th scope="col">Produto</th><th scope="col">Comprador</th>
+      <th scope="col">Data</th><th scope="col" class="num">Qtd</th><th scope="col" class="num">Valor</th>
+    </tr></thead><tbody>
+    ${atuais.map(v=>`<tr>
+      <td class="cell-strong cell-clip" title="${esc(v.produto_nome)}">${esc(v.produto_nome)}</td>
+      <td class="cell-clip" title="${esc(v.comprador_email||v.comprador)}">${esc(v.comprador)}
+        ${v.comprador_email?`<div class="cell-muted">${esc(v.comprador_email)}</div>`:''}</td>
+      <td class="cell-muted">${v.data ? fmtData(new Date(v.data),{day:'2-digit',month:'short',year:'2-digit',hour:'2-digit',minute:'2-digit'}) : '—'}</td>
+      <td class="num">${fmtInt(v.qty)}</td>
+      <td class="num cell-strong">${formatPrice(v.subtotal)}</td>
+    </tr>`).join('')}
+    </tbody></table></div>`;
+}
+
+// cortar, tabela e ligarDica vivem em charts.js
+// ---- Controles: filtro de período e alternância gráfico/tabela ----
+function ligarControlesVendas(){
+  document.querySelectorAll('.seg [data-periodo]').forEach(btn=>{
+    btn.addEventListener('click', ()=>{
+      V.periodo = btn.dataset.periodo;
+      document.querySelectorAll('.seg [data-periodo]').forEach(b=>
+        b.setAttribute('aria-pressed', String(b===btn)));
+      const u = new URL(location); u.searchParams.set('periodo', V.periodo);
+      history.replaceState({}, '', u);
+      desenharVendas();                       // sem refetch, sem pisca-pisca de esqueleto
+    });
+  });
+  [['toggle-serie','serie',pintarSerie],['toggle-top','top',pintarTop],['toggle-dow','dow',pintarDow]]
+    .forEach(([id,chave,pintar])=>{
+      const btn = document.getElementById(id);
+      btn?.addEventListener('click', ()=>{
+        V.vista[chave] = V.vista[chave]==='chart' ? 'table' : 'chart';
+        const tabelaAtiva = V.vista[chave]==='table';
+        btn.setAttribute('aria-pressed', String(tabelaAtiva));
+        btn.textContent = tabelaAtiva ? 'Ver gráfico' : 'Ver tabela';
+        if(V.dados) pintar();
+      });
+    });
+
+  // Redesenha na mudança de largura — SVG nítido em vez de esticado
+  aoRedimensionar(document.querySelector('.main'), ()=>{
+    if(V.dados && document.getElementById('page-vendas').classList.contains('active')){
+      pintarSerie(); pintarTop(); pintarDow();
+    }
+  });
 }
 
 // ---- STORE ----
@@ -507,6 +1047,11 @@ async function renderProductList(containerId, limit){
     container.innerHTML=`<div class="empty-state"><div class="icon">📦</div><p>Nenhum produto ainda.<br/>Adicione seu primeiro produto!</p></div>`;
     return;
   }
+  // Guarda os produtos para o preview 3D poder abrir pelo id
+  window._productsMap = window._productsMap || {};
+  prods.forEach(p=>{ window._productsMap[p.id] = p; });
+
+  const podeVer3D = !!(window.ARViewer && ARViewer.suportado());
   container.innerHTML = prods.map(p=>`
     <div class="product-item">
       <div class="prod-emoji">${p.imagem_url ? `<img src="${p.imagem_url}" style="width:100%;height:100%;object-fit:cover;display:block;">` : catEmoji(p.categoria)}</div>
@@ -519,6 +1064,7 @@ async function renderProductList(containerId, limit){
       </div>
       <div class="prod-price">${formatPrice(p.preco)}</div>
       <div class="prod-actions">
+        ${podeVer3D ? `<button class="btn btn-ghost" title="Ver como o cliente vê em 3D" onclick="previewProduto3D('${p.id}')">📐</button>` : ''}
         <button class="btn btn-edit" onclick="openEditModal('${p.id}')">✏️</button>
         <button class="btn btn-danger" onclick="deleteProduct('${p.id}')">🗑</button>
       </div>
@@ -542,16 +1088,153 @@ function onProductImageSelected(input){
   reader.readAsDataURL(file);
 }
 
+// ---- MODELO 3D ----
+// Guarda o arquivo e só sobe no salvar, igual à imagem: assim um produto
+// novo já nasce com o modelo, sem precisar salvar duas vezes.
+function onProductModelSelected(input){
+  const file = input.files[0];
+  if(!file) return;
+  const nome = file.name.toLowerCase();
+  if(!nome.endsWith('.glb') && !nome.endsWith('.gltf')){
+    toast('Envie um modelo no formato .glb ou .gltf.','error'); input.value=''; return;
+  }
+  if(file.size > 20*1024*1024){
+    toast('O modelo 3D deve ter no máximo 20MB.','error'); input.value=''; return;
+  }
+  pendingProductModel = file;
+  atualizarStatusModelo(file.name + ' (envia ao salvar)');
+}
+
+function atualizarStatusModelo(texto, previewURL){
+  document.getElementById('product-model-status').textContent = texto;
+  const temAlgo = !!(pendingProductModel || modeloAtualUrl);
+  document.getElementById('btn-remover-modelo').style.display = temAlgo ? '' : 'none';
+  const thumb = document.getElementById('product-model-thumb');
+  if(previewURL){
+    thumb.innerHTML = `<img src="${previewURL}" style="width:100%;height:100%;object-fit:cover;display:block">`;
+    thumb.style.display = 'flex';
+  } else if(!temAlgo){
+    thumb.innerHTML = ''; thumb.style.display = 'none';
+  }
+}
+
+// ---- ESCANEAMENTO 3D PELA CÂMERA ----
+// As medidas do formulário vão junto: o escaneamento define a FORMA e o
+// cadastro define o TAMANHO, então a peça chega ao cliente na escala certa
+// mesmo com a câmera tendo chutado a distância.
+function abrirScanner3D(){
+  if(!window.Scanner3D || !Scanner3D.suportado()){
+    toast('Este aparelho não tem câmera ou WebGL para escanear.','error');
+    return;
+  }
+  const [c, l, a] = medidasAtuais();
+  if(!(c>0 && l>0 && a>0)){
+    toast('Preencha comprimento, largura e altura antes de escanear.','error');
+    return;
+  }
+  Scanner3D.abrir({
+    produto: {
+      nome: document.getElementById('p-nome').value.trim() || 'Novo produto',
+      comprimento: c, largura: l, altura: a
+    },
+    aoConcluir: function(arquivo, previewURL){
+      pendingProductModel = arquivo;
+      document.getElementById('product-model-input').value = '';
+      atualizarStatusModelo('Modelo escaneado (envia ao salvar)', previewURL);
+      toast('Modelo 3D pronto! Salve o produto para publicar.');
+    }
+  });
+}
+
+async function removerModelo3D(){
+  // Arquivo ainda não enviado: basta esquecer a escolha
+  if(pendingProductModel){
+    pendingProductModel = null;
+    document.getElementById('product-model-input').value = '';
+    atualizarStatusModelo(modeloAtualUrl ? '✓ Modelo 3D enviado' : 'Nenhum modelo enviado');
+    return;
+  }
+  if(!modeloAtualUrl || !currentEditingProductId) return;
+  if(!confirm('Remover o modelo 3D deste produto?')) return;
+  const r = await DB.deleteProductModel(currentEditingProductId);
+  if(r && r.ok){
+    modeloAtualUrl = null;
+    atualizarStatusModelo('Nenhum modelo enviado');
+    toast('Modelo 3D removido.');
+  } else {
+    toast((r && r.msg) || 'Erro ao remover o modelo.','error');
+  }
+}
+
+// Abre o mesmo visualizador que o cliente vê, com os dados atuais do produto
+function previewProduto3D(id){
+  if(!window.ARViewer) return;
+  const p = (window._productsMap||{})[id];
+  if(!p){ toast('Produto não encontrado.','error'); return; }
+  ARViewer.open(p);
+}
+
+// ---- MEDIDAS DA EMBALAGEM ----
+// Um clique preenche C×L×A; o botão fica marcado só enquanto os valores
+// continuarem os do preset — assim ele nunca mente sobre o que está no campo.
+function montarPresets(){
+  document.getElementById('preset-embalagens').innerHTML = EMBALAGENS.map(e=>
+    `<button type="button" class="preset-btn" data-preset="${e.id}"
+             title="${esc(e.c)}×${esc(e.l)}×${esc(e.a)} cm — ${esc(e.ex)}"
+             aria-pressed="false" onclick="aplicarPreset('${e.id}')">${e.nome}</button>`).join('');
+  ['p-comprimento','p-largura','p-altura'].forEach(id=>
+    document.getElementById(id).addEventListener('input', sincronizarPresets));
+}
+
+function aplicarPreset(id){
+  const e = EMBALAGENS.find(x=>x.id===id);
+  if(!e) return;
+  document.getElementById('p-comprimento').value = e.c;
+  document.getElementById('p-largura').value     = e.l;
+  document.getElementById('p-altura').value      = e.a;
+  sincronizarPresets();
+}
+
+function medidasAtuais(){
+  return ['p-comprimento','p-largura','p-altura']
+    .map(id => parseFloat(document.getElementById(id).value) || 0);
+}
+
+function sincronizarPresets(){
+  const [c,l,a] = medidasAtuais();
+  document.querySelectorAll('#preset-embalagens .preset-btn').forEach(btn=>{
+    const e = EMBALAGENS.find(x=>x.id===btn.dataset.preset);
+    btn.setAttribute('aria-pressed', String(!!e && e.c===c && e.l===l && e.a===a));
+  });
+  const nota = document.getElementById('medidas-nota');
+  if(c>0 && l>0 && a>0){
+    nota.className = 'medidas-nota ok';
+    nota.textContent = `✓ ${formatarMedidas(c,l,a)} · ocupa ${(c*l*a/1000).toFixed(1)} L`;
+  } else {
+    nota.className = 'medidas-nota';
+    nota.textContent = 'O peso não aparece para o cliente. As medidas servem para calcular o frete '
+      + 'e para o entregador saber se o pedido cabe no veículo dele — sem elas, seu produto pode '
+      + 'ficar de fora da fila de quem entrega de moto — e são elas que dão a escala real no '
+      + '“Ver no meu espaço”, onde o cliente confere o tamanho antes de comprar.';
+  }
+}
+
 function openAddModal(){
   document.getElementById('modal-title').textContent = 'Novo Produto';
-  ['p-nome','p-preco','p-estoque','p-peso','p-descricao'].forEach(id=>document.getElementById(id).value='');
+  ['p-nome','p-preco','p-estoque','p-peso','p-descricao',
+   'p-comprimento','p-largura','p-altura'].forEach(id=>document.getElementById(id).value='');
+  sincronizarPresets();
   document.getElementById('p-categoria').value='';
   document.getElementById('p-edit-id').value='';
   currentEditingProductId = null;
   pendingProductImage = null;
   document.getElementById('product-image-preview').innerHTML = '<span style="font-size:2rem">📦</span>';
   document.getElementById('product-image-input').value = '';
-  document.getElementById('product-overlay').classList.add('open');
+  pendingProductModel = null;
+  modeloAtualUrl = null;
+  document.getElementById('product-model-input').value = '';
+  atualizarStatusModelo('Nenhum modelo enviado');
+  abrirOverlayProduto();
 }
 
 async function openEditModal(id){
@@ -565,6 +1248,10 @@ async function openEditModal(id){
   document.getElementById('p-preco').value=prod.preco;
   document.getElementById('p-estoque').value=prod.estoque||0;
   document.getElementById('p-peso').value=prod.peso||'';
+  document.getElementById('p-comprimento').value=prod.comprimento||'';
+  document.getElementById('p-largura').value=prod.largura||'';
+  document.getElementById('p-altura').value=prod.altura||'';
+  sincronizarPresets();
   document.getElementById('p-categoria').value=prod.categoria||'';
   document.getElementById('p-descricao').value=prod.descricao||'';
   document.getElementById('p-edit-id').value=id;
@@ -578,54 +1265,116 @@ async function openEditModal(id){
     document.getElementById('product-image-preview').innerHTML = '<span style="font-size:2rem">📦</span>';
   }
   document.getElementById('product-image-input').value = '';
-  
-  document.getElementById('product-overlay').classList.add('open');
+
+  pendingProductModel = null;
+  modeloAtualUrl = prod.modelo_3d_url || null;
+  document.getElementById('product-model-input').value = '';
+  atualizarStatusModelo(modeloAtualUrl ? '✓ Modelo 3D enviado' : 'Nenhum modelo enviado');
+
+  abrirOverlayProduto();
 }
 
+// Enquanto o modal está aberto o fundo não rola. Sem isso, no celular o
+// dedo arrasta a página de trás em vez do formulário.
+function abrirOverlayProduto(){
+  document.getElementById('product-overlay').classList.add('open');
+  document.body.classList.add('modal-aberto');
+}
 function closeModal(e){
   if(e && e.target !== document.getElementById('product-overlay')) return;
+  if(salvandoProduto) return;   // não fecha no meio do envio: o usuário perderia o retorno
   document.getElementById('product-overlay').classList.remove('open');
+  document.body.classList.remove('modal-aberto');
+}
+
+// Trava o salvar enquanto a requisição está em andamento. Sem isso, cada clique
+// durante o envio criava mais uma cópia do produto no banco.
+let salvandoProduto = false;
+function estadoSalvando(ativo, etapa){
+  salvandoProduto = ativo;
+  const btn = document.getElementById('btn-salvar-produto');
+  document.getElementById('btn-cancelar-produto').disabled = ativo;
+  btn.disabled = ativo;
+  btn.setAttribute('aria-busy', String(ativo));
+  btn.innerHTML = ativo
+    ? `<span class="btn-spinner" aria-hidden="true"></span>${etapa || 'Salvando…'}`
+    : 'Salvar produto';
 }
 
 function saveProduct(){
+  if(salvandoProduto) return;
   const nome = document.getElementById('p-nome').value.trim();
   const preco = parseFloat(document.getElementById('p-preco').value);
   if(!nome){ toast('Nome do produto é obrigatório.','error'); return; }
   if(isNaN(preco)||preco<0){ toast('Preço inválido.','error'); return; }
+  const [c, l, a] = medidasAtuais();
   const data = {
     nome, preco,
     estoque: parseInt(document.getElementById('p-estoque').value)||0,
     peso: parseFloat(document.getElementById('p-peso').value)||0,
+    // null (e não 0) quando não informado: "não sei" e "mede zero" são coisas
+    // diferentes para quem decide se o pedido cabe na moto
+    comprimento: c || null,
+    largura:     l || null,
+    altura:      a || null,
     categoria: document.getElementById('p-categoria').value,
     descricao: document.getElementById('p-descricao').value,
   };
   const editId = document.getElementById('p-edit-id').value;
-  
+
+  estadoSalvando(true, 'Salvando produto…');
   (async () => {
-    const store = await DB.getMyStore(currentUser.id);
-    if(!store){ toast('Configure sua loja antes de adicionar produtos.','error'); return; }
+    try {
+      const store = await DB.getMyStore(currentUser.id);
+      if(!store){ toast('Configure sua loja antes de adicionar produtos.','error'); return; }
 
-    let prod;
-    if(editId){
-      prod = await DB.updateProduct(editId, data);
-    } else {
-      prod = await DB.addProduct(store.id, data);
+      let prod;
+      if(editId){
+        prod = await DB.updateProduct(editId, data);
+      } else {
+        prod = await DB.addProduct(store.id, data);
+        // O produto já existe no banco: se a imagem falhar e o usuário tentar de
+        // novo, o próximo salvar atualiza este em vez de criar uma cópia
+        if(prod?.id) document.getElementById('p-edit-id').value = prod.id;
+      }
+      const prodId = prod?.id || editId;
+      if(!prodId){ toast('Erro ao salvar o produto.','error'); return; }
+
+      // Envia a imagem escolhida (vale tanto para produto novo quanto editado)
+      if(pendingProductImage){
+        estadoSalvando(true, 'Enviando imagem…');
+        const result = await DB.updateProductImage(prodId, pendingProductImage);
+        if(!result || !result.ok){ toast((result && result.msg) || 'Produto salvo, mas houve erro ao enviar a imagem.','error'); }
+        pendingProductImage = null;
+      }
+
+      // Mesma lógica para o modelo 3D opcional
+      if(pendingProductModel){
+        estadoSalvando(true, 'Enviando modelo 3D…');
+        const result = await DB.updateProductModel(prodId, pendingProductModel);
+        if(!result || !result.ok){ toast((result && result.msg) || 'Produto salvo, mas houve erro ao enviar o modelo 3D.','error'); }
+        pendingProductModel = null;
+      }
+
+      // Atualiza a lista ANTES de fechar: quando o modal some, o produto já está na tela.
+      // Uma falha aqui não desfaz o salvamento, então não vira erro de salvar.
+      estadoSalvando(true, 'Atualizando lista…');
+      try {
+        await renderProductList('full-product-list', false);
+        await renderProductList('dash-product-list', true);
+        await loadStats();
+      } catch(e){ console.error('Erro ao atualizar a lista de produtos:', e); }
+
+      estadoSalvando(false);
+      closeModal();
+      toast(editId ? 'Produto atualizado!' : 'Produto adicionado!');
+    } catch(e){
+      // Queda de conexão ou servidor fora do ar: antes a tela ficava sem resposta nenhuma
+      console.error('Erro ao salvar produto:', e);
+      toast('Não foi possível salvar. Verifique sua conexão e tente de novo.','error');
+    } finally {
+      if(salvandoProduto) estadoSalvando(false);
     }
-    const prodId = prod?.id || editId;
-    if(!prodId){ toast('Erro ao salvar o produto.','error'); return; }
-
-    // Envia a imagem escolhida (vale tanto para produto novo quanto editado)
-    if(pendingProductImage){
-      const result = await DB.updateProductImage(prodId, pendingProductImage);
-      if(!result || !result.ok){ toast((result && result.msg) || 'Produto salvo, mas houve erro ao enviar a imagem.','error'); }
-      pendingProductImage = null;
-    }
-
-    toast(editId ? 'Produto atualizado!' : 'Produto adicionado!');
-    closeModal();
-    await renderProductList('full-product-list', false);
-    await renderProductList('dash-product-list', true);
-    await loadStats();
   })();
 }
 

@@ -1,0 +1,72 @@
+<!DOCTYPE html><html lang="pt-BR"><head><meta charset="UTF-8"/>
+<script type="importmap">
+{"imports":{"three":"https://unpkg.com/three@0.161.0/build/three.module.js","three/addons/":"https://unpkg.com/three@0.161.0/examples/jsm/"}}
+</script>
+<style>body{margin:0;background:#111;color:#ddd;font:12px monospace}#out{padding:12px;white-space:pre-wrap}</style>
+</head><body><div id="out">rodando…</div>
+<script src="../scanner-3d.js"></script>
+<script type="module">
+import * as THREE from 'three';
+const out=document.getElementById('out');
+const log=m=>{out.textContent+='\n'+m;};
+window.onerror=e=>log('ERRO '+e);
+out.textContent='VALIDACAO DO PIPELINE — silhuetas sinteticas de objeto conhecido';
+
+await Scanner3D._carregarLib();
+const C=Scanner3D._consts, D=Scanner3D._distancia();
+const rend=new THREE.WebGLRenderer({antialias:false,preserveDrawingBuffer:true});
+rend.setSize(C.LARG,C.ALT,false); rend.setClearColor(0x000000,1);
+const gl=rend.getContext(); const cam=new THREE.PerspectiveCamera();
+
+function caso(nome,verdade,fazerAlvo,n,elev){
+  const cena=new THREE.Scene(); cena.add(fazerAlvo());
+  const qs=[],poses=[];
+  for(let i=0;i<n;i++){
+    const t=(i/n)*Math.PI*2, e=elev*Math.PI/180;
+    cam.position.set(D*Math.cos(e)*Math.sin(t), D*Math.sin(e), D*Math.cos(e)*Math.cos(t));
+    cam.lookAt(0,0,0); cam.fov=55; cam.aspect=C.LARG/C.ALT; cam.near=D*0.01; cam.far=100;
+    cam.updateProjectionMatrix(); rend.render(cena,cam);
+    const buf=new Uint8Array(C.LARG*C.ALT*4);
+    gl.readPixels(0,0,C.LARG,C.ALT,gl.RGBA,gl.UNSIGNED_BYTE,buf);
+    const m=new Uint8Array(C.LARG*C.ALT);
+    for(let y=0;y<C.ALT;y++)for(let x=0;x<C.LARG;x++)
+      m[y*C.LARG+x]= buf[((C.ALT-1-y)*C.LARG+x)*4]>128?1:0;
+    qs.push({mascara:m,cores:new Uint8ClampedArray(192*256*4)});
+    poses.push({t:t,e:e});
+  }
+  const t1=performance.now();
+  const r=Scanner3D._pipeline(qs,poses);
+  const tRec=Math.round(performance.now()-t1);
+  if(!r.malha.idx.length){ log(nome.padEnd(26)+'MALHA VAZIA'); return; }
+  let mn=[1e9,1e9,1e9],mx=[-1e9,-1e9,-1e9];
+  for(let i=0;i<r.malha.pos.length;i+=3)for(let k=0;k<3;k++){
+    mn[k]=Math.min(mn[k],r.malha.pos[i+k]); mx[k]=Math.max(mx[k],r.malha.pos[i+k]); }
+  const g=[mx[0]-mn[0],mx[1]-mn[1],mx[2]-mn[2]];
+  const e=k=>(100*Math.abs(g[k]-verdade[k])/verdade[k]).toFixed(1).padStart(5)+'%';
+  const p=r.malha.pos, ix=r.malha.idx; let fora=0,dentro=0;
+  for(let i=0;i<ix.length;i+=3){
+    const a=ix[i]*3,b=ix[i+1]*3,cc=ix[i+2]*3;
+    const ux=p[b]-p[a],uy=p[b+1]-p[a+1],uz=p[b+2]-p[a+2];
+    const vx=p[cc]-p[a],vy=p[cc+1]-p[a+1],vz=p[cc+2]-p[a+2];
+    const nx=uy*vz-uz*vy,ny=uz*vx-ux*vz,nz=ux*vy-uy*vx;
+    const gx=(p[a]+p[b]+p[cc])/3,gy=(p[a+1]+p[b+1]+p[cc+1])/3,gz=(p[a+2]+p[b+2]+p[cc+2])/3;
+    if(nx*gx+ny*gy+nz*gz>0) fora++; else dentro++;
+  }
+  log(nome.padEnd(26)+e(0)+' '+e(1)+' '+e(2)+'  '+(ix.length/3).toString().padStart(6)+' tris  '
+      +String(tRec).padStart(5)+'ms  faces invertidas '+(100*dentro/(fora+dentro)).toFixed(2)+'%');
+}
+const bm=()=>new THREE.MeshBasicMaterial({color:0xffffff});
+log('');
+log('objeto                       errX   errY   errZ');
+caso('caixa .62x.88x.40         ',[0.62,0.88,0.40],()=>new THREE.Mesh(new THREE.BoxGeometry(0.62,0.88,0.40),bm()),36,5);
+caso('cilindro d.50 h.80        ',[0.50,0.80,0.50],()=>new THREE.Mesh(new THREE.CylinderGeometry(0.25,0.25,0.80,48),bm()),36,5);
+caso('esfera d.60               ',[0.60,0.60,0.60],()=>new THREE.Mesh(new THREE.SphereGeometry(0.30,48,32),bm()),36,5);
+caso('caixa achatada .70x.25x.50',[0.70,0.25,0.50],()=>new THREE.Mesh(new THREE.BoxGeometry(0.70,0.25,0.50),bm()),36,5);
+caso('caixa, so 18 quadros      ',[0.62,0.88,0.40],()=>new THREE.Mesh(new THREE.BoxGeometry(0.62,0.88,0.40),bm()),18,5);
+caso('caixa, so 12 quadros      ',[0.62,0.88,0.40],()=>new THREE.Mesh(new THREE.BoxGeometry(0.62,0.88,0.40),bm()),12,5);
+log('');
+log('OBS: o erro em Y e o visual hull genuino — a aresta proxima projeta mais alto');
+log('que o eixo, entao o casco estoura em cima e embaixo. O reescalonamento final');
+log('para as medidas do cadastro corrige a dimensao; sobra so um leve abaulamento.');
+document.title='PRONTO';
+</script></body></html>

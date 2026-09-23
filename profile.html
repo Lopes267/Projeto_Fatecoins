@@ -4,60 +4,68 @@
   <meta charset="UTF-8"/>
   <meta name="viewport" content="width=device-width,initial-scale=1"/>
   <title>Meu Perfil – Mercado Local</title>
-  <link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,700&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet"/>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Merriweather:ital,wght@0,300;0,400;0,700;1,400;1,700&display=swap" rel="stylesheet"/>
   <style>
     *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
     :root{
+  --font-titulo:'Merriweather',Georgia,serif;--font-texto:'Inter',Arial,sans-serif;
       --bg:#0d0d0d;--card:#161616;--card2:#1c1c1c;--border:#2a2a2a;
-      --text:#f0ece3;--muted:#888;--accent:#e8854a;--accent2:#f4c56a;
+      --text:#f0ece3;--muted:#888;--accent:#e8854a;--accent-rgb:232,133,74;--accent-hover:#d9733c;--accent2:#f4c56a;
       --green:#5dcfa0;--red:#e85a5a;
     }
-    body{background:var(--bg);color:var(--text);font-family:'DM Sans',sans-serif;display:flex;min-height:100vh}
+    body{background:var(--bg);color:var(--text);font-family:var(--font-texto);display:flex;min-height:100vh}
 
     /* SIDEBAR */
     .sidebar{
       width:240px;flex-shrink:0;background:var(--card);border-right:1px solid var(--border);
       display:flex;flex-direction:column;padding:1.5rem;position:sticky;top:0;height:100vh;
     }
-    .logo{font-family:'Fraunces',serif;font-size:1.3rem;color:var(--accent);margin-bottom:2rem}
+    .logo{font-family:var(--font-titulo);font-size:1.3rem;color:var(--accent);margin-bottom:2rem}
     .logo span{color:var(--text)}
-    .nav-section{font-size:.7rem;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);font-weight:600;margin-bottom:.5rem;margin-top:1rem}
+    .nav-section{font-size:.75rem;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);font-weight:600;margin-bottom:.5rem;margin-top:1rem}
     .nav-item{
       display:flex;align-items:center;gap:.7rem;padding:.7rem .9rem;border-radius:9px;
-      cursor:pointer;color:var(--muted);font-size:.9rem;font-weight:500;transition:all .2s;
-      margin-bottom:.2rem;
+      cursor:pointer;color:var(--muted);font-size:.9375rem;font-weight:500;
+      transition:background-color .2s,color .2s;
+      margin-bottom:.2rem;text-decoration:none;touch-action:manipulation;
     }
     .nav-item:hover{background:var(--card2);color:var(--text)}
-    .nav-item.active{background:rgba(232,133,74,.12);color:var(--accent)}
+    .nav-item.active{background:rgba(var(--accent-rgb),.12);color:var(--accent)}
     .nav-item .icon{font-size:1.1rem;width:20px;text-align:center}
+    .nav-item:focus-visible,.user-chip:focus-visible,.logout-btn:focus-visible,.back-btn:focus-visible{
+      outline:2px solid var(--accent2);outline-offset:2px;
+    }
     .sidebar-footer{margin-top:auto;padding-top:1.5rem;border-top:1px solid var(--border)}
-    .user-chip{display:flex;align-items:center;gap:.7rem;margin-bottom:1rem;cursor:pointer;opacity:.7;transition:opacity .2s}
-    .user-chip:hover{opacity:1}
+    .user-chip{display:flex;align-items:center;gap:.7rem;margin-bottom:1rem;cursor:pointer;opacity:.7;
+      transition:opacity .2s;text-decoration:none;color:inherit}
+    .user-chip:hover,.user-chip.active-chip{opacity:1}
     .avatar{
       width:34px;height:34px;border-radius:50%;background:var(--accent);
-      display:flex;align-items:center;justify-content:center;font-size:.85rem;font-weight:700;color:#fff;
+      display:flex;align-items:center;justify-content:center;font-size:.875rem;font-weight:700;color:#fff;
     }
     .user-info{flex:1;min-width:0}
-    .user-name{font-size:.85rem;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-    .user-role{font-size:.73rem;color:var(--muted)}
+    .user-name{font-size:.875rem;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+    .user-role{font-size:.75rem;color:var(--muted)}
     .logout-btn{
       width:100%;padding:.6rem;border-radius:8px;background:transparent;
-      border:1px solid var(--border);color:var(--muted);cursor:pointer;font-size:.85rem;
-      font-family:'DM Sans',sans-serif;transition:all .2s;
+      border:1px solid var(--border);color:var(--muted);cursor:pointer;font-size:.875rem;
+      font-family:var(--font-texto);transition:all .2s;
     }
     .logout-btn:hover{border-color:var(--red);color:var(--red)}
 
     /* MAIN */
-    .main{flex:1;overflow-y:auto;padding:2.5rem;display:flex;flex-direction:column;gap:2rem;max-width:900px}
+    .main{flex:1;overflow-y:auto;padding:2.5rem var(--gutter);display:flex;flex-direction:column;gap:2rem}
+    /* Conteúdo em até 1140px, centralizado no espaço ao lado da barra lateral */
+    .main>*{width:100%;max-width:var(--container);margin-inline:auto}
 
     /* TOPBAR */
     .topbar{display:flex;align-items:center;justify-content:space-between;margin-bottom:2rem}
-    .page-title{font-family:'Fraunces',serif;font-size:1.8rem;font-weight:700}
-    .page-sub{color:var(--muted);font-size:.9rem;margin-top:.2rem}
+    .page-title{font-family:var(--font-titulo);font-size:1.8rem;font-weight:700}
+    .page-sub{color:var(--muted);font-size:.9375rem;margin-top:.2rem}
     .back-btn{
       background:transparent;border:1px solid var(--border);color:var(--muted);
-      padding:.5rem 1rem;border-radius:8px;cursor:pointer;font-size:.9rem;
-      font-family:'DM Sans',sans-serif;transition:all .2s;text-decoration:none;
+      padding:.5rem 1rem;border-radius:8px;cursor:pointer;font-size:.9375rem;
+      font-family:var(--font-texto);transition:all .2s;text-decoration:none;
       display:inline-flex;align-items:center;gap:.4rem;
     }
     .back-btn:hover{border-color:var(--accent);color:var(--accent)}
@@ -75,34 +83,34 @@
       background-size:cover;background-position:center;background-repeat:no-repeat;
       border:3px solid var(--border);
     }
-    .profile-info h2{font-family:'Fraunces',serif;font-size:1.5rem;margin-bottom:.4rem}
-    .profile-info p{color:var(--muted);font-size:.95rem}
+    .profile-info h2{font-family:var(--font-titulo);font-size:1.5rem;margin-bottom:.4rem}
+    .profile-info p{color:var(--muted);font-size:1rem}
 
     /* FORM CARD */
     .form-card{background:var(--card);border:1px solid var(--border);border-radius:16px;padding:2rem;margin-bottom:2rem}
-    .form-card h3{font-family:'Fraunces',serif;font-size:1.2rem;font-weight:700;margin-bottom:1.5rem}
+    .form-card h3{font-family:var(--font-titulo);font-size:1.2rem;font-weight:700;margin-bottom:1.5rem}
     .form-grid{display:grid;grid-template-columns:1fr 1fr;gap:1rem}
     .form-grid.full{grid-template-columns:1fr}
     .form-group{display:flex;flex-direction:column;gap:.4rem}
     .form-group.span2{grid-column:span 2}
-    label{font-size:.78rem;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.04em}
+    label{font-size:.8125rem;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.04em}
     input,select,textarea{
       padding:.7rem 1rem;background:var(--bg);border:1px solid var(--border);
-      border-radius:9px;color:var(--text);font-family:'DM Sans',sans-serif;font-size:.92rem;
+      border-radius:9px;color:var(--text);font-family:var(--font-texto);font-size:.9375rem;
       outline:none;transition:border-color .2s,box-shadow .2s;
     }
-    input:focus,select:focus,textarea:focus{border-color:var(--accent);box-shadow:0 0 0 3px rgba(232,133,74,.1)}
+    input:focus,select:focus,textarea:focus{border-color:var(--accent);box-shadow:0 0 0 3px rgba(var(--accent-rgb),.1)}
     textarea{resize:vertical;min-height:80px}
     select option{background:var(--bg)}
 
     /* BUTTONS */
     .btn{
       display:inline-flex;align-items:center;gap:.5rem;
-      padding:.65rem 1.4rem;border-radius:9px;font-weight:600;font-size:.9rem;
-      cursor:pointer;border:none;font-family:'DM Sans',sans-serif;transition:all .2s;
+      padding:.6rem 1.25rem;border-radius:10px;font-weight:600;font-size:.9375rem;
+      cursor:pointer;border:none;font-family:var(--font-texto);transition:all .2s;
     }
     .btn-primary{background:var(--accent);color:#fff}
-    .btn-primary:hover{background:#d9733c}
+    .btn-primary:hover{background:var(--accent-hover)}
     .btn-primary:disabled{background:var(--muted);cursor:not-allowed;opacity:.6}
     .btn-ghost{background:transparent;border:1px solid var(--border);color:var(--text)}
     .btn-ghost:hover{border-color:var(--accent);color:var(--accent)}
@@ -114,7 +122,7 @@
     .toast{
       position:fixed;bottom:2rem;right:2rem;z-index:300;
       background:var(--card);border:1px solid var(--border);border-radius:10px;
-      padding:.75rem 1.2rem;font-size:.9rem;transform:translateY(20px);opacity:0;
+      padding:.75rem 1.2rem;font-size:.9375rem;transform:translateY(20px);opacity:0;
       transition:all .3s;pointer-events:none;
     }
     .toast.show{transform:translateY(0);opacity:1}
@@ -133,6 +141,7 @@
       .form-group.span2{grid-column:span 1}
     }
   </style>
+<link rel="stylesheet" href="site.css"/>
 </head>
 <body>
 
@@ -140,19 +149,20 @@
 <aside class="sidebar">
   <div class="logo">mercado<span>local</span></div>
   <div class="nav-section">Minha Loja</div>
-  <div class="nav-item" onclick="window.location.href='dashboard.html'"><span class="icon">📊</span> Visão Geral</div>
-  <div class="nav-item" onclick="window.location.href='dashboard.html?page=loja'"><span class="icon">🏪</span> Dados da Loja</div>
-  <div class="nav-item" onclick="window.location.href='dashboard.html?page=produtos'"><span class="icon">📦</span> Produtos</div>
+  <a class="nav-item" href="dashboard.html"><span class="icon" aria-hidden="true">📊</span> Visão Geral</a>
+  <a class="nav-item" href="dashboard.html?aba=loja"><span class="icon" aria-hidden="true">🏪</span> Dados da Loja</a>
+  <a class="nav-item" href="dashboard.html?aba=produtos"><span class="icon" aria-hidden="true">📦</span> Produtos</a>
+  <a class="nav-item" href="dashboard.html?aba=vendas"><span class="icon" aria-hidden="true">🧾</span> Vendas</a>
   <div class="nav-section">Explorar</div>
-  <div class="nav-item" onclick="window.location.href='marketplace.html'"><span class="icon">🔍</span> Marketplace</div>
+  <a class="nav-item" href="marketplace.html"><span class="icon" aria-hidden="true">🔍</span> Marketplace</a>
   <div class="sidebar-footer">
-    <div class="user-chip" onclick="window.location.href='profile.html'">
-      <div class="avatar" id="avatar-letter">?</div>
+    <a class="user-chip active-chip" href="profile.html" aria-current="page">
+      <div class="avatar" id="avatar-letter" aria-hidden="true">?</div>
       <div class="user-info">
         <div class="user-name" id="user-name-display">Carregando…</div>
         <div class="user-role">Perfil</div>
       </div>
-    </div>
+    </a>
     <button class="logout-btn" onclick="doLogout()">Sair da conta</button>
   </div>
 </aside>
@@ -173,34 +183,34 @@
     <div class="profile-info">
       <h2 id="profile-name">Carregando…</h2>
       <p id="profile-email" style="margin-bottom:.5rem">email@exemplo.com</p>
-      <p id="profile-type" style="color:var(--accent);font-size:.85rem">Carregando…</p>
+      <p id="profile-type" style="color:var(--accent);font-size:.875rem">Carregando…</p>
       <div style="margin-top:1rem">
         <input type="file" id="profile-image-input" style="display:none" accept="image/*" onchange="handleProfileImageUpload(currentUser.id)"/>
-        <button class="btn btn-ghost" style="font-size:.8rem;padding:.3rem .8rem" onclick="document.getElementById('profile-image-input').click()">📷 Alterar foto</button>
+        <button class="btn btn-ghost" style="font-size:.875rem;padding:.3rem .8rem" onclick="document.getElementById('profile-image-input').click()">📷 Alterar foto</button>
       </div>
     </div>
   </div>
 
   <style>
     .tabs{display:flex;gap:.4rem;margin-bottom:1.6rem;border-bottom:1px solid var(--border);flex-wrap:wrap}
-    .tab{background:none;border:none;color:var(--muted);font-family:'DM Sans',sans-serif;font-size:.9rem;font-weight:600;padding:.7rem 1rem;cursor:pointer;border-bottom:2px solid transparent;transition:all .2s}
+    .tab{background:none;border:none;color:var(--muted);font-family:var(--font-texto);font-size:.9375rem;font-weight:600;padding:.7rem 1rem;cursor:pointer;border-bottom:2px solid transparent;transition:all .2s}
     .tab:hover{color:var(--text)}
     .tab.active{color:var(--accent);border-bottom-color:var(--accent)}
     .tab-panel[hidden]{display:none}
     .rev-item{background:var(--card);border:1px solid var(--border);border-radius:14px;padding:1.1rem 1.3rem;margin-bottom:1rem}
     .rev-top{display:flex;justify-content:space-between;align-items:center;gap:1rem;flex-wrap:wrap}
     .rev-name{font-weight:600}
-    .rev-stars{color:var(--accent2);font-size:.95rem}
-    .rev-comment{color:var(--muted);font-size:.88rem;margin-top:.5rem;white-space:pre-wrap}
+    .rev-stars{color:var(--accent2);font-size:1rem}
+    .rev-comment{color:var(--muted);font-size:.9375rem;margin-top:.5rem;white-space:pre-wrap}
     .rev-actions{display:flex;gap:.5rem;margin-top:.7rem;flex-wrap:wrap}
-    .rev-btn{font-size:.8rem;padding:.4rem .8rem;border-radius:8px;border:1px solid var(--border);background:var(--card2);color:var(--text);cursor:pointer;font-family:'DM Sans',sans-serif;transition:all .2s}
+    .rev-btn{font-size:.875rem;padding:.4rem .8rem;border-radius:8px;border:1px solid var(--border);background:var(--card2);color:var(--text);cursor:pointer;font-family:var(--font-texto);transition:all .2s}
     .rev-btn:hover{border-color:var(--accent);color:var(--accent)}
     .rev-btn.danger:hover{border-color:var(--red);color:var(--red)}
     .rev-empty{color:var(--muted);text-align:center;padding:2.5rem}
     .star-row{margin:.6rem 0 .4rem;font-size:1.7rem;line-height:1}
     .star-pick{color:var(--border);cursor:pointer;user-select:none;transition:color .15s}
     .star-pick.on{color:var(--accent2)}
-    textarea.rev-input{width:100%;background:var(--card2);border:1px solid var(--border);border-radius:8px;color:var(--text);font-family:'DM Sans',sans-serif;padding:.6rem;font-size:.9rem;resize:vertical;min-height:60px;outline:none}
+    textarea.rev-input{width:100%;background:var(--card2);border:1px solid var(--border);border-radius:8px;color:var(--text);font-family:var(--font-texto);padding:.6rem;font-size:.9375rem;resize:vertical;min-height:60px;outline:none}
     textarea.rev-input:focus{border-color:var(--accent)}
   </style>
 
@@ -224,7 +234,7 @@
       <div class="form-group span2">
         <label>Email *</label>
         <input type="email" id="profile-email-input" placeholder="seu@email.com" readonly style="opacity:.6;cursor:not-allowed;"/>
-        <small style="color:var(--muted);font-size:.75rem;margin-top:.3rem">Email não pode ser alterado</small>
+        <small style="color:var(--muted);font-size:.8125rem;margin-top:.3rem">Email não pode ser alterado</small>
       </div>
       <div class="form-group">
         <label>Telefone</label>
@@ -270,7 +280,7 @@
   <!-- DELETAR CONTA -->
   <div class="form-card" style="border-color:rgba(232,90,90,.3);background:rgba(232,90,90,.03)">
     <h3>⚠️ Zona de Risco</h3>
-    <p style="color:var(--muted);font-size:.92rem;margin-bottom:1.5rem">Esta ação não pode ser desfeita. Sua conta e todos os dados associados serão permanentemente deletados.</p>
+    <p style="color:var(--muted);font-size:.9375rem;margin-bottom:1.5rem">Esta ação não pode ser desfeita. Sua conta e todos os dados associados serão permanentemente deletados.</p>
     <div class="action-btns">
       <button class="btn btn-danger" onclick="deleteAccount()">Deletar minha conta</button>
     </div>
@@ -282,7 +292,7 @@
   <div id="tab-compras" class="tab-panel" hidden>
     <div class="form-card">
       <h3>🛒 Minhas Compras</h3>
-      <p style="color:var(--muted);font-size:.9rem;margin-bottom:1.2rem">Avalie os produtos que você comprou. Você não pode avaliar produtos da sua própria loja.</p>
+      <p style="color:var(--muted);font-size:.9375rem;margin-bottom:1.2rem">Avalie os produtos que você comprou. Você não pode avaliar produtos da sua própria loja.</p>
       <div id="compras-list"><p style="color:var(--muted)">Carregando…</p></div>
     </div>
   </div>
@@ -291,7 +301,7 @@
   <div id="tab-avaliacoes" class="tab-panel" hidden>
     <div class="form-card">
       <h3>⭐ Minhas Avaliações</h3>
-      <p style="color:var(--muted);font-size:.9rem;margin-bottom:1.2rem">Todas as avaliações que você já fez.</p>
+      <p style="color:var(--muted);font-size:.9375rem;margin-bottom:1.2rem">Todas as avaliações que você já fez.</p>
       <div id="avaliacoes-list"><p style="color:var(--muted)">Carregando…</p></div>
     </div>
   </div>
@@ -524,7 +534,7 @@ async function loadAvaliacoes(){
     <div class="rev-item">
       <div class="rev-top">
         <div class="rev-name">${r.produto_nome || 'Produto'}</div>
-        <div class="rev-stars">${starsText(r.nota)} <span style="color:var(--muted);font-size:.8rem">${(r.nota||0).toFixed(1)}</span></div>
+        <div class="rev-stars">${starsText(r.nota)} <span style="color:var(--muted);font-size:.875rem">${(r.nota||0).toFixed(1)}</span></div>
       </div>
       ${r.comentario ? `<div class="rev-comment">${r.comentario}</div>` : ''}
       <div class="rev-actions"><button class="rev-btn danger" onclick="removeReview('${r.produto_id}')">Remover</button></div>
