@@ -100,15 +100,6 @@ select option{background:var(--bg)}
 .demo-hint strong{display:block;margin-bottom:.3rem}
 
 /* toast */
-.toast{
-  position:fixed;bottom:2rem;right:2rem;z-index:1000;
-  background:var(--card);border:1px solid var(--border);border-radius:10px;
-  padding:.75rem 1.2rem;font-size:.9375rem;transform:translateY(20px);opacity:0;
-  transition:all .3s;max-width:300px;
-}
-.toast.show{transform:translateY(0);opacity:1}
-.toast-success{border-color:rgba(93,207,160,.4);color:var(--green)}
-.toast-error{border-color:rgba(232,90,90,.4);color:var(--red)}
 
 @keyframes fadeUp{from{opacity:0;transform:translateY(20px)}to{opacity:1;transform:translateY(0)}}
 </style>

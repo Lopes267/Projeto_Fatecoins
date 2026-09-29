@@ -93,16 +93,6 @@
     .btn-danger:hover{background:rgba(232,90,90,.1)}
     .action-btns{display:flex;gap:.8rem;margin-top:1.5rem;flex-wrap:wrap}
 
-    /* TOAST */
-    .toast{
-      position:fixed;bottom:2rem;right:2rem;z-index:300;
-      background:var(--card);border:1px solid var(--border);border-radius:10px;
-      padding:.75rem 1.2rem;font-size:.9375rem;transform:translateY(20px);opacity:0;
-      transition:all .3s;pointer-events:none;
-    }
-    .toast.show{transform:translateY(0);opacity:1}
-    .toast-success{border-color:rgba(93,207,160,.4);color:var(--green)}
-    .toast-error{border-color:rgba(232,90,90,.4);color:var(--red)}
 
     /* SECTION */
     .section-divider{border:none;border-top:1px solid var(--border);margin:2rem 0;opacity:.5}
@@ -368,7 +358,6 @@
 
 </main>
 
-<div class="toast" id="toast"></div>
 
 <script src="app.js"></script>
 <script>
@@ -860,12 +849,6 @@ async function removeReview(pid){
 }
 
 // ---- TOAST ----
-function toast(msg, type='success'){
-  const el = document.getElementById('toast');
-  el.className = `toast ${type === 'success' ? 'toast-success' : 'toast-error'} show`;
-  el.textContent = msg;
-  setTimeout(() => el.classList.remove('show'), 3500);
-}
 
 // ---- LOGOUT ----
 function doLogout(){

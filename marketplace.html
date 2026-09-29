@@ -190,6 +190,7 @@ nav{
 /* STORE DETAIL PANEL */
 .store-panel{display:none;animation:fadeUp .2s ease}
 .store-panel.open{display:block}
+.panel-banner{margin-bottom:1.2rem}
 .panel-head{
   display:flex;align-items:center;gap:1rem;margin-bottom:2rem;
   padding-bottom:1.5rem;border-bottom:1px solid var(--border);
@@ -216,15 +217,6 @@ nav{
 .empty-state .icon{font-size:4rem}
 .empty-state p{color:var(--muted);font-size:1rem}
 
-/* TOAST */
-.toast{
-  position:fixed;bottom:2rem;right:2rem;z-index:100;
-  background:var(--card);border:1px solid var(--border);border-radius:10px;
-  padding:.75rem 1.2rem;font-size:.9375rem;transform:translateY(20px);opacity:0;
-  transition:all .3s;pointer-events:none;
-}
-.toast.show{transform:translateY(0);opacity:1}
-.toast-success{border-color:rgba(93,207,160,.4);color:var(--green)}
 
 @keyframes fadeUp{from{opacity:0;transform:translateY(12px)}to{opacity:1;transform:translateY(0)}}
 
@@ -542,6 +534,7 @@ nav{
   <!-- STORE DETAIL -->
   <div class="store-panel" id="store-panel">
     <button class="back-btn" onclick="closeStorePanel()">← Voltar às lojas</button>
+    <div class="loja-banner panel-banner" id="panel-banner" hidden></div>
     <div class="panel-head">
       <div class="panel-store-avatar" id="panel-avatar">🏪</div>
       <div>
@@ -914,7 +907,7 @@ async function renderStores(){
   }
   grid.innerHTML = stores.map(s=>`
     <div class="store-card" onclick="openStore('${s.id}')">
-      <div class="store-avatar">${s.logo_url ? `<img src="${s.logo_url}" style="width:100%;height:100%;object-fit:cover;display:block;">` : catEmoji(s.categoria)}</div>
+      <div class="store-avatar">${s.logo_url ? logoLojaHTML(s.logo_url, s.logo_ajuste) : catEmoji(s.categoria)}</div>
       <div class="store-name">${s.nome}</div>
       <div class="store-desc">${s.descricao||'Sem descrição'}</div>
       <div class="store-meta">
@@ -943,10 +936,14 @@ async function openStore(storeId){
 
   const panelAvatar = document.getElementById('panel-avatar');
   if(store.logo_url){
-    panelAvatar.innerHTML = `<img src="${store.logo_url}" style="width:100%;height:100%;object-fit:cover;display:block;">`;
+    panelAvatar.innerHTML = logoLojaHTML(store.logo_url, store.logo_ajuste);
   } else {
     panelAvatar.textContent = catEmoji(store.categoria);
   }
+  // Banner no topo da página da loja, com a faixa que o lojista escolheu no painel
+  const panelBanner = document.getElementById('panel-banner');
+  panelBanner.hidden = !store.banner_url;
+  panelBanner.innerHTML = store.banner_url ? bannerLojaHTML(store.banner_url, store.banner_posicao) : '';
   document.getElementById('panel-name').textContent = store.nome;
   document.getElementById('panel-meta').innerHTML = `
     ${store.categoria||''} ${store.cidade?'· 📍 '+store.cidade:''}

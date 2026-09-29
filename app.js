@@ -663,13 +663,67 @@ function requireAuth(tipo) {
   return user;
 }
 
+// ============================================================
+//  NOTIFICAÇÕES — iguais em todas as páginas (estilo em site.css)
+//  Canto superior direito, logo abaixo da barra do site. Empilham com a mais
+//  nova em cima, somem sozinhas e pausam enquanto o mouse está em cima.
+//  Erro fica mais tempo na tela: é o que o usuário precisa ler até o fim.
+// ============================================================
+const NOTIF_ICONES = { success: '✓', error: '!', info: 'i' };
+const NOTIF_MAX = 4;
+
+function areaNotificacoes() {
+  let area = document.getElementById('notificacoes');
+  if (!area) {
+    area = document.createElement('div');
+    area.id = 'notificacoes';
+    area.className = 'notificacoes';
+    area.setAttribute('aria-live', 'polite');
+    document.body.appendChild(area);
+  }
+  // Logo abaixo da barra de navegação: a altura dela muda por página e no celular
+  const nav = document.querySelector('body > nav');
+  const baseNav = nav ? Math.max(0, nav.getBoundingClientRect().bottom) : 0;
+  area.style.top = (baseNav + 12) + 'px';
+  return area;
+}
+
 function toast(msg, tipo = 'success') {
+  if (!NOTIF_ICONES[tipo]) tipo = 'info';
+  const area = areaNotificacoes();
   const el = document.createElement('div');
-  el.className = `toast toast-${tipo}`;
-  el.textContent = msg;
-  document.body.appendChild(el);
+  el.className = `notif notif-${tipo}`;
+  el.setAttribute('role', tipo === 'error' ? 'alert' : 'status');
+  el.innerHTML = `<span class="notif-icone" aria-hidden="true">${NOTIF_ICONES[tipo]}</span>
+    <p class="notif-texto"></p>
+    <button type="button" class="notif-fechar" aria-label="Fechar notificação">×</button>`;
+  el.querySelector('.notif-texto').textContent = msg;   // texto puro: a mensagem pode vir do servidor
+  area.prepend(el);
+  [...area.children].slice(NOTIF_MAX).forEach(n => n.remove());
   requestAnimationFrame(() => el.classList.add('show'));
-  setTimeout(() => { el.classList.remove('show'); setTimeout(() => el.remove(), 400); }, 3000);
+
+  let restante = tipo === 'error' ? 6000 : 4000, inicio = 0, timer;
+  const fechar = () => {
+    clearTimeout(timer);
+    el.classList.remove('show');
+    setTimeout(() => el.remove(), 250);
+  };
+  const contar = () => { inicio = Date.now(); timer = setTimeout(fechar, restante); };
+  el.addEventListener('mouseenter', () => { clearTimeout(timer); restante = Math.max(1500, restante - (Date.now() - inicio)); });
+  el.addEventListener('mouseleave', contar);
+  el.querySelector('.notif-fechar').addEventListener('click', fechar);
+  contar();
+}
+
+// Imagens da loja: a vitrine (marketplace) e a prévia do painel montam o HTML
+// daqui, então a prévia mostra exatamente o que o cliente vai ver.
+function logoLojaHTML(url, ajuste) {
+  return `<img class="logo-img${ajuste === 'inteira' ? ' inteira' : ''}" src="${url}" alt="">`;
+}
+function bannerLojaHTML(url, posicao) {
+  const n = posicao == null || posicao === '' ? NaN : Number(posicao);   // +null seria 0 (topo)
+  const p = Number.isFinite(n) ? Math.min(100, Math.max(0, n)) : 50;
+  return `<img src="${url}" alt="" style="object-position:50% ${p}%">`;
 }
 
 function formatPrice(n) {
@@ -775,51 +829,8 @@ async function handleProfileImageUpload(userId) {
   }
 }
 
-async function handleStoreLogoUpload(storeId) {
-  const input = document.getElementById('store-logo-input');
-  const file = input.files[0];
-  if (!file) return;
-
-  try {
-    const result = await DB.updateStoreLogo(storeId, file);
-    if (result.ok) {
-      toast('Logo da loja atualizado com sucesso!');
-      // Atualizar preview se existir
-      const preview = document.getElementById('logo-preview');
-      if (preview) {
-        preview.innerHTML = `<img src="${result.logoUrl}" style="max-width: 100px; max-height: 100px; border-radius: 8px;">`;
-      }
-    } else {
-      toast(result.msg || 'Erro ao atualizar logo.', 'error');
-    }
-  } catch (error) {
-    console.error('Erro:', error);
-    toast('Erro ao atualizar logo.', 'error');
-  }
-}
-
-async function handleStoreBannerUpload(storeId) {
-  const input = document.getElementById('store-banner-input');
-  const file = input.files[0];
-  if (!file) return;
-
-  try {
-    const result = await DB.updateStoreBanner(storeId, file);
-    if (result.ok) {
-      toast('Banner da loja atualizado com sucesso!');
-      // Atualizar preview se existir
-      const preview = document.getElementById('banner-preview');
-      if (preview) {
-        preview.innerHTML = `<img src="${result.bannerUrl}" style="max-width: 300px; max-height: 150px; border-radius: 8px;">`;
-      }
-    } else {
-      toast(result.msg || 'Erro ao atualizar banner.', 'error');
-    }
-  } catch (error) {
-    console.error('Erro:', error);
-    toast('Erro ao atualizar banner.', 'error');
-  }
-}
+// Logo e banner da loja: enviados pelo "Salvar alterações" da aba Dados da Loja
+// (saveStore em dashboard.html), depois de o lojista conferir a prévia.
 
 async function handleProductImageUpload(productId) {
   const input = document.getElementById('product-image-input');

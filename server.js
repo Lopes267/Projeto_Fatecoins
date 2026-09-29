@@ -589,19 +589,28 @@ app.post('/api/stores', authenticateToken, async (req, res) => {
   if (!nome) return res.status(400).json({ ok: false, msg: 'Nome da loja é obrigatório.' });
 
   const cepLimpo = cep ? String(cep).replace(/\D/g, '') : null;
+  // Endereço era descartado aqui: o lojista preenchia e o campo voltava vazio
+  const endereco = typeof req.body.endereco === 'string' ? req.body.endereco.trim() : '';
+  // Enquadramento das imagens: qual faixa do banner aparece (0 = topo, 100 = base)
+  // e se a logo preenche o quadrado (recorta) ou aparece inteira
+  const posNum = Number(req.body.banner_posicao);
+  const banner_posicao = Number.isFinite(posNum) ? Math.min(100, Math.max(0, Math.round(posNum))) : 50;
+  const logo_ajuste = req.body.logo_ajuste === 'inteira' ? 'inteira' : 'preencher';
 
   try {
     const existing = await db.collection('lojas').where('usuario_id', '==', req.user.uid).limit(1).get();
 
     if (!existing.empty) {
       const ref = existing.docs[0].ref;
-      await ref.update({ nome, descricao, categoria, cidade, estado, telefone, cep: cepLimpo });
+      await ref.update({ nome, descricao, categoria, cidade, estado, telefone, cep: cepLimpo,
+        endereco, banner_posicao, logo_ajuste });
       const updated = await ref.get();
       return res.json({ ok: true, store: { id: ref.id, ...updated.data() } });
     }
 
     const ref = await db.collection('lojas').add({
       usuario_id: req.user.uid, nome, descricao, categoria, cidade, estado, telefone, cep: cepLimpo,
+      endereco, banner_posicao, logo_ajuste,
       logo_url: null, banner_url: null, ativa: true,
       criado_em: admin.firestore.FieldValue.serverTimestamp()
     });
