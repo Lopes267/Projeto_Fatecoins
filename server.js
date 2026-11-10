@@ -12,8 +12,10 @@ const multer  = require('multer');
 const bcrypt  = require('bcrypt');
 const net     = require('net');
 const https   = require('https');
-const crypto  = require('crypto');   // códigos de confirmação de entrega
+const crypto  = require('crypto');   // códigos de confirmação de entrega e de e-mail
+const dns     = require('dns');
 const admin   = require('firebase-admin');
+const nodemailer = require('nodemailer');
 
 // ============================================================
 //  FIREBASE – CONFIGURAÇÃO
@@ -41,6 +43,27 @@ cloudinary.config({
   api_key:    process.env.CLOUDINARY_API_KEY,
   api_secret: process.env.CLOUDINARY_API_SECRET
 });
+
+// ============================================================
+//  E-MAIL – CONFIGURAÇÃO (códigos de verificação)
+//  Qualquer servidor SMTP serve: Gmail com senha de app, Outlook, Brevo...
+//  Sem SMTP no .env o código aparece só no terminal do servidor: dá para
+//  testar em desenvolvimento, mas ninguém recebe e-mail.
+// ============================================================
+
+const SMTP_PORTA = Number(process.env.SMTP_PORT) || 465;
+const emailTransporte = process.env.SMTP_HOST && process.env.SMTP_USER && process.env.SMTP_PASS
+  ? nodemailer.createTransport({
+      host: process.env.SMTP_HOST,
+      port: SMTP_PORTA,
+      secure: SMTP_PORTA === 465,                 // 465 = TLS direto; 587 = STARTTLS
+      auth: { user: process.env.SMTP_USER, pass: process.env.SMTP_PASS }
+    })
+  : null;
+const EMAIL_REMETENTE = process.env.EMAIL_REMETENTE || `Mercado Local <${process.env.SMTP_USER}>`;
+if (!emailTransporte) {
+  console.warn('⚠️  SMTP não configurado no .env: os códigos de verificação aparecem só neste terminal.');
+}
 
 // ============================================================
 //  EXPRESS – MIDDLEWARE
@@ -167,15 +190,50 @@ function extractCloudinaryPublicId(url) {
 //  MIDDLEWARE – AUTENTICAÇÃO
 // ============================================================
 
+// ============================================================
+//  SESSÕES ENCERRADAS
+//  Quem redefine a senha sai da conta em todos os aparelhos. O Firebase invalida
+//  os refresh tokens, mas um ID token já emitido continua válido por até 1 hora;
+//  por isso cada usuário com senha redefinida ganha um "desde" (coleção
+//  sessoes_encerradas) e todo login feito antes desse instante é recusado.
+//  A coleção fica espelhada em memória: a checagem não custa ida ao banco.
+// ============================================================
+
+const sessoesEncerradas = new Map();   // uid -> segundos; logins anteriores não valem mais
+const sessoesCarregadas = new Promise(resolve => {
+  setTimeout(resolve, 5000);           // banco fora do ar não pode travar as rotas com login
+  db.collection('sessoes_encerradas').onSnapshot(
+    snap => { snap.docs.forEach(d => sessoesEncerradas.set(d.id, d.data().desde)); resolve(); },
+    err => { console.error('Espelho de sessões encerradas caiu:', err.message); resolve(); }
+  );
+});
+
+async function encerrarSessoes(uid) {
+  await admin.auth().revokeRefreshTokens(uid);
+  // O instante vem do Firebase, no mesmo relógio do auth_time dos tokens
+  const usuario = await admin.auth().getUser(uid);
+  const desde = Math.floor(new Date(usuario.tokensValidAfterTime).getTime() / 1000);
+  sessoesEncerradas.set(uid, desde);
+  await db.collection('sessoes_encerradas').doc(uid).set({ desde });
+}
+
 async function authenticateToken(req, res, next) {
   const token = req.headers['authorization']?.split(' ')[1];
   if (!token) return res.status(401).json({ ok: false, msg: 'Token de acesso necessário.' });
   try {
     req.user = await admin.auth().verifyIdToken(token);
-    next();
   } catch {
-    res.status(401).json({ ok: false, msg: 'Token inválido ou expirado.' });
+    return res.status(401).json({ ok: false, msg: 'Token inválido ou expirado.' });
   }
+  await sessoesCarregadas;
+  const desde = sessoesEncerradas.get(req.user.uid);
+  if (desde && req.user.auth_time < desde) {
+    return res.status(401).json({
+      ok: false, sessao_encerrada: true,
+      msg: 'Sua senha foi redefinida e esta sessão foi encerrada. Entre de novo com a nova senha.'
+    });
+  }
+  next();
 }
 
 // ============================================================
@@ -190,13 +248,21 @@ app.get('/api/config', (req, res) => {
   res.json({ api_url: `http://localhost:${req.socket.localPort}`, version: '1.0.0', environment: 'development' });
 });
 
+// Os contadores da página inicial não precisam ser ao vivo: valem por 1 minuto
+const STATS_VALIDADE_MS = 60 * 1000;
+let statsCache = null;   // { clientes, produtos, em }
+
 app.get('/api/stats', async (req, res) => {
   try {
-    const [usersSnap, productsSnap] = await Promise.all([
-      db.collection('usuarios').where('tipo', '==', 'cliente').get(),
-      db.collection('produtos').get()
-    ]);
-    res.json({ ok: true, clientes: usersSnap.size, produtos: productsSnap.size });
+    if (!statsCache || Date.now() - statsCache.em > STATS_VALIDADE_MS) {
+      // count() conta no banco sem trazer os documentos (antes vinha a coleção inteira)
+      const [clientes, produtos] = await Promise.all([
+        db.collection('usuarios').where('tipo', '==', 'cliente').count().get(),
+        db.collection('produtos').count().get()
+      ]);
+      statsCache = { clientes: clientes.data().count, produtos: produtos.data().count, em: Date.now() };
+    }
+    res.json({ ok: true, clientes: statsCache.clientes, produtos: statsCache.produtos });
   } catch (err) {
     console.error('Erro ao buscar stats:', err);
     res.status(500).json({ ok: false, clientes: 0, produtos: 0 });
@@ -204,26 +270,254 @@ app.get('/api/stats', async (req, res) => {
 });
 
 // ============================================================
-//  AUTH – REGISTRO
+//  CÓDIGOS POR E-MAIL – confirmação do cadastro e troca de senha
+//  O código tem 6 dígitos, vale 10 minutos e aceita 5 tentativas erradas.
+//  No banco (coleção codigos_email) fica só o hash dele, um documento por
+//  e-mail e finalidade: pedir outro código substitui o anterior.
+// ============================================================
+
+const CODIGO_VALIDADE_MS  = 10 * 60 * 1000;
+const CODIGO_TENTATIVAS   = 5;
+const CODIGO_INTERVALO_MS = 60 * 1000;     // entre dois envios para o mesmo e-mail
+const ENVIOS_POR_IP_HORA  = 10;            // freia quem tentar usar o site para mandar e-mail a terceiros
+
+const ultimoEnvio = new Map();   // "finalidade:email" -> instante do último envio
+const enviosPorIp = new Map();   // ip -> instantes dos envios na última hora
+
+const normalizarEmail = e => String(e || '').trim().toLowerCase();
+const emailValido     = e => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(e);
+const sha256          = txt => crypto.createHash('sha256').update(txt).digest('hex');
+const refCodigo       = (finalidade, email) =>
+  db.collection('codigos_email').doc(`${finalidade}_${sha256(email).slice(0, 40)}`);
+const hashCodigo      = (ref, codigo) => sha256(`${ref.id}:${codigo}`);
+const textoEspera     = s => s < 60 ? `${s} s` : `${Math.ceil(s / 60)} min`;
+
+async function usuarioPorEmail(email) {
+  try { return await admin.auth().getUserByEmail(email); }
+  catch (err) { if (err.code === 'auth/user-not-found') return null; throw err; }
+}
+
+// O domínio recebe e-mail? Pega erro de digitação como "gmial.con" antes de mandar o código
+const resolverDns = new dns.promises.Resolver({ timeout: 3000, tries: 1 });
+async function dominioRecebeEmail(email) {
+  const dominio = email.split('@')[1];
+  try {
+    const mx = await resolverDns.resolveMx(dominio);
+    return mx.some(r => r.exchange && r.exchange !== '.');   // MX nulo = domínio que não recebe e-mail
+  } catch (err) {
+    if (err.code === 'ENOTFOUND') return false;
+    // Sem MX, o e-mail ainda pode ir para o endereço do próprio domínio
+    if (err.code === 'ENODATA') return resolverDns.resolve4(dominio).then(a => a.length > 0, () => false);
+    return true;   // DNS fora do ar ou lento: não barra o cadastro por isso
+  }
+}
+
+// Segundos até poder mandar outro código (0 = já pode)
+function esperaParaEnviar(finalidade, email, ip) {
+  const agora = Date.now();
+  const desdeUltimo = agora - (ultimoEnvio.get(`${finalidade}:${email}`) || 0);
+  if (desdeUltimo < CODIGO_INTERVALO_MS) return Math.ceil((CODIGO_INTERVALO_MS - desdeUltimo) / 1000);
+  const recentes = (enviosPorIp.get(ip) || []).filter(t => agora - t < 3600000);
+  enviosPorIp.set(ip, recentes);
+  if (recentes.length >= ENVIOS_POR_IP_HORA) return Math.ceil((3600000 - (agora - recentes[0])) / 1000);
+  return 0;
+}
+function registrarEnvio(finalidade, email, ip) {
+  const agora = Date.now();
+  ultimoEnvio.set(`${finalidade}:${email}`, agora);
+  enviosPorIp.set(ip, [...(enviosPorIp.get(ip) || []), agora]);
+}
+
+const TEXTOS_EMAIL = {
+  cadastro: { titulo: 'Confirme seu e-mail',  frase: 'Use este código para terminar de criar sua conta no Mercado Local.' },
+  senha:    { titulo: 'Redefinição de senha', frase: 'Use este código para criar uma nova senha no Mercado Local.' }
+};
+
+async function mandarEmailCodigo(finalidade, email, codigo) {
+  if (!emailTransporte) {
+    console.log(`[e-mail] SMTP não configurado. Código de ${finalidade} para ${email}: ${codigo}`);
+    return;
+  }
+  const t = TEXTOS_EMAIL[finalidade];
+  const aviso = 'O código vale por 10 minutos. Se não foi você que pediu, ignore este e-mail: nada muda na sua conta.';
+  await emailTransporte.sendMail({
+    from: EMAIL_REMETENTE,
+    to: email,
+    subject: `${codigo} é o seu código do Mercado Local`,
+    text: `${t.titulo}\n\n${t.frase}\n\n${codigo}\n\n${aviso}`,
+    html: `<div style="font-family:Arial,Helvetica,sans-serif;max-width:480px;margin:0 auto;padding:24px;color:#1f1b16">
+      <p style="font-size:18px;font-weight:bold;margin:0 0 12px">${t.titulo}</p>
+      <p style="margin:0 0 20px;line-height:1.5">${t.frase}</p>
+      <p style="font-size:32px;font-weight:bold;letter-spacing:8px;margin:0 0 20px;padding:16px;background:#f4f1ea;border-radius:8px;text-align:center">${codigo}</p>
+      <p style="margin:0;color:#6b645a;font-size:13px;line-height:1.5">${aviso}</p>
+    </div>`
+  });
+}
+
+async function enviarCodigo(finalidade, email) {
+  const codigo = String(crypto.randomInt(0, 1000000)).padStart(6, '0');
+  const ref = refCodigo(finalidade, email);
+  await Promise.all([
+    ref.set({
+      finalidade, email, codigo_hash: hashCodigo(ref, codigo),
+      expira_em: Date.now() + CODIGO_VALIDADE_MS, tentativas: 0,
+      criado_em: admin.firestore.FieldValue.serverTimestamp()
+    }),
+    mandarEmailCodigo(finalidade, email, codigo)
+  ]);
+}
+
+// Confere o código numa transação, para tentativas simultâneas não passarem do limite.
+// Com emitirToken, troca o código certo por um token de uso único (10 min) que
+// autoriza o passo seguinte: a nova senha.
+async function conferirCodigo(finalidade, email, codigo, { emitirToken = false } = {}) {
+  const ref = refCodigo(finalidade, email);
+  const digitado = String(codigo || '').replace(/\D/g, '');
+  return db.runTransaction(async tx => {
+    const doc = await tx.get(ref);
+    const c = doc.exists ? doc.data() : null;
+    if (!c || !c.codigo_hash) return { ok: false, msg: 'Este código não vale mais. Peça um novo.' };
+    if (Date.now() > c.expira_em) { tx.delete(ref); return { ok: false, msg: 'O código expirou. Peça um novo.' }; }
+    if (c.codigo_hash !== hashCodigo(ref, digitado)) {
+      const tentativas = (c.tentativas || 0) + 1;
+      if (tentativas >= CODIGO_TENTATIVAS) {
+        tx.delete(ref);
+        return { ok: false, msg: 'Código errado muitas vezes. Peça um novo.' };
+      }
+      tx.update(ref, { tentativas });
+      const restam = CODIGO_TENTATIVAS - tentativas;
+      return { ok: false, msg: `Código incorreto. ${restam === 1 ? 'Resta 1 tentativa' : `Restam ${restam} tentativas`}.` };
+    }
+    if (!emitirToken) return { ok: true };
+    const token = crypto.randomBytes(32).toString('hex');
+    tx.update(ref, { codigo_hash: null, token_hash: sha256(token), token_expira_em: Date.now() + CODIGO_VALIDADE_MS });
+    return { ok: true, token };
+  });
+}
+
+// ============================================================
+//  AUTH – CÓDIGO DE CONFIRMAÇÃO DO CADASTRO
+// ============================================================
+
+app.post('/api/auth/register/code', async (req, res) => {
+  const email = normalizarEmail(req.body.email);
+  if (!emailValido(email)) return res.status(400).json({ ok: false, msg: 'Formato de e-mail inválido.' });
+  const espera = esperaParaEnviar('cadastro', email, req.ip);
+  if (espera) return res.status(429).json({ ok: false, msg: `Aguarde ${textoEspera(espera)} para pedir outro código.`, aguarde_s: espera });
+
+  try {
+    const [recebe, existente] = await Promise.all([dominioRecebeEmail(email), usuarioPorEmail(email)]);
+    if (!recebe) {
+      return res.status(400).json({ ok: false, msg: `O domínio "${email.split('@')[1]}" não recebe e-mails. Confira se o endereço está certo.` });
+    }
+    if (existente) {
+      return res.status(409).json({ ok: false, msg: 'Este e-mail já tem conta. Entre nela ou use "Esqueceu sua senha?".' });
+    }
+    await enviarCodigo('cadastro', email);
+    registrarEnvio('cadastro', email, req.ip);
+    res.json({ ok: true, msg: 'Enviamos um código para o seu e-mail.', reenviar_em_s: CODIGO_INTERVALO_MS / 1000 });
+  } catch (err) {
+    console.error('Erro ao enviar código de cadastro:', err);
+    res.status(502).json({ ok: false, msg: 'Não foi possível enviar o código agora. Tente de novo em instantes.' });
+  }
+});
+
+// ============================================================
+//  AUTH – ESQUECI A SENHA (código → token → nova senha)
+// ============================================================
+
+app.post('/api/auth/password/code', async (req, res) => {
+  const email = normalizarEmail(req.body.email);
+  if (!emailValido(email)) return res.status(400).json({ ok: false, msg: 'Formato de e-mail inválido.' });
+  const espera = esperaParaEnviar('senha', email, req.ip);
+  if (espera) return res.status(429).json({ ok: false, msg: `Aguarde ${textoEspera(espera)} para pedir outro código.`, aguarde_s: espera });
+
+  try {
+    // A resposta é a mesma exista ou não a conta: a rota não serve para descobrir quem tem cadastro
+    if (await usuarioPorEmail(email)) await enviarCodigo('senha', email);
+    registrarEnvio('senha', email, req.ip);
+    res.json({ ok: true, msg: 'Se houver uma conta com este e-mail, enviamos um código para ele.', reenviar_em_s: CODIGO_INTERVALO_MS / 1000 });
+  } catch (err) {
+    console.error('Erro ao enviar código de senha:', err);
+    res.status(502).json({ ok: false, msg: 'Não foi possível enviar o código agora. Tente de novo em instantes.' });
+  }
+});
+
+app.post('/api/auth/password/verify', async (req, res) => {
+  const email = normalizarEmail(req.body.email);
+  if (!emailValido(email) || !req.body.codigo) return res.status(400).json({ ok: false, msg: 'Informe o e-mail e o código.' });
+  try {
+    const r = await conferirCodigo('senha', email, req.body.codigo, { emitirToken: true });
+    if (!r.ok) return res.status(400).json({ ok: false, msg: r.msg });
+    res.json({ ok: true, token: r.token });
+  } catch (err) {
+    console.error('Erro ao conferir código de senha:', err);
+    res.status(500).json({ ok: false, msg: 'Erro interno do servidor.' });
+  }
+});
+
+app.post('/api/auth/password/reset', async (req, res) => {
+  const email = normalizarEmail(req.body.email);
+  const { token, senha } = req.body;
+  if (!emailValido(email) || !token) return res.status(400).json({ ok: false, msg: 'Pedido de troca inválido. Comece de novo.' });
+  if (!senha || String(senha).length < 6) return res.status(400).json({ ok: false, msg: 'A nova senha deve ter pelo menos 6 caracteres.' });
+
+  try {
+    const ref = refCodigo('senha', email);
+    const doc = await ref.get();
+    const c = doc.exists ? doc.data() : null;
+    const usuario = c && c.token_hash === sha256(String(token)) && Date.now() <= c.token_expira_em
+      ? await usuarioPorEmail(email) : null;
+    if (!usuario) return res.status(400).json({ ok: false, msg: 'Este pedido de troca expirou. Peça um novo código.' });
+
+    // A senha nova não pode ser a mesma de antes; o token continua valendo para tentar outra
+    const hashAtual = (await db.collection('usuarios').doc(usuario.uid).get()).data()?.senha_hash;
+    if (hashAtual && await comparePassword(String(senha), hashAtual)) {
+      return res.status(400).json({ ok: false, senha_em_uso: true, msg: 'Esta senha já está em uso.' });
+    }
+
+    await admin.auth().updateUser(usuario.uid, { password: String(senha) });
+    await db.collection('usuarios').doc(usuario.uid).update({ senha_hash: hashPassword(String(senha)) });
+    await encerrarSessoes(usuario.uid);   // sai da conta em todos os aparelhos, inclusive neste
+    await ref.delete();                   // o token é de uso único
+    res.json({ ok: true, msg: 'Senha alterada. Por segurança, você saiu da conta em todos os aparelhos.' });
+  } catch (err) {
+    if (err.code === 'auth/invalid-password') {
+      return res.status(400).json({ ok: false, msg: 'A nova senha deve ter pelo menos 6 caracteres.' });
+    }
+    console.error('Erro ao redefinir senha:', err);
+    res.status(500).json({ ok: false, msg: 'Erro interno do servidor.' });
+  }
+});
+
+// ============================================================
+//  AUTH – REGISTRO (exige o código enviado para o e-mail)
 // ============================================================
 
 app.post('/api/auth/register', async (req, res) => {
-  const { nome, email, senha, tipo = 'cliente' } = req.body;
+  const { nome, senha, tipo = 'cliente', codigo } = req.body;
+  const email = normalizarEmail(req.body.email);
 
   if (!nome || !email || !senha) {
     return res.status(400).json({ ok: false, msg: 'Campos obrigatórios faltando.' });
   }
-  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+  if (!emailValido(email)) {
     return res.status(400).json({ ok: false, msg: 'Formato de e-mail inválido.' });
   }
   if (!['lojista', 'cliente', 'entregador'].includes(tipo)) {
     return res.status(400).json({ ok: false, msg: 'Tipo de conta inválido.' });
   }
+  if (!codigo) {
+    return res.status(400).json({ ok: false, codigo_invalido: true, msg: 'Confirme seu e-mail com o código que enviamos.' });
+  }
 
   try {
+    const conferido = await conferirCodigo('cadastro', email, codigo);
+    if (!conferido.ok) return res.status(400).json({ ok: false, codigo_invalido: true, msg: conferido.msg });
+
     let firebaseUser;
     try {
-      firebaseUser = await admin.auth().createUser({ email, password: senha, displayName: nome });
+      firebaseUser = await admin.auth().createUser({ email, password: senha, displayName: nome, emailVerified: true });
     } catch (authError) {
       let msg = 'Erro no registro. ';
       if (authError.code === 'auth/email-already-exists') msg += 'Este e-mail já está cadastrado.';
@@ -239,6 +533,7 @@ app.post('/api/auth/register', async (req, res) => {
       endereco: null, cidade: null, estado: null, cep: null,
       criado_em: admin.firestore.FieldValue.serverTimestamp()
     });
+    refCodigo('cadastro', email).delete().catch(() => {});   // código já usado
 
     const loginData = await firebaseSignIn(email, senha);
     if (loginData.error) {
@@ -310,6 +605,10 @@ app.get('/api/auth/session', authenticateToken, async (req, res) => {
   }
 });
 
+// Só confere o login, sem ir ao banco: as páginas chamam a cada minuto para saber se
+// a sessão foi encerrada por uma troca de senha feita em outro aparelho
+app.get('/api/auth/session/check', authenticateToken, (req, res) => res.json({ ok: true }));
+
 // ============================================================
 //  PERFIL DO USUÁRIO – ATUALIZAR
 // ============================================================
@@ -326,6 +625,7 @@ app.put('/api/users/:id', authenticateToken, async (req, res) => {
 
   try {
     await db.collection('usuarios').doc(req.params.id).update(updates);
+    donosCache.delete(req.params.id);   // o nome do dono na lista de lojas acompanha a mudança
     const userDoc = await db.collection('usuarios').doc(req.params.id).get();
     res.json({ ok: true, user: { id: req.params.id, ...userDoc.data() } });
   } catch (err) {
@@ -351,6 +651,7 @@ app.post('/api/users/:id/change-password', authenticateToken, async (req, res) =
 
     const isValid = await comparePassword(senhaAtual, userDoc.data().senha_hash);
     if (!isValid) return res.status(401).json({ ok: false, msg: 'Senha atual incorreta.' });
+    if (senhaNova === senhaAtual) return res.status(400).json({ ok: false, senha_em_uso: true, msg: 'Esta senha já está em uso.' });
 
     await admin.auth().updateUser(req.params.id, { password: senhaNova });
     await db.collection('usuarios').doc(req.params.id).update({ senha_hash: hashPassword(senhaNova) });
@@ -629,9 +930,11 @@ app.post('/api/stores', authenticateToken, async (req, res) => {
 app.get('/api/stores/:userId', authenticateToken, async (req, res) => {
   if (req.user.uid !== req.params.userId) return res.status(403).json({ ok: false, msg: 'Acesso negado.' });
   try {
-    const snap = await db.collection('lojas').where('usuario_id', '==', req.params.userId).limit(1).get();
-    if (snap.empty) return res.json({ ok: true, store: null });
-    const doc = snap.docs[0];
+    // Loja ativa sai da vitrine em memória; desativada (ou espelho fora do ar), do banco
+    const doEspelho = vitrine.lojas && vitrine.lojas.find(d => d.data().usuario_id === req.params.userId);
+    const doc = doEspelho ||
+      (await db.collection('lojas').where('usuario_id', '==', req.params.userId).limit(1).get()).docs[0];
+    if (!doc) return res.json({ ok: true, store: null });
     res.json({ ok: true, store: { id: doc.id, ...doc.data() } });
   } catch (err) {
     console.error('Erro ao buscar loja:', err);
@@ -640,29 +943,115 @@ app.get('/api/stores/:userId', authenticateToken, async (req, res) => {
 });
 
 // ============================================================
+//  VITRINE EM MEMÓRIA
+//  Cada ida ao Firestore leva de meio a um segundo a partir deste servidor. Por
+//  isso os produtos e as lojas ativos ficam espelhados aqui: o Firestore avisa cada
+//  mudança (onSnapshot) e as rotas públicas da vitrine respondem da memória.
+//  Enquanto o espelho não carregou, ou se a conexão dele cair, elas consultam o banco.
+// ============================================================
+
+const vitrine = { produtos: null, lojas: null };   // documentos, na ordem da consulta
+
+function espelhar(chave, consulta, aoMudar) {
+  consulta.onSnapshot(
+    snap => { vitrine[chave] = snap.docs; if (aoMudar) aoMudar(snap.docs); },
+    err => {
+      console.error(`Espelho de ${chave} caiu; consultando o banco até religar:`, err.message);
+      vitrine[chave] = null;
+      setTimeout(() => espelhar(chave, consulta, aoMudar), 10000);
+    }
+  );
+}
+
+async function produtosAtivos() {
+  return vitrine.produtos || (await db.collection('produtos').where('ativo', '==', true).get()).docs;
+}
+async function lojasAtivas() {
+  return vitrine.lojas || (await db.collection('lojas').where('ativa', '==', true).get()).docs;
+}
+// Dados de uma loja: do espelho quando ela está ativa, senão do banco (uma loja
+// desativada ainda pode aparecer num carrinho ou pedido antigo)
+async function dadosDaLoja(id) {
+  const doEspelho = vitrine.lojas && vitrine.lojas.find(d => d.id === String(id));
+  if (doEspelho) return doEspelho.data();
+  const doc = await db.collection('lojas').doc(String(id)).get();
+  return doc.exists ? doc.data() : null;
+}
+
+// Nome e e-mail dos donos das lojas mudam pouco: valem por 10 minutos e, vencidos,
+// são atualizados por trás enquanto a resposta usa os que já estão aqui
+const DONOS_VALIDADE_MS = 10 * 60 * 1000;
+const donosCache = new Map();   // usuario_id -> { existe, nome, email, em }
+
+async function buscarDonos(ids) {
+  const docs = await db.getAll(...ids.map(id => db.collection('usuarios').doc(id)));
+  const em = Date.now();
+  docs.forEach(d => donosCache.set(d.id, {
+    existe: d.exists,
+    nome:   d.exists ? d.data().nome  : null,
+    email:  d.exists ? d.data().email : null,
+    em
+  }));
+}
+
+async function donosDasLojas(ids) {
+  const agora = Date.now();
+  const unicos = [...new Set(ids.filter(Boolean).map(String))];
+  const vencidos = unicos.filter(id => donosCache.has(id) && agora - donosCache.get(id).em > DONOS_VALIDADE_MS);
+  if (vencidos.length) {
+    vencidos.forEach(id => { donosCache.get(id).em = agora; });   // um pedido de atualização por vez
+    buscarDonos(vencidos).catch(() => {});
+  }
+  const faltam = unicos.filter(id => !donosCache.has(id));
+  if (faltam.length) await buscarDonos(faltam);
+  return donosCache;
+}
+
+espelhar('produtos', db.collection('produtos').where('ativo', '==', true));
+// Os donos já ficam buscados: a primeira abertura da aba Lojas não espera o banco
+espelhar('lojas', db.collection('lojas').where('ativa', '==', true),
+  docs => donosDasLojas(docs.map(d => d.data().usuario_id)).catch(() => {}));
+
+// ============================================================
 //  LOJAS – LOJAS PÚBLICAS
 // ============================================================
 
 app.get('/api/stores-public', async (req, res) => {
   try {
-    const snap = await db.collection('lojas').where('ativa', '==', true).get();
-    const stores = [];
-    for (const doc of snap.docs) {
+    // Lojas e contagem de produtos saem da memória; antes eram duas consultas por
+    // loja, uma loja depois da outra
+    const [lojaDocs, prodDocs] = await Promise.all([lojasAtivas(), produtosAtivos()]);
+    const totalPorLoja = new Map();
+    prodDocs.forEach(d => {
+      const id = d.data().loja_id;
+      totalPorLoja.set(id, (totalPorLoja.get(id) || 0) + 1);
+    });
+    const donos = await donosDasLojas(lojaDocs.map(d => d.data().usuario_id));
+    const stores = lojaDocs.map(doc => {
       const data = doc.data();
-      const [userDoc, prodsSnap] = await Promise.all([
-        db.collection('usuarios').doc(data.usuario_id).get(),
-        db.collection('produtos').where('loja_id', '==', doc.id).where('ativo', '==', true).get()
-      ]);
-      stores.push({
+      const dono = donos.get(String(data.usuario_id));
+      return {
         id: doc.id, ...data,
-        usuario_nome:  userDoc.exists ? userDoc.data().nome  : null,
-        usuario_email: userDoc.exists ? userDoc.data().email : null,
-        totalProdutos: prodsSnap.size
-      });
-    }
+        usuario_nome:  dono && dono.existe ? dono.nome  : null,
+        usuario_email: dono && dono.existe ? dono.email : null,
+        totalProdutos: totalPorLoja.get(doc.id) || 0
+      };
+    });
     res.json({ ok: true, stores });
   } catch (err) {
     console.error('Erro ao buscar lojas públicas:', err);
+    res.status(500).json({ ok: false, msg: 'Erro interno do servidor.' });
+  }
+});
+
+// Uma loja só, para a página da loja no marketplace (antes ela baixava a lista de todas)
+app.get('/api/stores-public/:id', async (req, res) => {
+  try {
+    const data = await dadosDaLoja(req.params.id);
+    if (!data || !data.ativa) return res.status(404).json({ ok: false, msg: 'Loja não encontrada.' });
+    res.json({ ok: true, store: { id: req.params.id, ...data } });
+  } catch (err) {
+    console.error('Erro ao buscar loja pública:', err);
     res.status(500).json({ ok: false, msg: 'Erro interno do servidor.' });
   }
 });
@@ -713,6 +1102,8 @@ app.post('/api/products', authenticateToken, async (req, res) => {
 //  PRODUTOS – LISTAR POR LOJA
 // ============================================================
 
+// Direto do banco, sem a vitrine em memória: o painel do lojista chama esta rota logo
+// depois de salvar um produto e precisa ver o que acabou de gravar
 app.get('/api/products/store/:storeId', async (req, res) => {
   try {
     const snap = await db.collection('produtos')
@@ -789,13 +1180,16 @@ app.delete('/api/products/:id', authenticateToken, async (req, res) => {
 app.get('/api/products', async (req, res) => {
   const { query, categoria } = req.query;
   try {
-    const snap = await db.collection('produtos').where('ativo', '==', true).get();
+    // Produtos e lojas ativos vêm da vitrine em memória. Antes a loja de cada produto
+    // era lida à parte no banco, uma depois da outra, e a espera crescia com o catálogo.
+    const [prodDocs, lojaDocs] = await Promise.all([produtosAtivos(), lojasAtivas()]);
+    const lojas = new Map(lojaDocs.map(d => [d.id, d.data()]));
     let products = [];
 
-    for (const doc of snap.docs) {
+    for (const doc of prodDocs) {
       const data = doc.data();
-      const storeDoc = await db.collection('lojas').doc(data.loja_id).get();
-      if (!storeDoc.exists || !storeDoc.data().ativa) continue;
+      const loja = lojas.get(data.loja_id);
+      if (!loja) continue;                       // loja desativada ou apagada
       products.push({
         id:         doc.id,
         nome:       data.nome,
@@ -816,9 +1210,9 @@ app.get('/api/products', async (req, res) => {
         nota_count: data.nota_count || 0,
         loja: {
           id:     data.loja_id,
-          nome:   storeDoc.data().nome,
-          cidade: storeDoc.data().cidade,
-          estado: storeDoc.data().estado
+          nome:   loja.nome,
+          cidade: loja.cidade,
+          estado: loja.estado
         }
       });
     }
@@ -843,6 +1237,27 @@ app.get('/api/products', async (req, res) => {
 });
 
 // ============================================================
+//  NINGUÉM COMPRA O QUE VENDE
+//  Quais produtos (dentre os ids) são de uma loja do próprio usuário. A loja vem do
+//  produto gravado no banco, nunca do loja_id que o navegador manda no carrinho ou
+//  no pedido. Produtos e lojas ativos saem da vitrine em memória; o resto, do banco.
+// ============================================================
+async function produtosDoProprioUsuario(uid, ids) {
+  const unicos = [...new Set(ids.filter(Boolean).map(String))];
+  if (!unicos.length) return [];
+  const doEspelho = unicos.map(id => vitrine.produtos && vitrine.produtos.find(d => d.id === id));
+  const faltam = unicos.filter((_, i) => !doEspelho[i]);
+  const lidos = faltam.length ? await db.getAll(...faltam.map(id => db.collection('produtos').doc(id))) : [];
+  const docs = [...doEspelho.filter(Boolean), ...lidos.filter(d => d.exists)];
+
+  const lojaIds = [...new Set(docs.map(d => d.data().loja_id).filter(Boolean).map(String))];
+  const donos = new Map(await Promise.all(lojaIds.map(async id => [id, (await dadosDaLoja(id))?.usuario_id])));
+  return docs
+    .filter(d => donos.get(String(d.data().loja_id)) === uid)
+    .map(d => ({ id: d.id, nome: d.data().nome || 'Produto' }));
+}
+
+// ============================================================
 //  CARRINHO – vinculado ao usuário logado (cliente OU lojista)
 //  Estrutura no Firestore:
 //    carrinho (coleção)
@@ -857,12 +1272,20 @@ function cartProdutosRef(uid) {
   return db.collection('carrinho').doc(uid).collection('produtos');
 }
 
-// Buscar o carrinho do usuário autenticado (consulta no Firestore)
+// Buscar o carrinho do usuário autenticado (consulta no Firestore).
+// Produto da loja do próprio usuário sai do carrinho, e a resposta diz qual saiu.
 app.get('/api/cart', authenticateToken, async (req, res) => {
   try {
     const snap = await cartProdutosRef(req.user.uid).get();
-    const items = snap.docs.map(d => d.data());
-    res.json({ ok: true, items });
+    const proprios = await produtosDoProprioUsuario(req.user.uid, snap.docs.map(d => d.id));
+    const fora = new Set(proprios.map(p => p.id));
+    if (fora.size) {
+      const batch = db.batch();
+      snap.docs.filter(d => fora.has(d.id)).forEach(d => batch.delete(d.ref));
+      await batch.commit();
+    }
+    const items = snap.docs.filter(d => !fora.has(d.id)).map(d => d.data());
+    res.json({ ok: true, items, ...(proprios.length ? { removidos: proprios } : {}) });
   } catch (err) {
     console.error('Erro ao buscar carrinho:', err);
     res.status(500).json({ ok: false, msg: 'Erro interno do servidor.' });
@@ -872,16 +1295,21 @@ app.get('/api/cart', authenticateToken, async (req, res) => {
 // Salvar/substituir o carrinho do usuário autenticado
 // Cada item vira um documento na subcoleção "produtos" (id do doc = id do produto)
 app.put('/api/cart', authenticateToken, async (req, res) => {
-  const items = Array.isArray(req.body.items) ? req.body.items : [];
+  const enviados = Array.isArray(req.body.items) ? req.body.items : [];
   try {
     const col   = cartProdutosRef(req.user.uid);
     const batch = db.batch();
 
-    // 1) limpa os produtos atuais
-    const existing = await col.get();
+    // 1) limpa os produtos atuais; ao mesmo tempo, vê quais enviados são da loja do próprio usuário
+    const [existing, proprios] = await Promise.all([
+      col.get(),
+      produtosDoProprioUsuario(req.user.uid, enviados.map(i => i && i.id))
+    ]);
     existing.docs.forEach(d => batch.delete(d.ref));
+    const fora  = new Set(proprios.map(p => p.id));
+    const items = enviados.filter(i => !fora.has(String(i && i.id)));
 
-    // 2) grava os produtos enviados (um doc por produto)
+    // 2) grava os produtos enviados (um doc por produto), menos os da própria loja
     items.forEach(item => {
       const docId = String(item.id || col.doc().id);
       batch.set(col.doc(docId), item);
@@ -894,7 +1322,7 @@ app.put('/api/cart', authenticateToken, async (req, res) => {
     }, { merge: true });
 
     await batch.commit();
-    res.json({ ok: true, items });
+    res.json({ ok: true, items, ...(proprios.length ? { removidos: proprios } : {}) });
   } catch (err) {
     console.error('Erro ao salvar carrinho:', err);
     res.status(500).json({ ok: false, msg: 'Erro interno do servidor.' });
@@ -950,8 +1378,19 @@ app.post('/api/orders', authenticateToken, async (req, res) => {
     const loja_ids    = [...new Set(normalizados.map(i => i.loja_id).filter(Boolean))];
     const total = normalizados.reduce((s, i) => s + i.preco * i.qty, 0);
 
-    // Dados do comprador (para o lojista ver quem comprou)
-    const userDoc = await db.collection('usuarios').doc(req.user.uid).get();
+    // Ninguém compra o que vende: confere antes de mexer no estoque. Ao mesmo tempo,
+    // os dados do comprador (para o lojista ver quem comprou)
+    const [proprios, userDoc] = await Promise.all([
+      produtosDoProprioUsuario(req.user.uid, produto_ids),
+      db.collection('usuarios').doc(req.user.uid).get()
+    ]);
+    if (proprios.length) {
+      const nomes = proprios.map(p => `"${p.nome}"`).join(', ');
+      return res.status(403).json({
+        ok: false, proprio_produto: true, removidos: proprios,
+        msg: `Você não pode comprar produtos da sua própria loja: ${nomes}. Tire-os do carrinho para continuar.`
+      });
+    }
     const perfil = userDoc.exists ? userDoc.data() : {};
     const usuario_nome  = perfil.nome  || 'Cliente';
     const usuario_email = perfil.email || null;
@@ -976,14 +1415,15 @@ app.post('/api/orders', authenticateToken, async (req, res) => {
     // Baixa o estoque conforme a quantidade comprada de cada produto
     const qtyPorProduto = {};
     normalizados.forEach(i => { qtyPorProduto[i.produto_id] = (qtyPorProduto[i.produto_id] || 0) + i.qty; });
-    for (const [pid, qty] of Object.entries(qtyPorProduto)) {
+    // Os produtos são atualizados ao mesmo tempo (antes, um depois do outro)
+    await Promise.all(Object.entries(qtyPorProduto).map(async ([pid, qty]) => {
       const pref = db.collection('produtos').doc(pid);
       const pdoc = await pref.get();
       if (pdoc.exists) {
         const atual = Number(pdoc.data().estoque) || 0;
         await pref.update({ estoque: Math.max(0, atual - qty) });
       }
-    }
+    }));
 
     const agora = new Date().toISOString();
     const dadosPedido = {
@@ -1252,9 +1692,8 @@ async function coordsDaLoja(lojaId) {
   if (!lojaId) return null;
   try {
     const ref = db.collection('lojas').doc(String(lojaId));
-    const doc = await ref.get();
-    if (!doc.exists) return null;
-    const l = doc.data();
+    const l = await dadosDaLoja(lojaId);   // loja ativa já geocodificada: sai da memória
+    if (!l) return null;
 
     const jaTem = coordsValidas(l);
     if (jaTem) return jaTem;
@@ -2288,8 +2727,13 @@ const PRAZO_BASE = {
   'Norte': '8 a 15 dias úteis'
 };
 
+// CEP não muda de endereço: o que o ViaCEP respondeu fica guardado enquanto o
+// servidor roda, e a segunda consulta do mesmo CEP não sai daqui
+const CEP_CACHE_MAX = 5000;
+const cepCache = new Map();
+
 // Resolve um CEP em { uf, regiao, cidade }. Usa cache para não repetir chamadas.
-async function resolverCep(cep, cache) {
+async function resolverCep(cep, cache = cepCache) {
   const limpo = String(cep || '').replace(/\D/g, '');
   if (limpo.length !== 8) return null;
   if (cache && cache.has(limpo)) return cache.get(limpo);
@@ -2302,7 +2746,10 @@ async function resolverCep(cep, cache) {
       uf: data.uf, regiao: UF_REGIAO[data.uf], cidade: data.localidade,
       logradouro: data.logradouro || null, bairro: data.bairro || null
     };
-    if (cache) cache.set(limpo, out);
+    if (cache) {
+      if (cache.size >= CEP_CACHE_MAX) cache.clear();
+      cache.set(limpo, out);
+    }
     return out;
   } catch (e) {
     return null;
@@ -2354,17 +2801,15 @@ app.post('/api/shipping/quote', async (req, res) => {
       return res.status(400).json({ ok: false, msg: 'Carrinho vazio.' });
     }
 
-    const cache   = new Map();
-    const destino = await resolverCep(cep, cache);
+    const destino = await resolverCep(cep);
     if (!destino || !destino.regiao) {
       return res.status(400).json({ ok: false, msg: 'Não foi possível identificar a região do CEP.' });
     }
 
     const threshold = FRETE_GRATIS_MIN[destino.regiao];
-    const detalhe   = [];
-    let freteTotal  = 0;
 
-    for (const loja of lojas) {
+    // As lojas são calculadas ao mesmo tempo (antes, uma depois da outra)
+    const detalhe = await Promise.all(lojas.map(async loja => {
       const subtotal = parseFloat(loja.subtotal) || 0;
       const itens    = parseInt(loja.itens) || 1;
       const peso     = parseFloat(loja.peso) || (itens * 0.5);
@@ -2372,10 +2817,9 @@ app.post('/api/shipping/quote', async (req, res) => {
       // Origem: CEP cadastrado na loja (fallback para o estado da loja)
       let origem = null;
       try {
-        const storeDoc = await db.collection('lojas').doc(String(loja.id)).get();
-        if (storeDoc.exists) {
-          const sd = storeDoc.data();
-          if (sd.cep) origem = await resolverCep(sd.cep, cache);
+        const sd = await dadosDaLoja(loja.id);
+        if (sd) {
+          if (sd.cep) origem = await resolverCep(sd.cep);
           if (!origem && sd.estado) origem = { uf: sd.estado, regiao: UF_REGIAO[sd.estado], cidade: sd.cidade };
         }
       } catch (_) { /* segue com origem nula → frete cheio */ }
@@ -2386,17 +2830,17 @@ app.post('/api/shipping/quote', async (req, res) => {
         frete  = freteEntreCeps(origem, destino, peso);
         gratis = false;
       }
-      freteTotal += frete;
 
-      detalhe.push({
+      return {
         id: loja.id, nome: loja.nome || 'Loja',
         subtotal, frete, gratis,
         faltam: gratis ? 0 : Math.round((threshold - subtotal) * 100) / 100,
         prazo: PRAZO_BASE[destino.regiao],
         origem: origem ? `${origem.cidade || ''} - ${origem.uf}`.trim() : null
-      });
-    }
+      };
+    }));
 
+    let freteTotal = detalhe.reduce((s, d) => s + d.frete, 0);
     freteTotal = Math.round(freteTotal * 100) / 100;
 
     res.json({
@@ -2418,10 +2862,18 @@ app.post('/api/shipping/quote', async (req, res) => {
 //  SEED – DADOS DE DEMO
 // ============================================================
 
+// Toda página chama esta rota ao abrir: depois que o banco já tem usuários, a
+// resposta é sempre a mesma e não precisa de outra ida ao Firestore
+let bancoJaTemUsuarios = false;
+
 app.post('/api/seed', async (req, res) => {
   try {
+    if (bancoJaTemUsuarios) return res.json({ ok: false, msg: 'Dados de demo já existem.' });
     const snap = await db.collection('usuarios').limit(1).get();
-    if (!snap.empty) return res.json({ ok: false, msg: 'Dados de demo já existem.' });
+    if (!snap.empty) {
+      bancoJaTemUsuarios = true;
+      return res.json({ ok: false, msg: 'Dados de demo já existem.' });
+    }
 
     const joao    = await admin.auth().createUser({ email: 'loja@demo.com',    password: '123456', displayName: 'João Silva'    });
     const maria   = await admin.auth().createUser({ email: 'maria@demo.com',   password: '123456', displayName: 'Maria Santos'  });
@@ -2447,6 +2899,7 @@ app.post('/api/seed', async (req, res) => {
       await db.collection('produtos').add({ loja_id: lojaId, nome, preco, descricao, categoria, estoque, ativo: true, imagem_url: null });
     }
 
+    bancoJaTemUsuarios = true;
     res.json({ ok: true, msg: 'Dados de demo carregados com sucesso!' });
   } catch (err) {
     console.error('Erro no seed:', err);

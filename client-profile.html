@@ -302,7 +302,9 @@
       </div>
       <div class="form-group">
         <label>Nova Senha</label>
-        <input type="password" id="client-senha-nova" placeholder="Deixe em branco para manter a atual"/>
+        <input type="password" id="client-senha-nova" placeholder="Deixe em branco para manter a atual"
+          aria-describedby="client-senha-erro" oninput="erroSenhaNova('')"/>
+        <p class="campo-erro" id="client-senha-erro" role="alert" hidden></p>
       </div>
       <div class="form-group">
         <label>Confirmar Nova Senha</label>
@@ -312,6 +314,9 @@
     <div class="action-btns">
       <button class="btn btn-primary" onclick="changePassword()">Alterar senha</button>
     </div>
+    <p style="margin-top:1rem">
+      <button type="button" class="link-esqueci" onclick="esqueciSenha()">Esqueceu sua senha?</button>
+    </p>
   </div>
 
   <hr class="section-divider"/>
@@ -360,6 +365,7 @@
 
 
 <script src="app.js"></script>
+<script src="recuperar-senha.js"></script>
 <script>
 let currentUser = null;
 
@@ -453,12 +459,34 @@ async function saveProfile(){
   }
 }
 
+// ---- ESQUECEU A SENHA ----
+// Pergunta antes, manda o código para o e-mail da conta e, depois da troca, a
+// sessão acaba em todos os aparelhos: volta para o login.
+function esqueciSenha(){
+  RecuperarSenha.abrir({
+    email: currentUser.email,
+    perguntar: true,
+    aoConcluir: () => { DB.logout(); window.location.href = 'login.html?aviso=senha-redefinida'; }
+  });
+}
+
 // ---- ALTERAR SENHA ----
+// Mensagem em vermelho embaixo de "Nova Senha"; some quando a pessoa volta a digitar
+function erroSenhaNova(msg){
+  const campo = document.getElementById('client-senha-nova');
+  const el = document.getElementById('client-senha-erro');
+  el.textContent = msg;
+  el.hidden = !msg;
+  if(msg) campo.setAttribute('aria-invalid', 'true');
+  else campo.removeAttribute('aria-invalid');
+}
+
 async function changePassword(){
   const senhaAtual = document.getElementById('client-senha-atual').value;
   const senhaNova = document.getElementById('client-senha-nova').value;
   const senhaConf = document.getElementById('client-senha-conf').value;
-  
+  erroSenhaNova('');
+
   if(!senhaAtual){
     toast('Senha atual é obrigatória', 'error');
     return;
@@ -488,11 +516,16 @@ async function changePassword(){
     });
     
     const data = await res.json();
+    if(data.senha_em_uso){
+      erroSenhaNova(data.msg);
+      document.getElementById('client-senha-nova').focus();
+      return;
+    }
     if(!data.ok){
       toast(data.msg || 'Erro ao alterar senha', 'error');
       return;
     }
-    
+
     toast('Senha alterada com sucesso!', 'success');
     document.getElementById('client-senha-atual').value = '';
     document.getElementById('client-senha-nova').value = '';

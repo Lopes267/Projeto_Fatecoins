@@ -248,6 +248,8 @@ main{max-width:calc(var(--container) + 2 * var(--gutter));margin:0 auto;padding:
 
 @media(max-width:640px){
   main{padding:1.4rem 1rem 3rem}
+  .sel{font-size:16px}   /* com menos, o iPhone dá zoom na página ao tocar */
+  .endereco a[target="_blank"]{display:inline-block;padding:.4rem 0}   /* "Abrir rota": alvo do tamanho do dedo */
   .page-head h1{font-size:1.6rem}
   .pedido-valor{margin-left:0;text-align:left}
   .acoes .btn{flex:1}

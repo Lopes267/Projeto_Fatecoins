@@ -278,11 +278,49 @@ body.a11y-light .selo-pendente{background:rgba(138,90,0,.08);border-color:rgba(1
 @media(prefers-reduced-motion:reduce){ .nav-item{transition:none} }
 
 /* RESPONSIVE (o que é do painel está em painel.css) */
+.nav-lbl-curto,.topo-celular{display:none}
 @media(max-width:768px){
-  .sidebar{display:none}
-  .main{padding:1.2rem}
+  /* No celular a barra lateral vira abas fixas no pé da tela (antes ela só sumia
+     e não havia como trocar de aba nem sair da conta). Perfil e "Sair" vão para o topo. */
+  :root{--nav-celular:65px}
+  .sidebar{
+    position:fixed;left:0;right:0;bottom:0;top:auto;z-index:50;width:100%;height:auto;
+    flex-direction:row;gap:.15rem;padding:.35rem .4rem calc(.35rem + env(safe-area-inset-bottom));
+    border-right:none;border-top:1px solid var(--border);
+  }
+  .sidebar .logo,.sidebar .nav-section,.sidebar .sidebar-footer{display:none}
+  .nav-item{
+    flex:1;min-width:0;min-height:52px;margin:0;padding:.35rem .15rem;
+    flex-direction:column;justify-content:center;gap:.15rem;
+    font-size:.6875rem;line-height:1.2;text-align:center;
+  }
+  .nav-item .icon{width:auto;font-size:1.2rem}
+  .nav-lbl{display:none}
+  .nav-lbl-curto{display:block}
+
+  .topo-celular{display:flex;align-items:center;gap:.7rem;margin-bottom:-.6rem}
+  .topo-celular .logo{margin:0 auto 0 0;font-size:1.15rem}
+  .topo-celular .user-chip{margin:0;min-width:0;min-height:40px}
+  .topo-celular .avatar{width:30px;height:30px;flex-shrink:0}
+  .topo-celular .user-name{max-width:28vw}
+  .topo-celular .logout-btn{width:auto;min-height:40px;padding:.45rem .9rem}
+
+  .main{padding:1.2rem;padding-bottom:calc(var(--nav-celular) + 1.5rem + env(safe-area-inset-bottom))}
+  /* A barra "Salvar" e o botão de acessibilidade ficam acima das abas */
+  .barra-acoes{bottom:calc(var(--nav-celular) + env(safe-area-inset-bottom));padding-bottom:1rem}
+  body .a11y-root{bottom:calc(var(--nav-celular) + 14px + env(safe-area-inset-bottom))}
   .form-grid{grid-template-columns:1fr}
   .form-group.span2{grid-column:span 1}
+  .voltar-link{padding:.5rem 0}                    /* alvo de toque do tamanho do dedo */
+  input[type=range]{min-height:32px}
+}
+/* Lista de produtos no celular: foto e nome em cima; preço e botões embaixo
+   (numa linha só, os botões passavam da borda e o 🗑 ficava cortado) */
+@media(max-width:640px){
+  .product-item{flex-wrap:wrap;gap:.6rem .9rem;padding:.9rem 1rem}
+  .prod-info{flex:1 1 calc(100% - 42px - .9rem)}
+  .prod-actions{margin-left:auto}
+  .prod-actions .btn{min-width:44px;min-height:40px;justify-content:center}
 }
 
 /* FORMULÁRIO DE PRODUTO NO CELULAR */
@@ -313,12 +351,12 @@ body.a11y-light .selo-pendente{background:rgba(138,90,0,.08);border-color:rgba(1
 <aside class="sidebar">
   <div class="logo">mercado<span>local</span></div>
   <div class="nav-section">Minha Loja</div>
-  <button type="button" class="nav-item active" data-aba="dashboard" onclick="showPage('dashboard',this)"><span class="icon" aria-hidden="true">📊</span> Visão Geral</button>
-  <button type="button" class="nav-item" data-aba="loja" onclick="showPage('loja',this)"><span class="icon" aria-hidden="true">🏪</span> Dados da Loja</button>
-  <button type="button" class="nav-item" data-aba="produtos" onclick="showPage('produtos',this)"><span class="icon" aria-hidden="true">📦</span> Produtos</button>
-  <button type="button" class="nav-item" data-aba="vendas" onclick="showPage('vendas',this)"><span class="icon" aria-hidden="true">🧾</span> Vendas</button>
+  <button type="button" class="nav-item active" data-aba="dashboard" onclick="showPage('dashboard',this)"><span class="icon" aria-hidden="true">📊</span> <span class="nav-lbl">Visão Geral</span><span class="nav-lbl-curto">Início</span></button>
+  <button type="button" class="nav-item" data-aba="loja" onclick="showPage('loja',this)"><span class="icon" aria-hidden="true">🏪</span> <span class="nav-lbl">Dados da Loja</span><span class="nav-lbl-curto">Loja</span></button>
+  <button type="button" class="nav-item" data-aba="produtos" onclick="showPage('produtos',this)"><span class="icon" aria-hidden="true">📦</span> <span class="nav-lbl">Produtos</span><span class="nav-lbl-curto">Produtos</span></button>
+  <button type="button" class="nav-item" data-aba="vendas" onclick="showPage('vendas',this)"><span class="icon" aria-hidden="true">🧾</span> <span class="nav-lbl">Vendas</span><span class="nav-lbl-curto">Vendas</span></button>
   <div class="nav-section">Explorar</div>
-  <a class="nav-item" href="marketplace.html"><span class="icon" aria-hidden="true">🔍</span> Marketplace</a>
+  <a class="nav-item" href="marketplace.html"><span class="icon" aria-hidden="true">🔍</span> <span class="nav-lbl">Marketplace</span><span class="nav-lbl-curto">Vitrine</span></a>
   <div class="sidebar-footer">
     <a class="user-chip" href="profile.html" title="Editar perfil">
       <div class="avatar" id="avatar-letter" aria-hidden="true">?</div>
@@ -333,6 +371,16 @@ body.a11y-light .selo-pendente{background:rgba(138,90,0,.08);border-color:rgba(1
 
 <!-- MAIN -->
 <main class="main" id="conteudo" tabindex="-1">
+
+  <!-- TOPO NO CELULAR: a barra lateral vira abas no pé da tela; perfil e "Sair" sobem para cá -->
+  <header class="topo-celular">
+    <div class="logo">mercado<span>local</span></div>
+    <a class="user-chip" href="profile.html" title="Editar perfil">
+      <div class="avatar" id="avatar-celular" aria-hidden="true">?</div>
+      <span class="user-name" id="user-name-celular"></span>
+    </a>
+    <button type="button" class="logout-btn" onclick="doLogout()">Sair</button>
+  </header>
 
   <!-- DASHBOARD PAGE -->
   <div class="page active" id="page-dashboard">
@@ -576,10 +624,9 @@ body.a11y-light .selo-pendente{background:rgba(138,90,0,.08);border-color:rgba(1
               <span id="product-model-status" style="font-size:.8125rem;color:var(--muted)">Nenhum modelo enviado</span>
             </div>
             <p style="font-size:.8125rem;color:var(--muted);margin-top:.4rem;line-height:1.5">
-              <strong>Escanear</strong> gira o produto na frente da câmera e monta o modelo 3D aqui mesmo,
-              sem enviar nada para fora. Funciona bem em produto “cheio” (caixa, garrafa, tênis, panela);
-              objeto vazado, fino, transparente ou espelhado não sai bem.
-              <strong>Preencha as medidas acima antes</strong> — é delas que sai o tamanho real da peça.
+              Envie um modelo 3D no formato <strong>.glb</strong> (até 20 MB): ele aparece no
+              “Ver no meu espaço” encaixado nas medidas cadastradas acima.
+              O escaneamento pela câmera ainda está em desenvolvimento.
               Sem modelo nenhum o “Ver no meu espaço” ainda funciona: montamos uma caixa no tamanho
               cadastrado com a foto do produto.
             </p>
@@ -598,13 +645,18 @@ body.a11y-light .selo-pendente{background:rgba(138,90,0,.08);border-color:rgba(1
     <div class="v-ambient" aria-hidden="true"></div>
 
     <div class="v-stack">
-      <div class="topbar" style="margin-bottom:0">
+      <div class="topbar v-topo" style="margin-bottom:0">
         <div>
           <h1 class="page-title">Vendas</h1>
           <p class="page-sub">O que a sua loja vendeu, e para quem</p>
         </div>
+        <div class="seg" role="group" aria-label="Modo de ver as vendas">
+          <button type="button" data-modo="geral"    aria-pressed="true">Visão geral</button>
+          <button type="button" data-modo="comparar" aria-pressed="false">Comparar períodos</button>
+        </div>
       </div>
 
+      <div class="v-modo" id="modo-geral">
       <!-- FILTRO: uma linha só, acima de tudo que ela filtra -->
       <div class="v-filters">
         <div class="seg" role="group" aria-label="Período das vendas">
@@ -673,6 +725,75 @@ body.a11y-light .selo-pendente{background:rgba(138,90,0,.08);border-color:rgba(1
         </div>
         <div id="sales-list"><p class="skeleton">Carregando…</p></div>
       </section>
+      </div>
+
+      <!-- COMPARAR PERÍODOS: os dois intervalos numa linha só, acima de tudo que eles filtram -->
+      <div class="v-modo" id="modo-comparar" hidden>
+        <div class="cmp-filtros">
+          <div class="seg" role="group" aria-label="Comparações prontas">
+            <button type="button" data-cmp="7"   aria-pressed="false">7 dias</button>
+            <button type="button" data-cmp="30"  aria-pressed="true">30 dias</button>
+            <button type="button" data-cmp="mes" aria-pressed="false">Este mês</button>
+            <button type="button" data-cmp="ano" aria-pressed="false">Este ano</button>
+          </div>
+          <div class="cmp-faixas">
+            <fieldset class="cmp-faixa">
+              <legend><i class="leg-chave leg-coluna" style="background:var(--data)" aria-hidden="true"></i>Período A</legend>
+              <input type="date" class="cmp-data" id="cmp-a-ini" aria-label="Período A, primeiro dia"/>
+              <span class="cmp-ate">até</span>
+              <input type="date" class="cmp-data" id="cmp-a-fim" aria-label="Período A, último dia"/>
+            </fieldset>
+            <fieldset class="cmp-faixa">
+              <legend><i class="leg-chave leg-coluna" style="background:var(--data-cmp)" aria-hidden="true"></i>Período B</legend>
+              <input type="date" class="cmp-data" id="cmp-b-ini" aria-label="Período B, primeiro dia"/>
+              <span class="cmp-ate">até</span>
+              <input type="date" class="cmp-data" id="cmp-b-fim" aria-label="Período B, último dia"/>
+            </fieldset>
+          </div>
+        </div>
+        <p class="v-note" id="cmp-nota" aria-live="polite" style="margin-top:-.4rem"></p>
+
+        <div class="kpi-row" id="cmp-kpis"></div>
+
+        <section class="glass chart-card" aria-labelledby="cmp-serie-lbl">
+          <div class="chart-head">
+            <div>
+              <h2 class="chart-title" id="cmp-serie-lbl">Receita dia a dia</h2>
+              <p class="chart-sub" id="cmp-serie-sub">Os dois períodos lado a lado, a partir do primeiro dia de cada um</p>
+            </div>
+            <button type="button" class="link-btn" id="toggle-cmp-serie"
+                    aria-pressed="false" aria-controls="cmp-serie-body">Ver tabela</button>
+          </div>
+          <div id="cmp-serie-leg"></div>
+          <div class="chart-body" id="cmp-serie-body"></div>
+        </section>
+
+        <div class="chart-grid">
+          <section class="glass chart-card" aria-labelledby="cmp-dow-lbl">
+            <div class="chart-head">
+              <div>
+                <h2 class="chart-title" id="cmp-dow-lbl">Em que dias você vende mais</h2>
+                <p class="chart-sub">Receita média por dia da semana</p>
+              </div>
+              <button type="button" class="link-btn" id="toggle-cmp-dow"
+                      aria-pressed="false" aria-controls="cmp-dow-body">Ver tabela</button>
+            </div>
+            <p class="cmp-destaque" id="cmp-dow-destaque"></p>
+            <div id="cmp-dow-leg"></div>
+            <div class="chart-body" id="cmp-dow-body"></div>
+          </section>
+
+          <section class="glass chart-card" aria-labelledby="cmp-top-lbl">
+            <div class="chart-head">
+              <div>
+                <h2 class="chart-title" id="cmp-top-lbl">Os dias que mais venderam</h2>
+                <p class="chart-sub">As 5 datas de maior receita em cada período</p>
+              </div>
+            </div>
+            <div class="cmp-top" id="cmp-top-body"></div>
+          </section>
+        </div>
+      </div>
     </div>
   </div>
 
@@ -682,7 +803,8 @@ body.a11y-light .selo-pendente{background:rgba(138,90,0,.08);border-color:rgba(1
 <script src="app.js"></script>
 <script src="charts.js"></script>
 <script src="ar-viewer.js"></script>
-<script src="scanner-3d.js"></script>
+<!-- scanner-3d.js desativado (em desenvolvimento): ver abrirScanner3D() -->
+<!-- <script src="scanner-3d.js"></script> -->
 <script>
 let currentUser = null;
 let currentStore = null;
@@ -708,7 +830,12 @@ document.addEventListener('DOMContentLoaded', async ()=>{
   } else {
     avatarEl.textContent = currentUser.nome[0].toUpperCase();
   }
-  
+  // O topo do celular repete o avatar e o primeiro nome
+  const avatarCel = document.getElementById('avatar-celular');
+  avatarCel.style.cssText = avatarEl.style.cssText;
+  avatarCel.textContent = avatarEl.textContent;
+  document.getElementById('user-name-celular').textContent = currentUser.nome.split(' ')[0];
+
   currentStore = await DB.getMyStore(currentUser.id);
   loadLojaForm();
   montarPresets();
@@ -723,8 +850,9 @@ document.addEventListener('DOMContentLoaded', async ()=>{
   if(ABAS_PAINEL.includes(abaInicial) && abaInicial !== 'dashboard'){
     await showPage(abaInicial, null);
   } else {
-    await loadStats();
-    await renderProductList('dash-product-list', true);
+    const prods = await produtosDaLoja();
+    await loadStats(prods);
+    await renderProductList('dash-product-list', true, prods);
   }
 });
 
@@ -751,7 +879,10 @@ async function showPage(name, origem, { semConfirmar = false } = {}){
   const u = new URL(location); u.searchParams.set('aba', name); history.replaceState({}, '', u);
   if(name==='produtos') await renderProductList('full-product-list', false);
   if(name==='vendas') await renderSales();
-  if(name==='dashboard'){ await loadStats(); await renderProductList('dash-product-list', true); }
+  if(name==='dashboard'){
+    const prods = await produtosDaLoja();
+    await loadStats(prods); await renderProductList('dash-product-list', true, prods);
+  }
 }
 
 // ============================================================
@@ -760,7 +891,7 @@ async function showPage(name, origem, { semConfirmar = false } = {}){
 //  marca reprova no teste de daltonismo, então a distinção vem de
 //  posição e rótulo, nunca de cor.
 // ============================================================
-const V = { raw:null, carregado:false, periodo:'30', vista:{serie:'chart',top:'chart',dow:'chart'} };
+const V = { raw:null, carregado:false, periodo:'30', modo:'geral', vista:{serie:'chart',top:'chart',dow:'chart'} };
 
 // Formatação, janelas de tempo, agrupamento, dicas e tabelas vêm de charts.js —
 // as mesmas primitivas que o painel de Desempenho do entregador usa.
@@ -790,12 +921,23 @@ const serieVendas = (vendas, ini, fim) => agruparNoTempo(vendas, ini, fim, {
 // ============================================================
 async function renderSales(){
   aplicarPeriodoDaURL();
+  aplicarComparacaoDaURL();
+  V.modo = new URLSearchParams(location.search).get('modo') === 'comparar' ? 'comparar' : 'geral';
   if(!V.carregado){
     const data = await DB.getSales();
     V.raw = (data.vendas || []).slice();
     V.carregado = true;
   }
-  desenharVendas();
+  aplicarModo();
+}
+
+// Visão geral ou Comparar períodos: só o modo visível é desenhado (com a largura certa)
+function aplicarModo(){
+  document.getElementById('modo-geral').hidden = V.modo !== 'geral';
+  document.getElementById('modo-comparar').hidden = V.modo !== 'comparar';
+  document.querySelectorAll('.seg [data-modo]').forEach(b=>
+    b.setAttribute('aria-pressed', String(b.dataset.modo === V.modo)));
+  if(V.modo === 'comparar') desenharComparacao(); else desenharVendas();
 }
 
 function aplicarPeriodoDaURL(){
@@ -985,9 +1127,337 @@ function pintarRegistro(atuais){
     </tbody></table></div>`;
 }
 
+// ============================================================
+//  COMPARAR PERÍODOS — dois intervalos quaisquer, lado a lado
+//  A é o período principal (matiz dos dados); B é a referência (cinza).
+//  Tudo sai de V.raw, já carregado: trocar as datas não vai ao servidor.
+// ============================================================
+const C = { preset:'30', a:null, b:null, dados:null, vista:{ serie:'chart', dow:'chart' } };
+const SERIE_A = { nome:'Período A', cor:'var(--data)' };
+const SERIE_B = { nome:'Período B', cor:'var(--data-cmp)' };
+const DIAS_NOME   = ['domingo','segunda','terça','quarta','quinta','sexta','sábado'];
+const DIAS_PLURAL = ['domingos','segundas','terças','quartas','quintas','sextas','sábados'];
+const noDia = i => (i === 0 || i === 6 ? 'no ' : 'na ') + DIAS_NOME[i];
+const maiuscula = s => s.charAt(0).toUpperCase() + s.slice(1);
+
+const inicioDia = d => { const c = new Date(d); c.setHours(0,0,0,0); return c; };
+const fimDia    = d => { const c = new Date(d); c.setHours(23,59,59,999); return c; };
+const deCampo   = s => { const [y,m,d] = String(s||'').split('-').map(Number); return y && m && d ? new Date(y, m-1, d) : null; };
+const diasNaFaixa = f => Math.round((inicioDia(f.fim) - inicioDia(f.ini)) / 864e5) + 1;
+
+// Mesmo dia em outro mês ou ano, sem passar do fim do mês (31/03 → 28/02)
+function mesmoDiaEm(d, anos, meses){
+  const alvo = new Date(d.getFullYear() + anos, d.getMonth() + meses, 1);
+  alvo.setDate(Math.min(d.getDate(), new Date(alvo.getFullYear(), alvo.getMonth() + 1, 0).getDate()));
+  return alvo;
+}
+
+// Comparações prontas. "Este mês" e "Este ano" vão até hoje e comparam com o
+// mesmo trecho do mês/ano anterior, para não pôr um mês pela metade contra um inteiro.
+function faixasDoPreset(p){
+  const hoje = inicioDia(new Date());
+  if(p === 'mes' || p === 'ano'){
+    const aIni = p === 'mes' ? new Date(hoje.getFullYear(), hoje.getMonth(), 1) : new Date(hoje.getFullYear(), 0, 1);
+    const [anos, meses] = p === 'mes' ? [0, -1] : [-1, 0];
+    return { a:{ ini:aIni, fim:hoje }, b:{ ini:mesmoDiaEm(aIni, anos, meses), fim:mesmoDiaEm(hoje, anos, meses) } };
+  }
+  const n = parseInt(p, 10);
+  const aIni = new Date(hoje); aIni.setDate(aIni.getDate() - (n - 1));
+  const bFim = new Date(aIni); bFim.setDate(bFim.getDate() - 1);
+  const bIni = new Date(bFim); bIni.setDate(bIni.getDate() - (n - 1));
+  return { a:{ ini:aIni, fim:hoje }, b:{ ini:bIni, fim:bFim } };
+}
+
+// O link guarda a comparação: ?cmp=30, ou ?cmp=livre&a=2026-10-01_2026-10-31&b=...
+function aplicarComparacaoDaURL(){
+  const q = new URLSearchParams(location.search);
+  const faixa = s => { const [ini, fim] = String(s||'').split('_').map(deCampo); return ini && fim && ini <= fim ? { ini, fim } : null; };
+  const p = q.get('cmp'), a = faixa(q.get('a')), b = faixa(q.get('b'));
+  if(p === 'livre' && a && b){ C.preset = null; C.a = a; C.b = b; return; }
+  C.preset = ['7','30','mes','ano'].includes(p) ? p : '30';
+  Object.assign(C, faixasDoPreset(C.preset));
+}
+function escreverComparacaoNaURL(){
+  const u = new URL(location);
+  ['cmp','a','b'].forEach(k => u.searchParams.delete(k));
+  u.searchParams.set('cmp', C.preset || 'livre');
+  if(!C.preset){
+    u.searchParams.set('a', chaveDia(C.a.ini) + '_' + chaveDia(C.a.fim));
+    u.searchParams.set('b', chaveDia(C.b.ini) + '_' + chaveDia(C.b.fim));
+  }
+  history.replaceState({}, '', u);
+}
+
+function mostrarFaixasNosCampos(){
+  document.querySelectorAll('.seg [data-cmp]').forEach(b=>
+    b.setAttribute('aria-pressed', String(b.dataset.cmp === C.preset)));
+  [['a', C.a], ['b', C.b]].forEach(([k, f])=>{
+    ['ini','fim'].forEach(lado=>{
+      const el = document.getElementById(`cmp-${k}-${lado}`);
+      el.value = chaveDia(f[lado]);
+      el.removeAttribute('aria-invalid');
+    });
+  });
+}
+
+// Datas digitadas: só redesenha com os dois períodos completos e em ordem
+function lerFaixasDosCampos(){
+  const erros = [], faixas = {};
+  ['a','b'].forEach(k=>{
+    const elIni = document.getElementById(`cmp-${k}-ini`), elFim = document.getElementById(`cmp-${k}-fim`);
+    const ini = deCampo(elIni.value), fim = deCampo(elFim.value);
+    const invalido = !ini || !fim || ini > fim;
+    [elIni, elFim].forEach(el => invalido ? el.setAttribute('aria-invalid','true') : el.removeAttribute('aria-invalid'));
+    if(!ini || !fim) erros.push(`Escolha o primeiro e o último dia do período ${k.toUpperCase()}.`);
+    else if(ini > fim) erros.push(`No período ${k.toUpperCase()}, o primeiro dia vem depois do último.`);
+    else faixas[k] = { ini, fim };
+  });
+  if(erros.length){ document.getElementById('cmp-nota').textContent = erros.join(' '); return; }
+  C.preset = null; C.a = faixas.a; C.b = faixas.b;
+  escreverComparacaoNaURL();
+  desenharComparacao();
+}
+
+// Receita em blocos contados a partir do 1º dia de cada período: o dia 1 de A fica ao lado do dia 1 de B
+function serieAlinhada(vendas, f, passo){
+  const ini = inicioDia(f.ini);
+  const baldes = Array.from({ length: Math.ceil(diasNaFaixa(f) / passo) }, (_, i)=>{
+    const t = new Date(ini); t.setDate(t.getDate() + i * passo);
+    return { t, valor:0, itens:0 };
+  });
+  vendas.forEach(v=>{
+    if(!v.data) return;
+    const b = baldes[Math.floor(Math.round((inicioDia(new Date(v.data)) - ini) / 864e5) / passo)];
+    if(b){ b.valor += +v.subtotal||0; b.itens += +v.qty||0; }
+  });
+  return baldes;
+}
+
+// Média por dia da semana: o total de cada dia dividido por quantas vezes ele
+// aparece no período (com ou sem venda). Assim períodos de tamanhos diferentes se comparam.
+function porDiaDaSemana(vendas, f){
+  const acc = DIAS.map((dia, i)=>({ dia, i, total:0, itens:0, vezes:0, media:0 }));
+  for(let d = inicioDia(f.ini); d <= f.fim; d.setDate(d.getDate() + 1)) acc[d.getDay()].vezes++;
+  vendas.forEach(v=>{
+    if(!v.data) return;
+    const a = acc[new Date(v.data).getDay()];
+    a.total += +v.subtotal||0; a.itens += +v.qty||0;
+  });
+  acc.forEach(a => a.media = a.vezes ? a.total / a.vezes : 0);
+  return acc;
+}
+
+function melhoresDias(vendas, quantos = 5){
+  const mapa = new Map();
+  vendas.forEach(v=>{
+    if(!v.data) return;
+    const d = new Date(v.data), k = chaveDia(d);
+    const a = mapa.get(k) || { t:inicioDia(d), receita:0, pedidos:new Set() };
+    a.receita += +v.subtotal||0;
+    if(v.pedido_id) a.pedidos.add(v.pedido_id);
+    mapa.set(k, a);
+  });
+  return [...mapa.values()].sort((x, y)=>y.receita - x.receita).slice(0, quantos);
+}
+
+// Sem base em B, porcentagem não faz sentido: diz com palavras
+const variacaoCmp = (a, b) => b > 0 ? variacao(a, b) : a > 0 ? { dir:'up', txt:'B sem vendas' } : { dir:'flat', txt:'Sem vendas' };
+
+function desenharComparacao(){
+  const todas = V.raw || [];
+  const { a, b } = C;
+  const naFaixa = f => todas.filter(v=>noIntervalo(v, inicioDia(f.ini), fimDia(f.fim)));
+  const emA = naFaixa(a), emB = naFaixa(b);
+  const mA = metricas(emA), mB = metricas(emB);
+  const nA = diasNaFaixa(a), nB = diasNaFaixa(b);
+  mostrarFaixasNosCampos();
+
+  const faixaTxt = f => `${fmtData(f.ini,{day:'2-digit',month:'short',year:'numeric'})} – ${fmtData(f.fim,{day:'2-digit',month:'short',year:'numeric'})}`;
+  const diasTxt = n => `${fmtInt(n)} ${n === 1 ? 'dia' : 'dias'}`;
+  const semData = todas.filter(v=>!v.data).length;
+  document.getElementById('cmp-nota').textContent =
+      `A: ${faixaTxt(a)} (${diasTxt(nA)}) · B: ${faixaTxt(b)} (${diasTxt(nB)})`
+    + (nA !== nB ? ' · Períodos de tamanhos diferentes: a média por dia da semana compara melhor do que os totais' : '')
+    + (semData ? ` · ${semData} ${semData === 1 ? 'venda sem data fica' : 'vendas sem data ficam'} de fora` : '');
+
+  const vazio = (id, txt) => document.getElementById(id).innerHTML = `<p class="skeleton" style="text-align:center">${txt}</p>`;
+  if(!todas.length){
+    C.dados = null;
+    document.getElementById('cmp-kpis').innerHTML = '';
+    ['cmp-serie-leg','cmp-dow-leg','cmp-dow-destaque','cmp-top-body'].forEach(id=>document.getElementById(id).innerHTML = '');
+    document.getElementById('cmp-serie-body').innerHTML = `
+      <div class="v-empty">
+        <div class="icon" aria-hidden="true">🧾</div>
+        <h4>Nenhuma venda ainda</h4>
+        <p>Assim que sua loja vender, você poderá comparar dois períodos aqui e ver em que dias vende mais.</p>
+      </div>`;
+    vazio('cmp-dow-body', 'Sem vendas para comparar');
+    return;
+  }
+
+  // Indicadores: A em destaque, B logo abaixo, e a variação de A em relação a B.
+  // Dinheiro a partir de R$ 100 mil vira "R$ 150,9 mil" no tile; o valor cheio fica no title.
+  const moeda   = n => ({ txt: n >= 1e5 ? 'R$ ' + fmtCompact(n) : formatPrice(n), cheio: formatPrice(n) });
+  const inteiro = n => ({ txt: fmtInt(n), cheio: fmtInt(n) });
+  const tiles = [
+    { rot:'Receita',        a:moeda(mA.receita),    b:moeda(mB.receita),    d:variacaoCmp(mA.receita, mB.receita) },
+    { rot:'Pedidos',        a:inteiro(mA.pedidos),  b:inteiro(mB.pedidos),  d:variacaoCmp(mA.pedidos, mB.pedidos) },
+    { rot:'Ticket médio',   a:moeda(mA.ticket),     b:moeda(mB.ticket),     d:variacaoCmp(mA.ticket, mB.ticket) },
+    { rot:'Itens vendidos', a:inteiro(mA.itens),    b:inteiro(mB.itens),    d:variacaoCmp(mA.itens, mB.itens) },
+    { rot:'Clientes',       a:inteiro(mA.clientes), b:inteiro(mB.clientes), d:variacaoCmp(mA.clientes, mB.clientes) },
+  ];
+  document.getElementById('cmp-kpis').innerHTML = tiles.map(t=>`
+    <div class="glass kpi">
+      <p class="kpi-label">${t.rot}</p>
+      <p class="kpi-value" title="Período A: ${esc(t.a.cheio)}">${chaveSerie(SERIE_A.cor,'coluna')}<span class="v-sr">Período A: </span>${esc(t.a.txt)}</p>
+      <p class="kpi-b" title="Período B: ${esc(t.b.cheio)}">${chaveSerie(SERIE_B.cor,'coluna')}<span>B: <strong>${esc(t.b.txt)}</strong></span></p>
+      <div class="kpi-foot"><span class="delta delta-${t.d.dir}">${esc(t.d.txt)}${/%/.test(t.d.txt) ? ' <small>vs. B</small>' : ''}</span></div>
+    </div>`).join('');
+
+  // Até 92 dias, dia a dia; até 550, semana a semana; acima disso, blocos de 30 dias
+  const maior = Math.max(nA, nB);
+  const passo = maior <= 92 ? 1 : maior <= 550 ? 7 : 30;
+  C.dados = {
+    emA, emB, mA, mB, passo,
+    serieA: serieAlinhada(emA, a, passo), serieB: serieAlinhada(emB, b, passo),
+    dowA: porDiaDaSemana(emA, a), dowB: porDiaDaSemana(emB, b)
+  };
+  const nenhuma = !emA.some(v=>v.data) && !emB.some(v=>v.data);
+  if(nenhuma){
+    ['cmp-serie-leg','cmp-dow-leg','cmp-dow-destaque'].forEach(id=>document.getElementById(id).innerHTML = '');
+    vazio('cmp-serie-body', 'Sem vendas nos dois períodos. Experimente outras datas.');
+    vazio('cmp-dow-body', 'Sem vendas nos dois períodos');
+  } else { pintarCmpSerie(); pintarCmpDow(); }
+  pintarCmpTop();
+}
+
+// ---- Receita ao longo dos dois períodos (duas linhas, A por cima) ----
+function pintarCmpSerie(){
+  const box = document.getElementById('cmp-serie-body');
+  const { serieA, serieB, passo, mA, mB } = C.dados;
+  const n = Math.max(serieA.length, serieB.length);
+  const unidade = passo === 1 ? 'Dia' : passo === 7 ? 'Semana' : 'Bloco de 30 dias';
+  document.getElementById('cmp-serie-lbl').textContent =
+    passo === 1 ? 'Receita dia a dia' : passo === 7 ? 'Receita semana a semana' : 'Receita a cada 30 dias';
+  const quando = bl => !bl ? '—'
+    : passo === 1 ? fmtData(bl.t,{weekday:'short',day:'2-digit',month:'short'})
+    : passo === 7 ? 'semana de ' + fmtData(bl.t,{day:'2-digit',month:'short'})
+    :               'a partir de ' + fmtData(bl.t,{day:'2-digit',month:'short',year:'2-digit'});
+
+  if(C.vista.serie === 'table'){
+    document.getElementById('cmp-serie-leg').innerHTML = '';
+    box.innerHTML = tabela('Receita dos dois períodos, lado a lado',
+      [{t:unidade},{t:'Data em A'},{t:'Receita em A',num:true},{t:'Data em B'},{t:'Receita em B',num:true}],
+      Array.from({length:n}, (_, i)=>[`${unidade} ${i+1}`,
+        quando(serieA[i]), serieA[i] ? formatPrice(serieA[i].valor) : '—',
+        quando(serieB[i]), serieB[i] ? formatPrice(serieB[i].valor) : '—']));
+    return;
+  }
+  document.getElementById('cmp-serie-leg').innerHTML = legenda([SERIE_A, SERIE_B], 'linha');
+  const valores = serie => Array.from({length:n}, (_, i)=>serie[i] ? serie[i].valor : null);
+  desenharLinhas(box, {
+    n, id:'cmp-serie',
+    series: [{ ...SERIE_A, valores: valores(serieA) }, { ...SERIE_B, valores: valores(serieB) }],
+    rotuloX: i => passo === 30 ? `${i+1}º bloco` : `${unidade} ${i+1}`,
+    fmtValor: fmtMoedaEixo,
+    // Valor primeiro, rótulo depois; a chave é um traço da cor da série
+    tipHtml: i => `<span>${unidade} ${i+1}</span><br>` + [[SERIE_A, serieA[i], 'A'], [SERIE_B, serieB[i], 'B']].map(([s, bl, k])=>
+      `${chaveSerie(s.cor)}<b>${bl ? formatPrice(bl.valor) : '—'}</b> <span>${k} · ${quando(bl)}</span>`).join('<br>'),
+    resumo: `Receita por ${unidade.toLowerCase()} nos dois períodos. Período A: ${formatPrice(mA.receita)} no total. `
+          + `Período B: ${formatPrice(mB.receita)}.`
+  });
+}
+
+// ---- Em que dias da semana você vende mais (colunas agrupadas, média por dia) ----
+function pintarCmpDow(){
+  const box = document.getElementById('cmp-dow-body');
+  const { dowA, dowB } = C.dados;
+  const melhor = acc => acc.reduce((b, d, i)=> d.media > acc[b].media ? i : b, 0);
+  const temA = dowA.some(d=>d.total > 0), temB = dowB.some(d=>d.total > 0);
+  const iA = melhor(dowA), iB = melhor(dowB);
+
+  const fraseA = temA
+    ? `No período A, você vende mais <strong>${noDia(iA)}</strong>: média de <strong>${formatPrice(dowA[iA].media)}</strong> por ${DIAS_NOME[iA]}.`
+    : 'No período A não houve vendas.';
+  const fraseB = !temB ? 'No período B não houve vendas.'
+    : temA && iA === iB ? `No período B, ${DIAS_NOME[iB]} também foi o melhor dia (média de ${formatPrice(dowB[iB].media)}).`
+    : `No período B, você vendia mais ${noDia(iB)} (média de ${formatPrice(dowB[iB].media)}).`;
+  document.getElementById('cmp-dow-destaque').innerHTML = `${fraseA}<span class="cell-muted">${fraseB}</span>`;
+
+  if(C.vista.dow === 'table'){
+    document.getElementById('cmp-dow-leg').innerHTML = '';
+    box.innerHTML = tabela('Receita por dia da semana nos dois períodos',
+      [{t:'Dia'},{t:'Média em A',num:true},{t:'Total em A',num:true},{t:'Média em B',num:true},{t:'Total em B',num:true}],
+      DIAS.map((_, i)=>[maiuscula(DIAS_NOME[i]),
+        formatPrice(dowA[i].media), formatPrice(dowA[i].total), formatPrice(dowB[i].media), formatPrice(dowB[i].total)]));
+    return;
+  }
+  document.getElementById('cmp-dow-leg').innerHTML = legenda([SERIE_A, SERIE_B], 'coluna');
+  const vezes = (acc, i) => `${acc[i].vezes} ${acc[i].vezes === 1 ? DIAS_NOME[i] : DIAS_PLURAL[i]}`;
+  desenharColunasAgrupadas(box, {
+    itens: DIAS.map((dia, i)=>({ dia, i })), id:'cmp-dow',
+    series: [{ ...SERIE_A, valorDe: d => dowA[d.i].media }, { ...SERIE_B, valorDe: d => dowB[d.i].media }],
+    rotuloDe: d => d.dia,
+    destaque: temA ? iA : -1,
+    fmtValor: fmtMoedaEixo,
+    tipHtml: d => `<span>${maiuscula(DIAS_NOME[d.i])}, média por dia</span><br>` + [[SERIE_A, dowA, 'A'], [SERIE_B, dowB, 'B']].map(([s, acc, k])=>
+      `${chaveSerie(s.cor)}<b>${formatPrice(acc[d.i].media)}</b> <span>${k} · ${formatPrice(acc[d.i].total)} em ${vezes(acc, d.i)}</span>`).join('<br>'),
+    resumo: 'Receita média por dia da semana. '
+          + DIAS.map((_, i)=>`${maiuscula(DIAS_NOME[i])}: A ${fmtMoedaEixo(dowA[i].media)}, B ${fmtMoedaEixo(dowB[i].media)}`).join('; ') + '.'
+  });
+}
+
+// ---- As datas que mais venderam em cada período (a tabela é a leitura) ----
+// "sáb., 24/10"; o ano só aparece quando não é o atual ("sáb., 24/10/25")
+const dataCurta = d => fmtData(d, { weekday:'short', day:'2-digit', month:'2-digit',
+  ...(d.getFullYear() !== new Date().getFullYear() ? { year:'2-digit' } : {}) });
+
+function pintarCmpTop(){
+  document.getElementById('cmp-top-body').innerHTML = [[SERIE_A, C.dados.emA], [SERIE_B, C.dados.emB]].map(([s, vendas])=>{
+    const top = melhoresDias(vendas);
+    return `<div><h3>${chaveSerie(s.cor,'coluna')}${s.nome}</h3>${top.length
+      ? tabela(`As datas de maior receita no ${s.nome.toLowerCase()}`,
+          [{t:'Data'},{t:'Pedidos',num:true},{t:'Receita',num:true}],
+          top.map(d=>[dataCurta(d.t), fmtInt(d.pedidos.size), formatPrice(d.receita)]))
+      : '<p class="cell-muted">Sem vendas neste período.</p>'}</div>`;
+  }).join('');
+}
+
 // cortar, tabela e ligarDica vivem em charts.js
 // ---- Controles: filtro de período e alternância gráfico/tabela ----
 function ligarControlesVendas(){
+  document.querySelectorAll('.seg [data-modo]').forEach(btn=>{
+    btn.addEventListener('click', ()=>{
+      V.modo = btn.dataset.modo;
+      const u = new URL(location);
+      if(V.modo === 'comparar') u.searchParams.set('modo', 'comparar'); else u.searchParams.delete('modo');
+      history.replaceState({}, '', u);
+      aplicarModo();
+    });
+  });
+  document.querySelectorAll('.seg [data-cmp]').forEach(btn=>{
+    btn.addEventListener('click', ()=>{
+      C.preset = btn.dataset.cmp;
+      Object.assign(C, faixasDoPreset(C.preset));
+      escreverComparacaoNaURL();
+      desenharComparacao();
+    });
+  });
+  ['a','b'].forEach(k=>['ini','fim'].forEach(lado=>
+    document.getElementById(`cmp-${k}-${lado}`).addEventListener('change', lerFaixasDosCampos)));
+  // Na comparação, redesenhar tudo cobre também o estado "sem vendas nos dois períodos"
+  [['toggle-cmp-serie','serie'],['toggle-cmp-dow','dow']]
+    .forEach(([id,chave])=>{
+      const btn = document.getElementById(id);
+      btn.addEventListener('click', ()=>{
+        C.vista[chave] = C.vista[chave]==='chart' ? 'table' : 'chart';
+        const tabelaAtiva = C.vista[chave]==='table';
+        btn.setAttribute('aria-pressed', String(tabelaAtiva));
+        btn.textContent = tabelaAtiva ? 'Ver gráfico' : 'Ver tabela';
+        if(C.dados) desenharComparacao();
+      });
+    });
+
   document.querySelectorAll('.seg [data-periodo]').forEach(btn=>{
     btn.addEventListener('click', ()=>{
       V.periodo = btn.dataset.periodo;
@@ -1012,9 +1482,9 @@ function ligarControlesVendas(){
 
   // Redesenha na mudança de largura — SVG nítido em vez de esticado
   aoRedimensionar(document.querySelector('.main'), ()=>{
-    if(V.dados && document.getElementById('page-vendas').classList.contains('active')){
-      pintarSerie(); pintarTop(); pintarDow();
-    }
+    if(!document.getElementById('page-vendas').classList.contains('active')) return;
+    if(V.modo === 'comparar'){ if(C.dados) desenharComparacao(); }
+    else if(V.dados){ pintarSerie(); pintarTop(); pintarDow(); }
   });
 }
 
@@ -1112,6 +1582,8 @@ function atualizarPreviaLoja(){
 function atualizarStatusLoja(){
   const el = document.getElementById('loja-status');
   if(salvandoLoja) return;
+  // Depois de salvar, o botão só volta a valer quando algo for editado de novo
+  document.getElementById('btn-salvar-loja').disabled = !!lojaSalvaAs && !lojaAlterada();
   if(lojaAlterada()){ el.textContent = 'Alterações não salvas'; el.className = 'salvo-status pendente'; }
   else if(lojaSalvaAs){ el.textContent = '✓ Tudo salvo às ' + lojaSalvaAs; el.className = 'salvo-status ok'; }
   else { el.textContent = ''; el.className = 'salvo-status'; }
@@ -1199,11 +1671,23 @@ async function saveStore(){
   else toast(`Loja salva: ${listaHumana(salvos)}.`);
 }
 
+// A loja do lojista fica em currentStore desde a abertura do painel; só é buscada
+// de novo se ainda não existir (antes cada lista e o resumo buscavam a loja outra vez)
+async function lojaAtual(){
+  if(!currentStore) currentStore = await DB.getMyStore(currentUser.id);
+  return currentStore;
+}
+// Uma busca de produtos serve ao resumo e às listas
+async function produtosDaLoja(){
+  const store = await lojaAtual();
+  return store ? DB.getStoreProducts(store.id) : null;
+}
+
 // ---- STATS ----
-async function loadStats(){
-  const store = await DB.getMyStore(currentUser.id);
+async function loadStats(prods){
+  const store = await lojaAtual();
   if(!store){ document.getElementById('stat-produtos').textContent='0'; return; }
-  const prods = await DB.getStoreProducts(store.id);
+  prods = prods || await DB.getStoreProducts(store.id);
   document.getElementById('stat-produtos').textContent = prods.length;
   document.getElementById('stat-estoque').textContent = prods.reduce((s,p)=>s+(+p.estoque||0),0);
   const max = prods.length ? Math.max(...prods.map(p=>+p.preco)) : 0;
@@ -1216,11 +1700,11 @@ function catEmoji(cat){
   return m[cat] || '📦';
 }
 
-async function renderProductList(containerId, limit){
+async function renderProductList(containerId, limit, prods){
   const container = document.getElementById(containerId);
-  const store = await DB.getMyStore(currentUser?.id);
+  const store = await lojaAtual();
   if(!store){ container.innerHTML=`<div class="empty-state"><div class="icon">🏪</div><p>Configure sua loja primeiro</p></div>`; return; }
-  let prods = await DB.getStoreProducts(store.id);
+  prods = prods || await DB.getStoreProducts(store.id);
   if(limit) prods = prods.slice(-5).reverse();
   if(!prods.length){
     container.innerHTML=`<div class="empty-state"><div class="icon">📦</div><p>Nenhum produto ainda.<br/>Adicione seu primeiro produto!</p></div>`;
@@ -1298,10 +1782,17 @@ function atualizarStatusModelo(texto, previewURL){
 }
 
 // ---- ESCANEAMENTO 3D PELA CÂMERA ----
-// As medidas do formulário vão junto: o escaneamento define a FORMA e o
-// cadastro define o TAMANHO, então a peça chega ao cliente na escala certa
-// mesmo com a câmera tendo chutado a distância.
+// DESATIVADO: o scanner (scanner-3d.js) fica no projeto só como conceito e
+// não é carregado no painel. O botão avisa que está em desenvolvimento; o
+// envio de .glb continua funcionando normalmente.
 function abrirScanner3D(){
+  toast('Em desenvolvimento', 'info');
+}
+
+// Implementação original, mantida para quando o scanner voltar. Para
+// reativar: carregar scanner-3d.js no fim da página e trocar o corpo de
+// abrirScanner3D() por uma chamada a esta função.
+function abrirScanner3DConceito(){
   if(!window.Scanner3D || !Scanner3D.suportado()){
     toast('Este aparelho não tem câmera ou WebGL para escanear.','error');
     return;
@@ -1445,10 +1936,12 @@ function abrirNovoProduto(){
 }
 
 async function abrirEdicaoProduto(id){
-  const store = await DB.getMyStore(currentUser.id);
-  if(!store) return;
-  const prods = await DB.getStoreProducts(store.id);
-  const prod = prods.find(p=>p.id===id);
+  // O produto veio junto com a lista; só busca de novo se não estiver nela
+  let prod = window._productsMap && window._productsMap[id];
+  if(!prod){
+    const prods = await produtosDaLoja();
+    prod = prods && prods.find(p=>p.id===id);
+  }
   if(!prod) return;
   document.getElementById('form-produto-titulo').textContent='Editar Produto';
   document.getElementById('p-nome').value=prod.nome;
@@ -1581,7 +2074,7 @@ function saveProduct(){
   estadoSalvando(true, 'Salvando produto…');
   (async () => {
     try {
-      const store = await DB.getMyStore(currentUser.id);
+      const store = await lojaAtual();
       if(!store){ toast('Configure sua loja antes de adicionar produtos.','error'); return; }
 
       let prod;
@@ -1616,9 +2109,10 @@ function saveProduct(){
       // Uma falha aqui não desfaz o salvamento, então não vira erro de salvar.
       estadoSalvando(true, 'Atualizando lista…');
       try {
-        await renderProductList('full-product-list', false);
-        await renderProductList('dash-product-list', true);
-        await loadStats();
+        const prods = await produtosDaLoja();
+        await renderProductList('full-product-list', false, prods);
+        await renderProductList('dash-product-list', true, prods);
+        await loadStats(prods);
       } catch(e){ console.error('Erro ao atualizar a lista de produtos:', e); }
 
       estadoSalvando(false);
@@ -1639,9 +2133,10 @@ function deleteProduct(id){
   (async () => {
     await DB.deleteProduct(id);
     toast('Produto removido.');
-    await renderProductList('full-product-list', false);
-    await renderProductList('dash-product-list', true);
-    await loadStats();
+    const prods = await produtosDaLoja();
+    await renderProductList('full-product-list', false, prods);
+    await renderProductList('dash-product-list', true, prods);
+    await loadStats(prods);
   })();
 }
 

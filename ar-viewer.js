@@ -289,23 +289,55 @@ async function montarObjeto(produto, dims) {
       const gltf = await new GLTFLoader().loadAsync(produto.modelo_3d_url);
       const modelo = gltf.scene;
 
-      // Encaixa o modelo nas medidas cadastradas sem distorcer e
-      // apoia a base no chão (y = 0)
-      const box = new THREE.Box3().setFromObject(modelo);
-      const tam = box.getSize(new THREE.Vector3());
-      const centro = box.getCenter(new THREE.Vector3());
+      // Modelo do scanner do site: a geometria já está em METROS de verdade
+      // (o lojista confirmou a altura) e o arquivo diz isso nos extras do glTF.
+      // Reencaixar nas medidas da EMBALAGEM o encolheria ou esticaria.
+      let escalaReal = false;
+      modelo.traverse(function (o) { if (o.userData && o.userData.escalaReal) escalaReal = true; });
+
+      // Fora isso, encaixa nas medidas cadastradas sem distorcer, apoia a
+      // base no chão (y = 0) e, se o modelo veio deitado de lado em relação
+      // às medidas (o lado comprido no eixo da profundidade), gira 90° —
+      // senão ele encolhia até o lado comprido caber na medida curta.
+      let box = new THREE.Box3().setFromObject(modelo);
+      let tam = box.getSize(new THREE.Vector3());
+      // O arquivo vem do lojista, e a marca "escalaReal" é só um campo dele:
+      // ela vale se o tamanho for de produto, na mesma régua das medidas do
+      // cadastro. Fora disso (arquivo em outra unidade, marca posta à mão) o
+      // modelo cai no encaixe normal, em vez de aparecer com 200 m na sala.
+      const maior = Math.max(tam.x, tam.y, tam.z);
+      if (escalaReal && !(maior >= MIN_M && maior <= MAX_M)) escalaReal = false;
       if (tam.x > 0 && tam.y > 0 && tam.z > 0) {
-        const escala = Math.min(dims.w / tam.x, dims.h / tam.y, dims.d / tam.z);
-        modelo.scale.setScalar(escala);
+        let escala = 1;
+        if (!escalaReal) {
+          const reto = Math.min(dims.w / tam.x, dims.h / tam.y, dims.d / tam.z);
+          const virado = Math.min(dims.w / tam.z, dims.h / tam.y, dims.d / tam.x);
+          // Só gira quando compensa (5%): planta quase quadrada fica como veio,
+          // de frente. E a escala é a da posição em que o modelo ficou — a de
+          // "virado" sem virar o deixava maior do que a medida cadastrada.
+          const girar = virado > reto * 1.05;
+          if (girar) {
+            modelo.rotation.y = Math.PI / 2;
+            modelo.updateMatrixWorld(true);
+            box = new THREE.Box3().setFromObject(modelo);
+            tam = box.getSize(new THREE.Vector3());
+          }
+          escala = girar ? virado : reto;
+        }
+        const centro = box.getCenter(new THREE.Vector3());
+        modelo.scale.multiplyScalar(escala);
         modelo.position.set(
           -centro.x * escala,
           -(centro.y - tam.y / 2) * escala,
           -centro.z * escala
         );
         grupo.userData.altura = tam.y * escala;
+        // O tamanho que o cliente vê é o do modelo, não o da embalagem
+        if (escalaReal) grupo.userData.dimsModelo = { w: tam.x, h: tam.y, d: tam.z };
       }
       grupo.add(modelo);
-      grupo.add(planoDeSombra(dims.w, dims.d));
+      const base = grupo.userData.dimsModelo || dims;
+      grupo.add(planoDeSombra(base.w, base.d));
       grupo.userData.tipo = 'glb';
       return grupo;
     } catch (e) {
@@ -496,10 +528,13 @@ const CSS = `
 .arv-back{position:fixed;inset:0;z-index:1200;display:flex;align-items:center;justify-content:center;
   background:rgba(0,0,0,.72);backdrop-filter:blur(8px);padding:1.2rem;animation:arvIn .18s ease}
 @keyframes arvIn{from{opacity:0}to{opacity:1}}
-.arv-modal{display:flex;flex-direction:column;width:min(1080px,100%);height:min(760px,100%);
+/* min-width:0 aqui e no bloco do título: sem isso a linha das medidas (sem quebra)
+   alargava a janela além da tela do celular, e ela saía cortada dos dois lados */
+.arv-modal{display:flex;flex-direction:column;width:min(1080px,100%);height:min(760px,100%);min-width:0;
   background:var(--card,#161616);color:var(--text,#f0ece3);border:1px solid var(--border,#2a2a2a);
   border-radius:18px;overflow:hidden;font-family:var(--font-texto,'Inter',system-ui,sans-serif);box-shadow:0 24px 70px rgba(0,0,0,.5)}
 .arv-head{display:flex;align-items:center;gap:.9rem;padding:.9rem 1.2rem;border-bottom:1px solid var(--border,#2a2a2a);flex-shrink:0}
+.arv-head>div:first-child{min-width:0}
 .arv-title{font-weight:600;font-size:1rem;line-height:1.25;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .arv-dims{font-size:.74rem;color:var(--muted,#888);margin-top:.15rem;white-space:nowrap}
 .arv-dims b{color:var(--accent2,#f4c56a);font-weight:600}
@@ -569,8 +604,10 @@ body.arv-aberto .a11y-root{z-index:100}
 @media(max-width:640px){
   .arv-back{padding:0}
   .arv-modal{width:100%;height:100%;border-radius:0;border:none}
+  .arv-dims{white-space:normal;line-height:1.35}   /* as medidas quebram linha em vez de sair da tela */
   .arv-tools{gap:.6rem;font-size:.74rem}
   .arv-tools input[type=range]{width:88px}
+  .arv-sw{width:28px;height:28px}                 /* alvo de toque: 22px era pequeno para o dedo */
 }
 `;
 
@@ -699,7 +736,7 @@ Viewer.prototype._construirUI = function () {
   modal.appendChild(xrbar);
 
   this.dom = { back: back, modal: modal, stage: stage, video: video, hint: hint,
-               msg: msg, tools: tools, abas: abas, xrTxt: xrTxt, xrGirar: xrGirar };
+               msg: msg, tools: tools, abas: abas, xrTxt: xrTxt, xrGirar: xrGirar, dims: dimsTxt };
 
   // Fecha no ESC ou clicando fora
   this._onKey = function (e) { if (e.key === 'Escape' && !self.session) self.fechar(); };
@@ -787,6 +824,16 @@ Viewer.prototype.iniciar = async function () {
   }
   if (this.destruido) return;
   scene.add(this.objeto);
+
+  // Modelo escaneado em tamanho real: a mesa, o enquadramento e o texto do
+  // cabeçalho passam a usar o tamanho do PRODUTO, não o da embalagem.
+  const dm = this.objeto.userData.dimsModelo;
+  if (dm) {
+    this.dims = { w: dm.w, h: dm.h, d: dm.d, estimado: false };
+    if (this.dom.dims) {
+      this.dom.dims.innerHTML = 'Tamanho real · <b>' + emCm(dm.w) + ' L × ' + emCm(dm.h) + ' A × ' + emCm(dm.d) + ' P</b>';
+    }
+  }
 
   // Retículo do AR: o anel que marca onde o objeto vai encostar no chão
   const ret = new THREE.Mesh(

@@ -22,7 +22,7 @@ body::before{content:'';position:fixed;inset:0;pointer-events:none;z-index:999;
 nav{padding:1.2rem 2rem;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:1rem}
 .logo{font-family:var(--font-titulo);font-size:1.4rem;color:var(--accent);text-decoration:none}
 .logo span{color:var(--text)}
-nav a.back{color:var(--muted);font-size:.875rem;text-decoration:none;margin-left:auto}
+nav a.back{color:var(--muted);font-size:.875rem;text-decoration:none;margin-left:auto;padding:.5rem 0}
 nav a.back:hover{color:var(--text)}
 
 main{flex:1;display:flex;align-items:center;justify-content:center;padding:2rem;
@@ -86,6 +86,12 @@ select option{background:var(--bg)}
 }
 .voltar-aviso strong{display:block;margin-bottom:.15rem}
 
+/* "Esqueceu sua senha?" e o passo de confirmar o e-mail */
+.esqueci-login{display:block;margin:.6rem 0 0 auto}
+.campo-codigo{font-size:1.6rem;letter-spacing:.45em;text-align:center;font-variant-numeric:tabular-nums}
+.conf-links{display:flex;justify-content:space-between;gap:1rem;margin-top:1.2rem}
+#form-confirmar .sub strong{color:var(--text);overflow-wrap:anywhere}
+
 .divider{
   display:flex;align-items:center;gap:.8rem;margin:1.5rem 0;
   color:var(--muted);font-size:.875rem;
@@ -118,6 +124,10 @@ select option{background:var(--bg)}
       Seu carrinho e o endereço de entrega continuam salvos — depois de entrar, você volta
       para confirmar a compra.
     </div>
+    <div class="voltar-aviso" id="aviso-conta" role="status" hidden>
+      <strong id="aviso-titulo"></strong>
+      <span id="aviso-texto"></span>
+    </div>
     <div class="tabs">
       <div class="tab active" id="tab-login" onclick="switchTab('login')">Entrar</div>
       <div class="tab" id="tab-cadastro" onclick="switchTab('cadastro')">Criar conta</div>
@@ -135,6 +145,7 @@ select option{background:var(--bg)}
       <div class="form-group">
         <label>Senha</label>
         <input type="password" id="login-senha" placeholder="••••••••" onkeydown="if(event.key==='Enter')doLogin()"/>
+        <button type="button" class="link-esqueci esqueci-login" onclick="abrirEsqueciSenha()">Esqueceu sua senha?</button>
       </div>
       <button class="btn btn-primary" onclick="doLogin()">Entrar na conta →</button>
 
@@ -187,14 +198,48 @@ select option{background:var(--bg)}
         <label>Senha</label>
         <input type="password" id="cad-senha" placeholder="Mínimo 6 caracteres" onkeydown="if(event.key==='Enter')doCadastro()"/>
       </div>
-      <button class="btn btn-primary" onclick="doCadastro()">Criar conta grátis →</button>
+      <button class="btn btn-primary" id="cad-btn" onclick="doCadastro()">Criar conta grátis →</button>
+    </div>
+
+    <!-- CONFIRMAR E-MAIL: 2º passo do cadastro -->
+    <div id="form-confirmar" style="display:none">
+      <h2>Confirme seu e-mail</h2>
+      <p class="sub">Enviamos um código de 6 dígitos para <strong id="conf-email"></strong>.
+        Confira a caixa de entrada e a pasta de spam.</p>
+      <div class="error-msg" id="conf-error" role="alert"></div>
+      <div class="form-group">
+        <label for="conf-codigo">Código</label>
+        <input type="text" id="conf-codigo" class="campo-codigo" inputmode="numeric" autocomplete="one-time-code"
+          maxlength="6" placeholder="000000" oninput="this.value=this.value.replace(/\D/g,'').slice(0,6)"
+          onkeydown="if(event.key==='Enter')confirmarCadastro()"/>
+      </div>
+      <button class="btn btn-primary" id="conf-btn" onclick="confirmarCadastro()">Confirmar e criar conta →</button>
+      <div class="conf-links">
+        <button type="button" class="link-esqueci" id="conf-reenviar" onclick="reenviarCodigoCadastro()">Reenviar código</button>
+        <button type="button" class="link-esqueci" onclick="voltarAoCadastro()">Trocar e-mail</button>
+      </div>
     </div>
   </div>
 </main>
 
+<script src="recuperar-senha.js"></script>
 <script>
 const params = new URLSearchParams(location.search);
 if(params.get('modo')==='cadastro') switchTab('cadastro');
+
+// Avisos de quem chega aqui porque a senha foi trocada
+const AVISOS_CONTA = {
+  'sessao-encerrada': ['Sua sessão foi encerrada.', 'A senha desta conta foi redefinida. Entre de novo com a senha nova.'],
+  'senha-redefinida': ['Senha alterada.', 'Por segurança, você saiu da conta em todos os aparelhos. Entre de novo com a senha nova.']
+};
+function mostrarAviso(chave){
+  const aviso = AVISOS_CONTA[chave];
+  if(!aviso) return;
+  document.getElementById('aviso-titulo').textContent = aviso[0];
+  document.getElementById('aviso-texto').textContent = aviso[1];
+  document.getElementById('aviso-conta').hidden = false;
+}
+mostrarAviso(params.get('aviso'));
 
 let tipoSelecionado = 'lojista';
 
@@ -216,6 +261,7 @@ function switchTab(tab){
   document.getElementById('tab-cadastro').classList.toggle('active', tab==='cadastro');
   document.getElementById('form-login').style.display = tab==='login'?'':'none';
   document.getElementById('form-cadastro').style.display = tab==='cadastro'?'':'none';
+  document.getElementById('form-confirmar').style.display = 'none';
 }
 
 // Para onde cada tipo de conta vai depois de entrar
@@ -256,6 +302,21 @@ function doLogin(){
   })();
 }
 
+// ---- CADASTRO EM DOIS PASSOS ----
+// 1) os dados vão para cá e o servidor manda um código para o e-mail;
+// 2) a conta só é criada quando a pessoa devolve o código certo.
+let cadastroPendente = null;   // { nome, email, senha, tipo } até o e-mail ser confirmado
+let timerReenvioCadastro = null;
+
+// Botão ocupado enquanto o servidor responde; null = sem conexão
+async function comBotaoOcupado(btn, rotulo, pedido){
+  const original = btn.textContent;
+  btn.disabled = true; btn.textContent = rotulo;
+  try { return await pedido(); }
+  catch { return null; }
+  finally { btn.disabled = false; btn.textContent = original; }
+}
+
 function doCadastro(){
   hideError('cad-error');
   const nome  = document.getElementById('cad-nome').value.trim();
@@ -263,19 +324,93 @@ function doCadastro(){
   const senha = document.getElementById('cad-senha').value;
   const tipo  = tipoSelecionado;
   if(!nome || !email || !senha){ showError('cad-error','Preencha todos os campos.'); return; }
+  if(!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)){ showError('cad-error','Digite um e-mail válido.'); return; }
   if(senha.length < 6){ showError('cad-error','Senha deve ter pelo menos 6 caracteres.'); return; }
-  
+
   (async () => {
-    const res = await DB.registerUser(nome, email, senha, tipo);
+    const res = await comBotaoOcupado(document.getElementById('cad-btn'), 'Enviando código…',
+      () => DB.enviarCodigoCadastro(email));
+    if(!res){ showError('cad-error','Sem conexão com o servidor. Tente de novo.'); return; }
     if(!res.ok){ showError('cad-error', res.msg); return; }
-    const loginRes = await DB.loginUser(email, senha);
-    if(loginRes.ok) {
-      toast('Conta criada com sucesso!');
-      setTimeout(()=>{
-        window.location.href = destinoDepoisDeEntrar(tipo);
-      }, 800);
-    }
+    cadastroPendente = { nome, email, senha, tipo };
+    mostrarConfirmacao(res.reenviar_em_s);
   })();
+}
+
+function mostrarConfirmacao(segundosParaReenviar){
+  hideError('conf-error');
+  document.getElementById('conf-email').textContent = cadastroPendente.email;
+  document.getElementById('conf-codigo').value = '';
+  document.getElementById('form-cadastro').style.display = 'none';
+  document.getElementById('form-confirmar').style.display = '';
+  document.getElementById('conf-codigo').focus();
+  contarReenvioCadastro(segundosParaReenviar);
+}
+
+function voltarAoCadastro(){
+  clearInterval(timerReenvioCadastro);
+  document.getElementById('form-confirmar').style.display = 'none';
+  document.getElementById('form-cadastro').style.display = '';
+  document.getElementById('cad-email').focus();
+}
+
+function contarReenvioCadastro(segundos){
+  const btn = document.getElementById('conf-reenviar');
+  let resta = Math.max(0, Math.round(segundos || 0));
+  const pintar = () => {
+    btn.disabled = resta > 0;
+    btn.textContent = resta > 0 ? `Reenviar em ${resta} s` : 'Reenviar código';
+  };
+  pintar();
+  clearInterval(timerReenvioCadastro);
+  timerReenvioCadastro = setInterval(() => { resta--; pintar(); if(resta <= 0) clearInterval(timerReenvioCadastro); }, 1000);
+}
+
+async function reenviarCodigoCadastro(){
+  hideError('conf-error');
+  const res = await comBotaoOcupado(document.getElementById('conf-reenviar'), 'Enviando…',
+    () => DB.enviarCodigoCadastro(cadastroPendente.email));
+  if(!res){ showError('conf-error','Sem conexão com o servidor. Tente de novo.'); return; }
+  if(!res.ok){ showError('conf-error', res.msg); contarReenvioCadastro(res.aguarde_s); return; }
+  toast('Enviamos um novo código.');
+  contarReenvioCadastro(res.reenviar_em_s);
+}
+
+async function confirmarCadastro(){
+  hideError('conf-error');
+  const codigo = document.getElementById('conf-codigo').value;
+  if(codigo.length !== 6){ showError('conf-error','Digite os 6 números do código.'); return; }
+  const { nome, email, senha, tipo } = cadastroPendente;
+  const btn = document.getElementById('conf-btn');
+  const res = await comBotaoOcupado(btn, 'Criando conta…', () => DB.registerUser(nome, email, senha, tipo, codigo));
+  if(!res){ showError('conf-error','Sem conexão com o servidor. Tente de novo.'); return; }
+  if(!res.ok){ showError('conf-error', res.msg); return; }
+  clearInterval(timerReenvioCadastro);
+  btn.disabled = true;                 // a conta já existe: não deixa criar de novo
+  const loginRes = await DB.loginUser(email, senha);
+  if(!loginRes.ok){
+    switchTab('login');
+    document.getElementById('login-email').value = email;
+    showError('login-error','Conta criada. Entre com seu e-mail e senha.');
+    return;
+  }
+  toast('Conta criada com sucesso!');
+  setTimeout(()=>{ window.location.href = destinoDepoisDeEntrar(tipo); }, 800);
+}
+
+// ---- ESQUECEU A SENHA ----
+function abrirEsqueciSenha(){
+  RecuperarSenha.abrir({
+    email: document.getElementById('login-email').value,
+    aoConcluir: email => {
+      switchTab('login');
+      document.getElementById('login-email').value = email;
+      document.getElementById('login-senha').value = '';
+      hideError('login-error');
+      mostrarAviso('senha-redefinida');
+      document.getElementById('login-senha').focus();
+    }
+  });
 }
 </script>
 <script src="accessibility.js"></script>

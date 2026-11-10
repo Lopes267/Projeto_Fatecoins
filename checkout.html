@@ -94,7 +94,7 @@ nav{
 .ship-label{font-size:.875rem;font-weight:600;margin-bottom:.7rem;display:flex;align-items:center;gap:.4rem}
 .ship-input-row{display:flex;gap:.5rem}
 .ship-input-row input{
-  flex:1;padding:.6rem .8rem;background:var(--card2);border:1px solid var(--border);
+  flex:1;min-width:0;padding:.6rem .8rem;background:var(--card2);border:1px solid var(--border);
   border-radius:8px;color:var(--text);font-family:var(--font-texto);font-size:.9375rem;
   outline:none;transition:border-color .2s;letter-spacing:.04em;
 }
@@ -447,6 +447,9 @@ nav{
   .summary-panel,.payment-panel{padding:1.5rem 1rem}
   .form-grid{grid-template-columns:1fr}
   .boleto-meta{grid-template-columns:1fr}
+  /* 16px: com menos, o iPhone dá zoom na página ao tocar no campo */
+  .ship-input-row input,.addr-box input{font-size:16px}
+  .ship-cep-link{padding:.35rem 0}
 }
 </style>
 <link rel="stylesheet" href="site.css"/>
@@ -1085,7 +1088,7 @@ function setBoletoDate(){
 }
 
 // Process payment
-function processPayment(){
+async function processPayment(){
   // Trava: exige CEP válido e frete calculado antes de finalizar a compra
   const cep = document.getElementById('cep-input').value.replace(/\D/g,'');
   if(cep.length !== 8 || freteAtual === null){
@@ -1114,10 +1117,35 @@ function processPayment(){
   const overlay = document.getElementById('processing-overlay');
   overlay.classList.add('active');
   clearInterval(timerInterval);
-  setTimeout(()=>{
-    overlay.classList.remove('active');
-    showSuccess();
-  }, 2200);
+  // Enquanto o pagamento processa, o servidor confere o carrinho. Sem isto, um produto
+  // da loja do próprio comprador só seria recusado depois da tela de sucesso, com o
+  // carrinho já esvaziado.
+  const [carrinhoOk] = await Promise.all([conferirCarrinho(), new Promise(r => setTimeout(r, 2200))]);
+  overlay.classList.remove('active');
+  if(!carrinhoOk){ startPixTimer(); return; }
+  showSuccess();
+}
+
+// Ninguém compra o que vende: lê o carrinho de novo no servidor, que tira os produtos
+// da loja do próprio usuário e diz quais tirou (o aviso aparece por avisarProdutosProprios).
+// Se tirou algum, o resumo e o frete são refeitos e a compra para para a pessoa conferir.
+async function conferirCarrinho(){
+  let data;
+  try{
+    const res = await fetch(`${API_URL}/api/cart`, { headers: { ...DB._authHeaders() } });
+    data = await res.json();
+  }catch{ return true; }             // sem conexão: o pedido ainda é conferido no servidor
+  if(!data.ok || !data.removidos?.length) return true;
+  avisarProdutosProprios(data.removidos);
+  const fora = new Set(data.removidos.map(p => String(p.id)));
+  _cartItems = _cartItems.filter(i => !fora.has(String(i.id)));
+  if(!_cartItems.length){ setTimeout(() => window.location.href = 'marketplace.html', 4000); return false; }
+  freteAtual = null; freteBreakdown = null;
+  const resultEl = document.getElementById('ship-result');
+  resultEl.className = 'ship-result show';
+  resultEl.innerHTML = '<span class="ship-err">O carrinho mudou. Clique em <strong>Calcular</strong> para ver o frete de novo.</span>';
+  renderSummary();
+  return false;
 }
 
 // ============================================================
@@ -1274,12 +1302,12 @@ async function showSuccess(){
   // ainda lá. Limpar não depende da resposta, então não deve esperar por ela.
   clearCart();
 
-  let pedido = null, falhou = false;
+  let pedido = null, falhou = false, recusado = null;
   if (DB.currentUser() && itensComprados.length) {
     try {
       const res = await DB.createOrder(itensComprados, getEnderecoEntrega());
       if (res && res.ok) pedido = res.pedido;
-      else falhou = true;
+      else { falhou = true; if (res && res.proprio_produto) recusado = res.msg; }
     } catch { falhou = true; }
   }
 
@@ -1298,6 +1326,14 @@ async function showSuccess(){
     box.hidden = false;
     box.style.borderColor = 'rgba(232,90,90,.45)';
     box.style.background = 'rgba(232,90,90,.08)';
+    if (recusado) {
+      // O servidor recusou: produto da loja do próprio comprador (normalmente barrado antes)
+      box.innerHTML = `
+        <div class="sucesso-codigo-lbl" style="color:var(--red)">Pedido não registrado</div>
+        <p class="sucesso-codigo-txt" style="margin-top:.5rem"></p>`;
+      box.querySelector('p').textContent = recusado;
+      return;
+    }
     box.innerHTML = `
       <div class="sucesso-codigo-lbl" style="color:var(--red)">Não conseguimos registrar o pedido</div>
       <p class="sucesso-codigo-txt" style="margin-top:.5rem">
@@ -1330,7 +1366,11 @@ function spawnConfetti(){
 
 document.addEventListener('DOMContentLoaded', async ()=>{
   await loadCart();
-  if(!getCart().length){ window.location.href = 'marketplace.html'; return; }
+  if(!getCart().length){
+    // Só havia produtos da loja da própria pessoa: o aviso fica na tela antes de voltar à vitrine
+    setTimeout(() => window.location.href = 'marketplace.html', produtosPropriosRemovidos.length ? 4000 : 0);
+    return;
+  }
   document.getElementById('login-aviso').hidden = !!DB.currentUser();
   renderSummary();
   generateQR();

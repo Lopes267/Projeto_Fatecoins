@@ -1,51 +1,78 @@
-# 🚀 Mercado Local - Setup com Node.js
+# 🚀 Mercado Local - Setup rápido
+
+Resumo para colocar o projeto no ar. Configuração detalhada do Firebase, segurança, lista de APIs e solução de problemas estão em [START-HERE.md](START-HERE.md).
 
 ## 📋 Requisitos
-- **Node.js** (v14+) - [Baixar aqui](https://nodejs.org/)
-- **npm** (já vem com Node.js)
+- **Node.js 18+** - [Baixar aqui](https://nodejs.org/) (exigido pelo `firebase-admin`)
+- **npm** (já vem com o Node.js)
+- Um projeto no **Firebase** (Firestore + Authentication com e-mail/senha)
+- Uma conta no **Cloudinary** (imagens e modelos 3D)
 
 ---
 
 ## ⚙️ Instalação
 
 ### 1️⃣ Instalar dependências
-Abra o terminal na pasta do projeto e execute:
+Na pasta do projeto:
 
 ```powershell
 npm install
 ```
 
-Isso vai instalar:
-- `express` - Framework web
-- `cors` - Permitir requisições do navegador
-- `nodemon` - Recarregar o servidor automaticamente
+Principais pacotes:
+- `express` e `cors` - servidor web
+- `firebase-admin` - Firestore e Firebase Auth
+- `cloudinary` e `multer` - upload de imagens e modelos 3D
+- `bcrypt` - hash de senha
+- `dotenv` - lê o arquivo `.env`
+- `nodemon` - reinicia o servidor ao editar (desenvolvimento)
+
+### 2️⃣ Configurar o `.env`
+1. Coloque o JSON da conta de serviço do Firebase na raiz do projeto (nunca suba esse arquivo).
+2. Copie `.env.example` para `.env` e preencha:
+
+```env
+FIREBASE_WEB_API_KEY=chave-de-api-da-web
+FIREBASE_SERVICE_ACCOUNT=nome-do-arquivo-adminsdk.json
+
+CLOUDINARY_CLOUD_NAME=
+CLOUDINARY_API_KEY=
+CLOUDINARY_API_SECRET=
+```
+
+O passo a passo de onde pegar cada valor está na seção **1. Configuração** do [START-HERE.md](START-HERE.md).
 
 ---
 
-## 🎯 Como Rodar
+## 🎯 Como rodar
 
-### 2️⃣ Iniciar o servidor
+### 3️⃣ Iniciar o servidor
 
 ```powershell
 npm start
 ```
 
+Ou dê um duplo clique em `iniciar.bat`.
+
 Você verá:
 ```
-✅ Servidor rodando em http://localhost:5000
+🚀 Servidor rodando em http://localhost:4000
+🔥 Conectado ao Firebase (Firestore + Auth) + Cloudinary (imagens)
 
-📁 Dados salvos em: c:\Users\Enzo\Desktop\SIte de Mercado Local\data.json
-
-💡 Para carregar dados de demo, acesse: http://localhost:5000/api/seed
+💡 Para carregar dados de demo: POST /api/seed
+💻 Abra no navegador: http://localhost:4000
 ```
 
-### 3️⃣ Carregar dados de demo
-Abra o navegador e acesse:
-```
-http://localhost:5000/api/seed
+Se a porta 4000 estiver ocupada, o servidor usa a próxima livre (4001, 4002…) e mostra qual no terminal.
+
+### 4️⃣ Carregar dados de demo (opcional)
+Só funciona com o banco vazio. É um `POST`, então não dá para abrir no navegador:
+
+```powershell
+Invoke-RestMethod -Method Post http://localhost:4000/api/seed
 ```
 
-Você deve ver:
+Resposta esperada:
 ```json
 {
   "ok": true,
@@ -53,15 +80,14 @@ Você deve ver:
 }
 ```
 
-### 4️⃣ Acessar o site
-Abra em uma nova aba do navegador:
+### 5️⃣ Acessar o site
 ```
-http://localhost:5000
+http://localhost:4000
 ```
 
 ---
 
-## 🔑 Credenciais de Teste
+## 🔑 Credenciais de Teste (criadas pelo seed)
 
 **Lojistas:**
 - Email: `loja@demo.com` | Senha: `123456`
@@ -72,91 +98,20 @@ http://localhost:5000
 
 ---
 
-## 📂 Estrutura de Arquivos
-
-```
-c:\Users\Enzo\Desktop\SIte de Mercado Local\
-├── server.js           ← Backend Node.js (Express)
-├── app.js              ← Front-end (conectado ao servidor)
-├── package.json        ← Dependências npm
-├── data.json           ← Banco de dados (criado automaticamente)
-├── index.html          ← Home
-├── login.html          ← Login
-├── marketplace.html    ← Marketplace
-├── dashboard.html      ← Dashboard (lojista)
-└── schema.sql          ← Referência do banco de dados
-```
-
----
-
-## 🌐 APIs Disponíveis
-
-### Auth
-- `POST /api/auth/register` - Registrar usuário
-- `POST /api/auth/login` - Fazer login
-
-### Lojas
-- `POST /api/stores` - Criar/atualizar loja
-- `GET /api/stores/:userId` - Buscar loja do usuário
-- `GET /api/stores-public` - Listar lojas ativas
-
-### Produtos
-- `POST /api/products` - Criar produto
-- `GET /api/products` - Buscar produtos (com filtro)
-- `GET /api/products/store/:storeId` - Produtos de uma loja
-- `PUT /api/products/:id` - Atualizar produto
-- `DELETE /api/products/:id` - Desativar produto
-
-### Seed
-- `POST /api/seed` - Carregar dados de demo
-
----
-
 ## 🛠️ Modo Desenvolvimento (com auto-reload)
 
 ```powershell
 npm run dev
 ```
 
-Isso usa **nodemon** e recarrega o servidor automaticamente quando você edita `server.js`.
+Usa o **nodemon** e reinicia o servidor sempre que você edita um arquivo.
 
 ---
 
-## 💾 Dados Persistem?
+## 💾 Onde ficam os dados?
 
-✅ **SIM!** Os dados são salvos em `data.json` e persistem mesmo após fechar o servidor.
+- **Dados** (usuários, lojas, produtos, carrinho, pedidos, avaliações, entregas): no **Firestore**.
+- **Contas e senhas**: no **Firebase Authentication**.
+- **Imagens e modelos 3D**: no **Cloudinary**.
 
-Para **limpar os dados**, delete `data.json`:
-```powershell
-Remove-Item data.json
-```
-
----
-
-## ⚠️ Erros Comuns
-
-### ❌ "Cannot GET /api/customers" ou erro 404
-→ Certifique-se de que o servidor está rodando em `http://localhost:5000`
-
-### ❌ "CORS error" no navegador
-→ Já está configurado no `server.js` com `cors()`
-
-### ❌ Porta 5000 já está em uso
-→ Troque a porta em `server.js`:
-```javascript
-const PORT = 3000; // ou outra porta
-```
-
----
-
-## 📚 Próximos Passos
-
-- ✨ Adicionar banco de dados real (SQLite/PostgreSQL)
-- 🔐 Melhorar segurança (JWT tokens, passwords com hash)
-- 📧 Enviar e-mails de confirmação
-- 💳 Integrar pagamento (Stripe, PayPal)
-- 📱 Criar app mobile (React Native)
-
----
-
-**Pronto! Seu backend Node.js está funcionando!** 🎉
+Nada fica salvo em arquivo local. Para limpar os dados, apague as coleções no Console do Firebase e os usuários em Authentication.

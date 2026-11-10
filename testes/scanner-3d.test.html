@@ -66,7 +66,9 @@ caso('caixa, so 18 quadros      ',[0.62,0.88,0.40],()=>new THREE.Mesh(new THREE.
 caso('caixa, so 12 quadros      ',[0.62,0.88,0.40],()=>new THREE.Mesh(new THREE.BoxGeometry(0.62,0.88,0.40),bm()),12,5);
 log('');
 log('OBS: o erro em Y e o visual hull genuino — a aresta proxima projeta mais alto');
-log('que o eixo, entao o casco estoura em cima e embaixo. O reescalonamento final');
-log('para as medidas do cadastro corrige a dimensao; sobra so um leve abaulamento.');
+log('que o eixo, entao o casco estoura em cima e embaixo. Este teste mede o casco');
+log('CRU (_pipeline). No scanner de verdade a sobra de baixo e cortada na altura da');
+log('mesa e a escala final e uniforme, sem esticar eixo por eixo: esse caminho');
+log('inteiro e medido em reconstrucao.test.html.');
 document.title='PRONTO';
 </script></body></html>

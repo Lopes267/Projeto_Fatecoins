@@ -58,7 +58,7 @@ const DB = {
   },
 
   // ---------- users ----------
-  async registerUser(nome, email, senha, tipo = 'cliente') {
+  async registerUser(nome, email, senha, tipo = 'cliente', codigo = '') {
     // Validação básica de email no cliente
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     if (!emailRegex.test(email)) {
@@ -75,10 +75,24 @@ const DB = {
     const res = await fetch(`${API_URL}/api/auth/register`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ nome, email, senha, tipo })
+      body: JSON.stringify({ nome, email, senha, tipo, codigo })
     });
     return await res.json();
   },
+
+  // ---------- confirmação de e-mail e recuperação de senha ----------
+  async _postPublico(rota, corpo) {
+    const res = await fetch(`${API_URL}${rota}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(corpo)
+    });
+    return await res.json();
+  },
+  enviarCodigoCadastro(email)          { return this._postPublico('/api/auth/register/code', { email }); },
+  enviarCodigoSenha(email)             { return this._postPublico('/api/auth/password/code', { email }); },
+  verificarCodigoSenha(email, codigo)  { return this._postPublico('/api/auth/password/verify', { email, codigo }); },
+  redefinirSenha(email, token, senha)  { return this._postPublico('/api/auth/password/reset', { email, token, senha }); },
 
   async loginUser(email, senha) {
     const res = await fetch(`${API_URL}/api/auth/login`, {
@@ -115,7 +129,7 @@ const DB = {
       
       // Verificar se a sessão expirou
       if (Date.now() > sessionData.expiresAt) {
-        console.warn('⏰ Sessão expirada (24h)');
+        console.warn('⏰ Sessão expirada (55 min)');
         localStorage.removeItem('mp_session');
         return null;
       }
@@ -171,6 +185,12 @@ const DB = {
       );
     }
     return stores;
+  },
+
+  async getPublicStore(storeId) {
+    const res = await fetch(`${API_URL}/api/stores-public/${storeId}`);
+    const data = await res.json();
+    return data.ok ? data.store : null;
   },
 
   // ---------- products ----------
@@ -335,11 +355,14 @@ const DB = {
   },
 
   // ---------- cart (carrinho no Firestore, por cliente) ----------
+  // O servidor tira do carrinho os produtos da loja do próprio usuário (ninguém compra
+  // o que vende) e responde "removidos"; getCart e saveCart avisam a pessoa.
   async getCart() {
     const res = await fetch(`${API_URL}/api/cart`, {
       headers: { ...this._authHeaders() }
     });
     const data = await res.json();
+    avisarProdutosProprios(data.removidos);
     return data.ok ? (data.items || []) : [];
   },
 
@@ -367,12 +390,18 @@ const DB = {
   },
 
   async saveCart(items) {
+    const body = JSON.stringify({ items });
     const res = await fetch(`${API_URL}/api/cart`, {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json', ...this._authHeaders() },
-      body: JSON.stringify({ items })
+      body,
+      // O marketplace grava o carrinho por trás: se a pessoa trocar de página no meio,
+      // o envio continua. O navegador só aceita keepalive até 64 KB.
+      keepalive: new TextEncoder().encode(body).length < 60000
     });
-    return await res.json();
+    const data = await res.json();
+    avisarProdutosProprios(data.removidos);
+    return data;
   },
 
   async clearCart() {
@@ -715,6 +744,16 @@ function toast(msg, tipo = 'success') {
   contar();
 }
 
+// Ninguém compra o que vende: quando o servidor tira do carrinho produtos da loja
+// da própria pessoa, ela fica sabendo quais e por quê
+let produtosPropriosRemovidos = [];   // o último aviso: o checkout espera a pessoa ler antes de sair da página
+function avisarProdutosProprios(removidos) {
+  if (!Array.isArray(removidos) || !removidos.length) return;
+  produtosPropriosRemovidos = removidos;
+  const nomes = removidos.map(p => `"${p.nome}"`).join(', ');
+  toast(`${nomes} ${removidos.length === 1 ? 'saiu' : 'saíram'} do carrinho: você não pode comprar produtos da sua própria loja.`, 'error');
+}
+
 // Imagens da loja: a vitrine (marketplace) e a prévia do painel montam o HTML
 // daqui, então a prévia mostra exatamente o que o cliente vai ver.
 function logoLojaHTML(url, ajuste) {
@@ -888,6 +927,24 @@ function checkSessionExpiry() {
 setInterval(checkSessionExpiry, 5 * 60 * 1000);
 // Verificar também ao carregar a página
 document.addEventListener('DOMContentLoaded', checkSessionExpiry);
+
+// Quem redefine a senha sai da conta em todos os aparelhos. O servidor recusa os
+// logins antigos; aqui a página descobre isso ao abrir, ao voltar para a aba e a
+// cada minuto, e leva a pessoa para entrar de novo.
+async function conferirSessaoNoServidor() {
+  if (!DB.currentUser() || document.hidden) return;
+  try {
+    const res = await fetch(`${API_URL}/api/auth/session/check`, { headers: { ...DB._authHeaders() } });
+    if (res.status !== 401) return;
+    const data = await res.json().catch(() => ({}));
+    if (!data.sessao_encerrada) return;          // token vencido: checkSessionExpiry cuida disso
+    DB.logout();
+    if (!/login\.html$/.test(location.pathname)) window.location.href = 'login.html?aviso=sessao-encerrada';
+  } catch { /* sem conexão: confere na próxima vez */ }
+}
+document.addEventListener('DOMContentLoaded', conferirSessaoNoServidor);
+document.addEventListener('visibilitychange', conferirSessaoNoServidor);
+setInterval(conferirSessaoNoServidor, 60 * 1000);
 
 // ============================================================
 //  SEED DATA (demo)

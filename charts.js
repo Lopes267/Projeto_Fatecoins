@@ -4,7 +4,9 @@
 //  Usado pelo painel de Vendas (dashboard.html) e pelo painel de
 //  Desempenho do entregador (entregas.html), para que os dois falem a
 //  mesma língua visual:
-//    • UMA matiz (--data) — a distinção vem de posição e rótulo, não de cor
+//    • UMA matiz (--data) — a distinção vem de posição e rótulo, não de cor.
+//      Exceção: na comparação de dois períodos o segundo é cinza (--data-cmp),
+//      sempre com legenda
 //    • rótulo direto só no pico, nunca um número sobre cada marca
 //    • toda figura tem uma gêmea em tabela (o botão "Ver tabela")
 //    • a dica do ponteiro e a do teclado mostram exatamente a mesma coisa
@@ -41,6 +43,10 @@ const fmtMin = n => {
 const fmtMetros = m => m >= 1000 ? fmt1(m / 1000) + ' km' : Math.round(m) + ' m';
 
 const cortar = (s, n) => { s = String(s || ''); return s.length > n ? s.slice(0, Math.max(1, n - 1)).trimEnd() + '…' : s; };
+
+// Quantas datas cabem no eixo x sem se encavalar: um rótulo como "29 de out." ocupa
+// ~55px em 11px de fonte, então uma marca a cada 72px, no máximo 5
+const marcasNoEixo = larguraUtil => Math.max(2, Math.min(5, Math.floor(larguraUtil / 72)));
 
 // Teto "redondo" do eixo: 1, 2, 2.5, 5 ou 10 × potência de dez
 function tetoRedondo(v) {
@@ -176,8 +182,13 @@ function ligarDica(box, seletorTip, dadosDe, total, mira, X, Yv) {
       mira.setAttribute('opacity', '1');
       mira.querySelector('line').setAttribute('x1', X(i));
       mira.querySelector('line').setAttribute('x2', X(i));
-      mira.querySelector('circle').setAttribute('cx', X(i));
-      mira.querySelector('circle').setAttribute('cy', Yv(i));
+      // Um ponto por série; Yv devolve um número (uma série) ou uma lista (null = a série acabou)
+      const ys = [].concat(Yv(i));
+      mira.querySelectorAll('circle').forEach((c, k) => {
+        c.setAttribute('cx', X(i));
+        if (ys[k] == null) c.setAttribute('visibility', 'hidden');
+        else { c.removeAttribute('visibility'); c.setAttribute('cy', ys[k]); }
+      });
     }
   };
   const esconder = () => { ativo = -1; tip.dataset.show = 'false'; mira?.setAttribute('opacity', '0'); };
@@ -228,8 +239,8 @@ function desenharLinha(box, cfg) {
     g += `<text x="${pad.l - 10}" y="${y + 4}" text-anchor="end" font-size="11" fill="var(--axis)"
             style="font-variant-numeric:tabular-nums">${esc(fmtValor(v))}</text>`;
   }
-  // Eixo x: ~5 marcas
-  const passo = Math.max(1, Math.ceil(n / 5));
+  // Eixo x: até 5 marcas, menos quando falta largura (no celular as datas se encavalavam)
+  const passo = Math.max(1, Math.ceil(n / marcasNoEixo(iw)));
   for (let i = 0; i < n; i += passo) {
     g += `<text x="${X(i)}" y="${h - 10}" text-anchor="middle" font-size="11" fill="var(--axis)">${
       esc(gran === 'dia' ? fmtData(baldes[i].t, { day: '2-digit', month: 'short' }) : rotuloBalde(baldes[i], gran))}</text>`;
@@ -347,6 +358,136 @@ function desenharColunas(box, cfg) {
   ligarDica(box, `#tip-${id}`, i => ({
     x: pad.l + banda * i + banda / 2,
     y: pad.t + ih - (valores[i] / teto) * ih,
+    html: tipHtml(itens[i], i)
+  }), itens.length);
+}
+
+// ============================================================
+//  Várias séries — comparação (ex.: período A × período B)
+//  A primeira série é a principal, na matiz dos dados (--data); as
+//  outras são contexto, em cinza (--data-cmp). A legenda é obrigatória
+//  e o texto nunca usa a cor da série: a chave ao lado faz a ligação.
+// ============================================================
+
+// Chave imita a marca: traço para linha, quadrado para coluna
+const chaveSerie = (cor, forma = 'linha') =>
+  `<i class="leg-chave leg-${forma}" style="background:${cor}" aria-hidden="true"></i>`;
+
+function legenda(series, forma = 'linha') {
+  return `<div class="leg">${series.map(s =>
+    `<span class="leg-item">${chaveSerie(s.cor, forma)}${esc(s.nome)}</span>`).join('')}</div>`;
+}
+
+// ---------- 4. Linhas no mesmo eixo ----------
+//  n          quantas posições no eixo x
+//  series     [{ nome, cor, valores:[número | null] }]  null = a série já acabou
+//             (período mais curto); só a principal ganha rótulo no pico
+//  rotuloX    i => texto do eixo x
+//  fmtValor, tipHtml(i), resumo, id, padEsq — como em desenharLinha
+function desenharLinhas(box, cfg) {
+  const { n, series, rotuloX, fmtValor, tipHtml, resumo, id = 'linhas', padEsq = 62 } = cfg;
+  if (!n) { box.innerHTML = ''; return; }
+  const w = Math.max(320, box.clientWidth || 640), h = cfg.altura || 250;
+  const pad = { t: 18, r: 22, b: 30, l: padEsq };
+  const iw = w - pad.l - pad.r, ih = h - pad.t - pad.b;
+  const teto = tetoRedondo(Math.max(0, ...series.flatMap(s => s.valores.filter(v => v != null)))) || 10;
+  const X = i => pad.l + (n <= 1 ? iw / 2 : i * (iw / (n - 1)));
+  const Y = v => pad.t + ih - (v / teto) * ih;
+
+  let g = '';
+  for (let k = 0; k <= 4; k++) {
+    const v = teto * k / 4, y = Y(v);
+    g += `<line x1="${pad.l}" y1="${y}" x2="${w - pad.r}" y2="${y}" stroke="var(--grid)" stroke-width="1"/>`;
+    g += `<text x="${pad.l - 10}" y="${y + 4}" text-anchor="end" font-size="11" fill="var(--axis)"
+            style="font-variant-numeric:tabular-nums">${esc(fmtValor(v))}</text>`;
+  }
+  const passo = Math.max(1, Math.ceil(n / marcasNoEixo(iw)));
+  for (let i = 0; i < n; i += passo) {
+    g += `<text x="${X(i)}" y="${h - 10}" text-anchor="middle" font-size="11" fill="var(--axis)">${esc(rotuloX(i))}</text>`;
+  }
+
+  // Da última para a primeira: a principal fica por cima
+  [...series].reverse().forEach(s => {
+    const v = s.valores;
+    const d = v.map((y, i) => y == null ? '' : `${i && v[i - 1] != null ? 'L' : 'M'}${X(i).toFixed(1)},${Y(y).toFixed(1)}`).join(' ');
+    g += `<path d="${d}" fill="none" stroke="${s.cor}" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/>`;
+    // Marcadores: todos quando cabem; senão só a ponta (e o pico da principal, abaixo)
+    const idx = v.map((y, i) => y == null ? -1 : i).filter(i => i >= 0);
+    (n <= 14 ? idx : idx.slice(-1)).forEach(i => {
+      g += `<circle cx="${X(i)}" cy="${Y(v[i])}" r="4.5" fill="${s.cor}" stroke="var(--card)" stroke-width="2"/>`;
+    });
+  });
+  // Rótulo direto: só o pico da série principal
+  const vp = series[0].valores;
+  const iMax = vp.reduce((b, y, i) => y != null && (b < 0 || y > vp[b]) ? i : b, -1);
+  if (iMax >= 0 && vp[iMax] > 0) {
+    if (n > 14) g += `<circle cx="${X(iMax)}" cy="${Y(vp[iMax])}" r="4.5" fill="${series[0].cor}" stroke="var(--card)" stroke-width="2"/>`;
+    const anchor = X(iMax) > w - 90 ? 'end' : X(iMax) < pad.l + 40 ? 'start' : 'middle';
+    g += `<text x="${X(iMax)}" y="${Math.max(pad.t + 2, Y(vp[iMax]) - 13)}" text-anchor="${anchor}"
+            font-size="11.5" font-weight="600" fill="var(--text)"
+            style="font-variant-numeric:tabular-nums">${esc(fmtValor(vp[iMax]))}</text>`;
+  }
+  g += `<g id="mira-${id}" opacity="0">
+          <line y1="${pad.t}" y2="${pad.t + ih}" stroke="var(--axis)" stroke-width="1" opacity=".55"/>
+          ${series.map(s => `<circle r="5.5" fill="${s.cor}" stroke="var(--card)" stroke-width="2"/>`).join('')}
+        </g>`;
+  for (let i = 0; i < n; i++) {
+    const bw = n <= 1 ? iw : iw / (n - 1);
+    g += `<rect class="hitbox" x="${X(i) - bw / 2}" y="${pad.t}" width="${bw}" height="${ih}" data-i="${i}"/>`;
+  }
+
+  box.innerHTML =
+      `<svg viewBox="0 0 ${w} ${h}" width="${w}" height="${h}" role="img" tabindex="0"
+         aria-label="${esc(resumo)}" style="max-width:100%">${g}</svg>`
+    + `<div class="vtip" id="tip-${id}" role="status"></div>`;
+
+  const ysEm = i => series.map(s => s.valores[i] == null ? null : Y(s.valores[i]));
+  ligarDica(box, `#tip-${id}`, i => ({
+    x: X(i), y: Math.min(...ysEm(i).filter(y => y != null), pad.t + ih), html: tipHtml(i)
+  }), n, box.querySelector(`#mira-${id}`), X, ysEm);
+}
+
+// ---------- 5. Colunas agrupadas ----------
+//  itens      categorias em ordem natural (ex.: dias da semana)
+//  series     [{ nome, cor, valorDe: item => número }]
+//  destaque   índice da categoria em destaque: rótulo forte e o valor da principal no topo
+//  rotuloDe, fmtValor, tipHtml(item, i), resumo, id
+function desenharColunasAgrupadas(box, cfg) {
+  const { itens, series, rotuloDe, fmtValor, tipHtml, resumo, id = 'grupos', destaque = -1 } = cfg;
+  if (!itens.length) { box.innerHTML = ''; return; }
+  const w = Math.max(300, box.clientWidth || 420), h = cfg.altura || 250;
+  const pad = { t: 26, r: 4, b: 28, l: 4 };
+  const iw = w - pad.l - pad.r, ih = h - pad.t - pad.b;
+  const ns = series.length, vao = 2;            // 2px de superfície entre colunas vizinhas
+  const valores = series.map(s => itens.map(s.valorDe));
+  const teto = tetoRedondo(Math.max(0, ...valores.flat())) || 10;
+  const banda = iw / itens.length;
+  const barW = Math.min(24, Math.max(3, (banda - 12 - vao * (ns - 1)) / ns));
+  const grupoW = barW * ns + vao * (ns - 1);
+  const alt = v => v > 0 ? Math.max(2, (v / teto) * ih) : 0;
+
+  let g = `<line x1="${pad.l}" y1="${pad.t + ih}" x2="${w - pad.r}" y2="${pad.t + ih}" stroke="var(--grid)" stroke-width="1"/>`;
+  itens.forEach((it, i) => {
+    const x0 = pad.l + banda * i + (banda - grupoW) / 2, cx = pad.l + banda * i + banda / 2;
+    series.forEach((s, k) => {
+      const bh = alt(valores[k][i]);
+      if (bh) g += `<path d="${pathColuna(x0 + k * (barW + vao), pad.t + ih - bh, barW, bh, 4)}" fill="${s.cor}"/>`;
+    });
+    if (i === destaque && valores[0][i] > 0) {
+      const topo = Math.max(...series.map((_, k) => alt(valores[k][i])));
+      g += `<text x="${cx}" y="${pad.t + ih - topo - 9}" text-anchor="middle" font-size="11.5" font-weight="600"
+              fill="var(--text)" style="font-variant-numeric:tabular-nums">${esc(fmtValor(valores[0][i]))}</text>`;
+    }
+    g += `<text x="${cx}" y="${h - 9}" text-anchor="middle" font-size="11"
+            ${i === destaque ? 'font-weight="600" fill="var(--text)"' : 'fill="var(--axis)"'}>${esc(rotuloDe(it))}</text>`;
+    g += `<rect class="hitbox" x="${pad.l + banda * i}" y="${pad.t}" width="${banda}" height="${ih}" data-i="${i}"/>`;
+  });
+  box.innerHTML = `<svg viewBox="0 0 ${w} ${h}" width="${w}" height="${h}" role="img" tabindex="0"
+      aria-label="${esc(resumo)}" style="max-width:100%">${g}</svg><div class="vtip" id="tip-${id}" role="status"></div>`;
+
+  ligarDica(box, `#tip-${id}`, i => ({
+    x: pad.l + banda * i + banda / 2,
+    y: pad.t + ih - Math.max(...series.map((_, k) => alt(valores[k][i]))),
     html: tipHtml(itens[i], i)
   }), itens.length);
 }

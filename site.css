@@ -151,3 +151,49 @@ body.a11y-light .notif{box-shadow:0 14px 34px -16px rgba(64,50,35,.4)}
 /* Selos e avatares com letra branca sobre a cor da marca.
    Só background-color: o avatar pode ter foto em background-image. */
 .cart-badge,.avatar,.avatar-sm,.profile-avatar{background-color:var(--btn-bg);color:var(--btn-fg)}
+
+/* ---------- "Esqueceu sua senha?" (recuperar-senha.js) ----------
+   O pop-up entra no body e herda as cores do tema da página (escuro ou claro). */
+.link-esqueci{background:none;border:none;padding:.4rem 0;color:var(--accent);font:inherit;font-size:.875rem;
+  cursor:pointer;text-decoration:underline;text-underline-offset:3px}
+.link-esqueci:hover{color:var(--text)}
+.link-esqueci:disabled{color:var(--muted);cursor:default;text-decoration:none}
+
+/* Erro preso a um campo do formulário (ex.: "Esta senha já está em uso." nos perfis) */
+.campo-erro{margin:0;color:var(--red);font-size:.875rem;font-weight:500;line-height:1.4}
+.form-group input[aria-invalid="true"]{border-color:var(--red)}
+.form-group input[aria-invalid="true"]:focus{box-shadow:0 0 0 3px rgba(232,90,90,.15)}
+
+/* margin:auto centraliza o <dialog>; as páginas zeram a margem de tudo no reset (*{margin:0}) */
+.rs-dialog{margin:auto;width:min(420px,calc(100vw - 2rem));padding:2rem 1.75rem 1.5rem;border:1px solid var(--border);
+  border-radius:18px;background:var(--card);color:var(--text);font-family:'Inter',Arial,sans-serif;
+  box-shadow:0 20px 60px rgba(0,0,0,.45)}
+.rs-dialog::backdrop{background:rgba(0,0,0,.6)}
+body.a11y-light .rs-dialog{box-shadow:0 20px 60px rgba(64,50,35,.18)}
+body.a11y-light .rs-dialog::backdrop{background:rgba(31,27,22,.35)}
+.rs-dialog h2{font-family:'Merriweather',Georgia,serif;font-size:1.4rem;line-height:1.3;margin:0 0 .6rem;
+  padding-right:1.5rem;text-wrap:balance}
+.rs-texto{color:var(--muted);font-size:.9375rem;line-height:1.55;margin:0 0 1.2rem}
+.rs-texto strong{color:var(--text);overflow-wrap:anywhere}
+.rs-dialog label{display:block;font-size:.8125rem;font-weight:600;color:var(--muted);margin:0 0 .35rem;
+  letter-spacing:.04em;text-transform:uppercase}
+.rs-dialog input{display:block;width:100%;box-sizing:border-box;padding:.75rem 1rem;margin:0 0 1rem;
+  background:var(--bg);border:1px solid var(--border);border-radius:10px;color:var(--text);font:inherit;font-size:1rem}
+.rs-dialog input:focus{outline:none;border-color:var(--accent);box-shadow:0 0 0 3px rgba(var(--accent-rgb),.15)}
+.rs-dialog input.rs-codigo{font-size:1.6rem;letter-spacing:.45em;text-align:center;font-variant-numeric:tabular-nums}
+.rs-erro{background:rgba(232,90,90,.1);border:1px solid rgba(232,90,90,.3);color:var(--red);border-radius:8px;
+  padding:.65rem .9rem;font-size:.875rem;line-height:1.45;margin:0 0 1rem}
+.rs-acoes{display:flex;gap:.6rem;justify-content:flex-end;align-items:center;flex-wrap:wrap;margin-top:.4rem}
+.rs-btn{padding:.7rem 1.2rem;border-radius:10px;border:1px solid transparent;background:var(--btn-bg);
+  color:var(--btn-fg);font:inherit;font-weight:600;cursor:pointer}
+.rs-btn:hover{background:var(--btn-bg-hover)}
+.rs-btn:disabled{opacity:.55;cursor:default}
+.rs-btn-sec{background:transparent;color:var(--text);border-color:var(--border)}
+.rs-btn-sec:hover{background:rgba(var(--accent-rgb),.08)}
+.rs-link{background:none;border:none;padding:.4rem 0;margin-right:auto;color:var(--accent);font:inherit;
+  font-size:.875rem;cursor:pointer;text-decoration:underline;text-underline-offset:3px}
+.rs-link:disabled{color:var(--muted);cursor:default;text-decoration:none}
+.rs-fechar{position:absolute;top:.75rem;right:.85rem;background:none;border:none;color:var(--muted);
+  font-size:1.5rem;line-height:1;cursor:pointer;padding:.2rem .45rem;border-radius:6px}
+.rs-fechar:hover{color:var(--text)}
+.rs-dialog :focus-visible{outline:2px solid var(--accent);outline-offset:2px}

@@ -347,6 +347,7 @@ nav{
 .btn-add-cart:hover{border-color:var(--accent);color:var(--accent)}
 .btn-add-cart.feito,.btn-add-cart.feito:hover{border-color:var(--green);color:var(--green)}
 .btn-add-cart:disabled{cursor:default}
+a.btn-add-cart{text-decoration:none}
 .btn-buy:active,.btn-add-cart:active{transform:scale(.98)}
 .btn-buy:focus-visible,.btn-add-cart:focus-visible,.btn-ar:focus-visible,.pm-close:focus-visible,.pm-store-link:focus-visible{
   outline:2px solid var(--accent);outline-offset:2px}
@@ -454,6 +455,12 @@ nav{
   .hero-banner,.content,.tabs-row,.filters-bar{padding-left:1rem;padding-right:1rem}
   .product-grid{grid-template-columns:repeat(auto-fill,minmax(160px,1fr))}
   .store-grid{grid-template-columns:1fr}
+  /* 16px: com menos, o iPhone dá zoom na página ao tocar na busca */
+  .search-bar input{font-size:16px}
+  /* Alvos de toque do tamanho do dedo */
+  .cart-remove{min-width:40px;min-height:40px}
+  .back-btn{min-height:40px}
+  .pm-store-link{padding:.6rem 0}
 }
 @media(max-width:480px){
   /* Logo, Entrar, Criar conta e carrinho numa linha só: tudo compacto */
@@ -617,6 +624,51 @@ let currentView = 'products';
 let currentCategoria = 'todas';
 let searchQuery = '';
 window._productsMap = {};
+// Cada tela ou busca nova ganha um número; resposta que chega depois de outra mais
+// nova é descartada, senão uma busca lenta podia sobrescrever o resultado atual.
+let navegacao = 0;
+
+// Ninguém compra o que vende: o lojista vê os produtos da própria loja na vitrine,
+// mas sem Comprar nem Adicionar. A busca começa já, junto com a dos produtos; o
+// servidor confere de novo no carrinho e no pedido.
+let lojaPropriaId = null;
+const lojaPropriaPronta = (async () => {
+  const user = DB.currentUser();
+  if(user?.tipo !== 'lojista') return;
+  try{ lojaPropriaId = (await DB.getMyStore(user.id))?.id || null; }catch{}
+})();
+const ehProprio = p => !!lojaPropriaId && p?.loja?.id === lojaPropriaId;
+const MSG_PROPRIO = 'Você não pode comprar produtos da sua própria loja.';
+
+// ---- CATÁLOGO ----
+// /api/products devolve todos os produtos ativos de uma vez. A busca e as categorias
+// filtram essa lista aqui mesmo, sem nova requisição a cada tecla; depois de 1 minuto
+// ela é buscada de novo para preço e estoque não ficarem velhos.
+const CATALOGO_VALIDADE_MS = 60 * 1000;
+const Catalogo = {
+  _produtos: null,
+  _em: 0,
+  _pendente: null,
+  fresco(){ return !!this._produtos && Date.now() - this._em < CATALOGO_VALIDADE_MS; },
+  carregar(){
+    // Duas telas pedindo ao mesmo tempo dividem a mesma requisição
+    if(!this._pendente){
+      this._pendente = DB.searchProducts()
+        // Lista vazia não é guardada: é também o que chega quando o servidor falha
+        .then(prods => { this._produtos = prods; this._em = prods.length ? Date.now() : 0; return prods; })
+        .finally(() => { this._pendente = null; });
+    }
+    return this._pendente;
+  },
+  // O mesmo filtro que /api/products aplica com ?query= e ?categoria=
+  filtrar(query, categoria){
+    const q = query.toLowerCase();
+    const contem = txt => String(txt || '').toLowerCase().includes(q);
+    return this._produtos.filter(p =>
+      (!q || contem(p.nome) || contem(p.descricao)) &&
+      (!categoria || categoria === 'todas' || p.categoria === categoria));
+  }
+};
 
 function catEmoji(cat){
   const m={'Eletrônicos':'💻','Moda':'👗','Alimentos':'🍎','Casa & Decoração':'🏠','Esportes':'⚽','Beleza':'💄','Livros':'📚','Brinquedos':'🧸'};
@@ -667,7 +719,10 @@ function goToProfile(){
   }
 }
 
-function doLogout(){ DB.logout(); renderNav(); toast('Saiu da conta.'); }
+function doLogout(){
+  DB.logout(); renderNav(); toast('Saiu da conta.');
+  if(lojaPropriaId){ lojaPropriaId = null; render(); }   // os produtos da loja voltam a ser compráveis
+}
 
 // Menu do usuário: perfil ou sair
 function toggleUserMenu(force){
@@ -748,7 +803,10 @@ function temEstoque(p){ return p.estoque == null || Number(p.estoque) > 0; }
 
 // Card de produto: clique abre o pop-up; Comprar e Adicionar ao carrinho agem direto
 function productCard(p, { mostrarLoja = true } = {}){
-  const acoes = temEstoque(p)
+  const acoes = ehProprio(p)
+    ? `<button type="button" class="btn-buy" disabled title="${MSG_PROPRIO}">Produto da sua loja</button>
+       <a class="btn-add-cart" href="dashboard.html?aba=produtos" onclick="event.stopPropagation()">Gerenciar na sua loja</a>`
+    : temEstoque(p)
     ? `<button type="button" class="btn-buy" onclick="event.stopPropagation();buyNow('${p.id}')">Comprar</button>
        <button type="button" class="btn-add-cart" onclick="event.stopPropagation();addToCart('${p.id}',this)">Adicionar ao carrinho</button>`
     : `<button type="button" class="btn-buy" disabled>Indisponível</button>`;
@@ -756,7 +814,7 @@ function productCard(p, { mostrarLoja = true } = {}){
     <div class="product-card" tabindex="0" title="Ver detalhes"
       onclick="openProductModal('${p.id}')"
       onkeydown="if((event.key==='Enter'||event.key===' ')&&event.target===this){event.preventDefault();openProductModal('${p.id}')}">
-      <div class="prod-img">${p.imagem_url ? `<img src="${p.imagem_url}" alt="${p.nome}">` : catEmoji(p.categoria)}</div>
+      <div class="prod-img">${p.imagem_url ? `<img src="${p.imagem_url}" alt="${p.nome}" loading="lazy" decoding="async">` : catEmoji(p.categoria)}</div>
       <div class="prod-body">
         <div class="prod-cat">${p.categoria||'Produto'}</div>
         <div class="prod-name">${p.nome}</div>
@@ -775,11 +833,13 @@ function productCard(p, { mostrarLoja = true } = {}){
 async function buyNow(productId){
   const p = window._productsMap[productId];
   if(!p) return;
+  await Cart.pronto();
   const jaNoCarrinho = Cart.getItems().some(i => i.id === productId);
   if(!jaNoCarrinho){
     const ok = await Cart.add(p);
     if(!ok) return;
   }
+  await Cart.salvo();                // o checkout lê o carrinho do Firebase
   window.location.href = 'checkout.html';
 }
 
@@ -836,11 +896,13 @@ function openProductModal(productId){
   const naLoja = document.getElementById('store-panel').classList.contains('open');
   document.getElementById('pm-store-link').hidden = !loja.id || naLoja;
 
+  const proprio = ehProprio(p);
   const buy = document.getElementById('pm-buy');
-  buy.disabled = !disponivel;
-  buy.textContent = disponivel ? 'Comprar' : 'Indisponível';
+  buy.disabled = !disponivel || proprio;
+  buy.textContent = proprio ? 'Produto da sua loja' : disponivel ? 'Comprar' : 'Indisponível';
+  buy.title = proprio ? MSG_PROPRIO : '';
   const add = document.getElementById('pm-add');
-  add.hidden = !disponivel;
+  add.hidden = !disponivel || proprio;
   estadoBotaoAdicionar(add, emEspera(p.id));
 
   if(!dlg.open) dlg.showModal();
@@ -881,8 +943,22 @@ function productModalStore(){
 }
 
 async function renderProducts(){
-  showProductSkeletons();
-  const prods = await DB.searchProducts(searchQuery, currentCategoria);
+  const minha = ++navegacao;
+  if(!Catalogo._produtos){
+    showProductSkeletons();
+    await Catalogo.carregar();
+    if(minha !== navegacao) return;
+  } else if(!Catalogo.fresco()){
+    // Vencido: mostra o que já tem agora e troca quando a lista nova chegar
+    Catalogo.carregar().then(() => { if(minha === navegacao) mostrarProdutos(); }).catch(() => {});
+  }
+  await lojaPropriaPronta;           // os cards precisam saber quais produtos são do próprio lojista
+  if(minha !== navegacao) return;
+  mostrarProdutos();
+}
+
+function mostrarProdutos(){
+  const prods = Catalogo.filtrar(searchQuery, currentCategoria);
   const grid = document.getElementById('product-grid');
   document.getElementById('results-info').innerHTML = `<strong>${prods.length} produto${prods.length!==1?'s':''}</strong> encontrado${prods.length!==1?'s':''}`;
   if(!prods.length){
@@ -895,9 +971,11 @@ async function renderProducts(){
 }
 
 async function renderStores(){
+  const minha = ++navegacao;
   document.getElementById('store-grid').innerHTML = skeletonCards(6);
   document.getElementById('results-info').innerHTML = 'Carregando lojas…';
   const stores = await DB.getPublicStores(searchQuery);
+  if(minha !== navegacao) return;
   const grid = document.getElementById('store-grid');
   document.getElementById('results-info').innerHTML = `<strong>${stores.length} loja${stores.length!==1?'s':''}</strong> encontrada${stores.length!==1?'s':''}`;
   if(!stores.length){
@@ -921,6 +999,7 @@ async function renderStores(){
 
 // ---- STORE PANEL ----
 async function openStore(storeId){
+  const minha = ++navegacao;
   // Abre o painel e mostra skeletons imediatamente, antes de buscar os dados
   document.getElementById('view-products').style.display='none';
   document.getElementById('view-stores').style.display='none';
@@ -929,10 +1008,16 @@ async function openStore(storeId){
   document.getElementById('panel-products').innerHTML = skeletonCards(6);
   document.getElementById('results-info').innerHTML = 'Carregando…';
 
-  const stores = await DB.getPublicStores();
-  const store = stores.find(s=>s.id===storeId);
+  // A loja vem do servidor e os produtos dela, do catálogo que a vitrine já carregou
+  // (antes vinha a lista de todas as lojas e só depois os produtos)
+  const [store] = await Promise.all([
+    DB.getPublicStore(storeId),
+    Catalogo.fresco() ? null : Catalogo.carregar(),
+    lojaPropriaPronta
+  ]);
+  if(minha !== navegacao) return;
   if(!store){ closeStorePanel(); return; }
-  const prods = await DB.getStoreProducts(storeId);
+  const prods = Catalogo._produtos.filter(p => p.loja && p.loja.id === storeId);
 
   const panelAvatar = document.getElementById('panel-avatar');
   if(store.logo_url){
@@ -980,11 +1065,22 @@ async function closeStorePanel(){
 // só é pedido na confirmação final da compra; aí os itens passam para a conta.
 const Cart = {
   _items: [],                                   // cache em memória
+  _leitura: null,                               // leitura em andamento: alterações esperam por ela
+  _gravacao: null,                              // gravação em andamento no Firebase
+  _sujo: false,                                 // mudou de novo durante a gravação: grava outra vez
   isAuthed(){ return !!DB.currentUser(); },
 
-  async load(){
+  load(){ return this._leitura = this._ler(); },
+  // A vitrine aparece antes de o carrinho chegar. Sem esta espera, um clique em
+  // "Adicionar" nesse intervalo salvaria um carrinho só com o item novo, por cima do salvo.
+  async pronto(){ await this._leitura; },
+  // Espera o que ainda está sendo gravado (antes de ir para o checkout, por exemplo)
+  async salvo(){ while(this._gravacao) await this._gravacao; },
+
+  async _ler(){
     if(!this.isAuthed()){ this._items = CarrinhoVisitante.get(); this.updateBadge(); return this._items; }
     try{
+      await this.salvo();                       // não trocar uma alteração ainda não gravada pela versão antiga
       await DB.juntarCarrinhoVisitante();       // itens escolhidos antes de entrar na conta
       this._items = await DB.getCart();          // consulta no Firebase
     }catch(e){
@@ -995,28 +1091,51 @@ const Cart = {
     return this._items;
   },
 
-  async _persist(){
+  // A tela muda na hora e o Firebase é gravado por trás: um envio por vez, sempre com o
+  // carrinho mais recente (antes cada clique esperava ~1 s pela resposta do servidor)
+  _persist(){
     if(!this.isAuthed()){ CarrinhoVisitante.set(this._items); return; }
-    try{ await DB.saveCart(this._items); }
-    catch(e){ console.warn('Erro ao salvar o carrinho no Firebase:', e); }
+    if(this._gravacao){ this._sujo = true; return; }
+    this._gravacao = (async () => {
+      do {
+        this._sujo = false;
+        try{
+          const r = await DB.saveCart(this._items);
+          // O servidor recusou produtos da loja do próprio usuário (saveCart já avisou)
+          if(r?.removidos?.length){
+            const fora = new Set(r.removidos.map(p => String(p.id)));
+            this._items = this._items.filter(i => !fora.has(String(i.id)));
+            this.updateBadge(); renderCartDrawer();
+          }
+        }
+        catch(e){ console.warn('Erro ao salvar o carrinho no Firebase:', e); }
+      } while(this._sujo);
+      this._gravacao = null;
+    })();
   },
 
   getItems(){ return this._items; },
 
   async add(product){
+    await Promise.all([this.pronto(), lojaPropriaPronta]);
+    if(ehProprio(product)){ toast(MSG_PROPRIO, 'error'); return false; }
     const ex = this._items.find(i=>i.id===product.id);
     if(ex){ ex.qty=(ex.qty||1)+1; }
     else{ this._items.push({...product, qty:1}); }
-    await this._persist(); this.updateBadge();
+    this._persist(); this.updateBadge();
     return true;
   },
-  async remove(id){ this._items = this._items.filter(i=>i.id!==id); await this._persist(); this.updateBadge(); },
+  async remove(id){
+    await this.pronto();
+    this._items = this._items.filter(i=>i.id!==id); this._persist(); this.updateBadge();
+  },
   async updateQty(id, delta){
+    await this.pronto();
     const item = this._items.find(i=>i.id===id);
     if(!item) return;
     item.qty=(item.qty||1)+delta;
     if(item.qty<=0) this._items = this._items.filter(i=>i.id!==id);
-    await this._persist(); this.updateBadge();
+    this._persist(); this.updateBadge();
   },
   total(){ return this._items.reduce((s,i)=>s+(i.preco||0)*(i.qty||1),0); },
   count(){ return this._items.reduce((s,i)=>s+(i.qty||1),0); },
@@ -1030,7 +1149,8 @@ const Cart = {
 async function openCart(){
   document.getElementById('cart-overlay').classList.add('open');
   document.getElementById('cart-drawer').classList.add('open');
-  await Cart.load();                 // ao abrir o carrinho, consulta o Firebase
+  renderCartDrawer();                // mostra na hora o que já está na página
+  await Cart.load();                 // e confere com o Firebase
   renderCartDrawer();
 }
 function closeCart(){
@@ -1104,17 +1224,18 @@ function renderCartDrawer(){
   document.getElementById('cart-total').textContent=formatPrice(Cart.total());
   footerEl.style.display='';
 }
-function goToCheckout(){
+async function goToCheckout(){
   if(!Cart.count()) return;
   closeCart();
+  await Cart.salvo();                // o checkout lê o carrinho do Firebase
   window.location.href='checkout.html';
 }
 
 // ---- INIT ----
 document.addEventListener('DOMContentLoaded', async ()=>{
   renderNav();
-  await Cart.load();
-  await render();
+  // Vitrine e carrinho em paralelo: os produtos não dependem do carrinho
+  await Promise.all([Cart.load(), render()]);
 });
 </script>
 <script src="accessibility.js"></script>

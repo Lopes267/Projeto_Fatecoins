@@ -1,0 +1,188 @@
+<!DOCTYPE html><html lang="pt-BR"><head><meta charset="UTF-8"/>
+<title>Reconstrução — teste</title>
+<script type="importmap">
+{"imports":{"three":"https://unpkg.com/three@0.161.0/build/three.module.js","three/addons/":"https://unpkg.com/three@0.161.0/examples/jsm/"}}
+</script>
+<style>body{margin:0;background:#111;color:#ddd;font:12px monospace}#out{padding:12px;white-space:pre-wrap}</style>
+</head><body><div id="out">rodando…</div>
+<script src="../scanner-3d.js"></script>
+<script type="module">
+// RECONSTRUÇÃO COMPLETA — o caminho que o scanner percorre depois da volta
+// (Scanner3D._reconstruir): quadros confiáveis, eixo do giro, giroscópio, corte
+// da "saia", alinhamento da planta e tamanho pela embalagem.
+// As silhuetas são de sólidos de tamanho conhecido, desenhados pelo three.js.
+// Abra este arquivo pelo servidor do site (http://localhost:4000/testes/…).
+import * as THREE from 'three';
+const out = document.getElementById('out');
+const log = m => { out.textContent += '\n' + m; };
+window.onerror = e => log('ERRO ' + e);
+out.textContent = 'RECONSTRUCAO — do conjunto de quadros até a peça final';
+
+let falhas = 0;
+function confere(cond, msg) { log((cond ? '  ok     ' : '  FALHA  ') + msg); if (!cond) falhas++; }
+const graus = r => r * 180 / Math.PI, rad = g => g * Math.PI / 180;
+const S = Scanner3D;
+
+// ---------------------------------------------------------------
+log('\n1. Funções puras');
+// ---------------------------------------------------------------
+confere(Math.abs(graus(S._fovDoRecorte(720, 1280)) - 51.9) < 0.5, 'campo de visão de um vídeo 720×1280 ≈ 52°');
+confere(Math.abs(graus(S._fovDoRecorte(960, 1280)) - 66) < 0.5, 'campo de visão de um vídeo 960×1280 ≈ 66°');
+confere(Math.abs(graus(S._fovDoRecorte(1280, 720)) - 40.1) < 0.5, 'campo de visão de uma webcam 1280×720 ≈ 40°');
+confere(Math.abs(graus(S._fovDoRecorte(0, 0)) - 55) < 0.01, 'sem tamanho de vídeo: padrão de 55°');
+
+const o1 = S._orientacaoDaCamera(90, 0, 0);
+confere(Math.abs(graus(o1.e)) < 0.01 && Math.abs(graus(o1.r)) < 0.01, 'celular em pé: elevação 0, rolagem 0');
+confere(Math.abs(graus(S._orientacaoDaCamera(60, 0, 0).e) - 30) < 0.01, 'inclinado 30° para a frente: câmera olha 30° para baixo');
+const o4 = S._orientacaoDaCamera(80, -90, 0);
+confere(Math.abs(graus(o4.r) - 10) < 0.01 && Math.abs(graus(o4.e)) < 0.01, 'em pé e torto 10°: rolagem de 10°, elevação 0');
+confere(S._orientacaoDaCamera(null, 3, 0) === null, 'sem leitura do sensor: null');
+
+const t3 = (x, y, z) => ({ x, y, z });
+const e1 = S._escalaPelaEmbalagem(t3(0.054, 0.166, 0.069), { largura: 5.4, altura: 16.6, comprimento: 6.9 });
+confere(Math.abs(e1.escala - 1) < 1e-6 && e1.confiavel, 'medidas do próprio produto: escala 1, confiável');
+const e2 = S._escalaPelaEmbalagem(t3(0.069, 0.166, 0.054), { largura: 5.4, altura: 16.6, comprimento: 6.9 });
+confere(Math.abs(e2.escala - 1) < 1e-6, 'largura e profundidade trocadas: mesma escala (não deforma)');
+const e4 = S._escalaPelaEmbalagem(t3(5.4, 16.6, 6.9), { largura: 7, altura: 5, comprimento: 3 });
+confere(Math.abs(e4.escala * 16.6 - 0.07) < 1e-9 && !e4.confiavel, 'embalagem 3×7×5 com produto alto: maior lado vira 7 cm, sem esticar');
+confere(S._escalaPelaEmbalagem(t3(1, 2, 1), { largura: 0, altura: 10, comprimento: 5 }) === null, 'medida faltando: null');
+
+// ---------------------------------------------------------------
+log('\n2. Reconstrução de sólidos conhecidos');
+// ---------------------------------------------------------------
+await S._carregarLib();
+const C = S._consts, LARG = C.LARG, ALT = C.ALT;
+const FOV = 55;
+const D = 1 / (2 * 0.5 * Math.tan(rad(FOV / 2)));      // distância que o scanner supõe
+const rend = new THREE.WebGLRenderer({ antialias: false, preserveDrawingBuffer: true });
+rend.setSize(LARG, ALT, false); rend.setClearColor(0x000000, 1);
+const gl = rend.getContext();
+const branco = () => new THREE.MeshBasicMaterial({ color: 0xffffff });
+
+// Uma volta de `n` quadros em torno do sólido.
+//   elev: elevação da câmera (graus) · desvioPx: eixo do giro fora do centro da imagem
+//   sensor: o giroscópio informa a elevação (como no celular) · volta: graus girados
+function capturar(fazer, op) {
+  op = op || {};
+  const n = op.n || 36, e = rad(op.elev == null ? 5 : op.elev), volta = rad(op.volta || 360);
+  const cena = new THREE.Scene(); cena.add(fazer());
+  const cam = new THREE.PerspectiveCamera(FOV, LARG / ALT, D * 0.01, 100);
+  const quadros = [];
+  for (let i = 0; i < n; i++) {
+    const t = (i / n) * volta;
+    cam.position.set(D * Math.cos(e) * Math.sin(t), D * Math.sin(e), D * Math.cos(e) * Math.cos(t));
+    cam.lookAt(0, 0, 0);
+    if (op.desvioPx) cam.setViewOffset(LARG, ALT, -op.desvioPx, 0, LARG, ALT); else cam.clearViewOffset();
+    cam.updateProjectionMatrix();
+    rend.render(cena, cam);
+    const buf = new Uint8Array(LARG * ALT * 4);
+    gl.readPixels(0, 0, LARG, ALT, gl.RGBA, gl.UNSIGNED_BYTE, buf);
+    const m = new Uint8Array(LARG * ALT);
+    for (let y = 0; y < ALT; y++) for (let x = 0; x < LARG; x++)
+      m[y * LARG + x] = buf[((ALT - 1 - y) * LARG + x) * 4] > 128 ? 1 : 0;
+    quadros.push({ mascara: m, cores: new Uint8ClampedArray(192 * 256 * 4), t: i * 620,
+      orient: op.sensor ? { e: e, r: 0 } : null });
+  }
+  return quadros;
+}
+
+const reconstruir = (quadros, produto) => S._reconstruir(quadros, produto || {}, { fov: rad(FOV) });
+// lados da peça final, do maior para o menor, em cm
+const lados = r => [r.dims.largura, r.dims.altura, r.dims.profundidade].sort((a, b) => b - a);
+const pct = (a, b) => Math.abs(a / b - 1) * 100;
+const fmt = v => v.map(x => x.toFixed(2)).join(' × ');
+// maior erro (%) entre os lados medidos e os esperados, os dois ordenados
+function erroMax(r, esperado) {
+  const a = lados(r), b = esperado.slice().sort((x, y) => y - x);
+  return Math.max(pct(a[0], b[0]), pct(a[1], b[1]), pct(a[2], b[2]));
+}
+
+const caixa = (lx, ly, lz) => () => new THREE.Mesh(new THREE.BoxGeometry(lx, ly, lz), branco());
+const cilindro = (d, h) => () => new THREE.Mesh(new THREE.CylinderGeometry(d / 2, d / 2, h, 64), branco());
+
+// 2.1 — caixa, câmera apoiada (5°), medidas do próprio produto
+{
+  const r = reconstruir(capturar(caixa(0.62, 0.88, 0.40), { sensor: true }), { largura: 6.2, altura: 8.8, comprimento: 4.0 });
+  log('caixa 6,2 × 8,8 × 4,0 cm, câmera a 5°  →  ' + fmt(lados(r)) + ' cm · eixo ' + r.meta.eixoPx + ' px · saia ' + (r.meta.saiaCortada || 0) + '%');
+  confere(!r.vazio && erroMax(r, [6.2, 8.8, 4.0]) < 12, 'os três lados a menos de 12% do real (erro máx. ' + erroMax(r, [6.2, 8.8, 4.0]).toFixed(1) + '%)');
+  confere(r.medidasConfiaveis === true, 'medidas reconhecidas como do próprio produto');
+  confere(Math.abs(r.meta.eixoPx) <= 1, 'eixo no centro da imagem');
+  confere(r.meta.sensor === true && Math.abs(r.meta.elevacao - 5) < 0.2, 'elevação veio do giroscópio (5°)');
+}
+
+// 2.2 — o mesmo, com o produto 22 px fora do centro (o que derrubava a peça)
+{
+  const r = reconstruir(capturar(caixa(0.62, 0.88, 0.40), { sensor: true, desvioPx: 22 }), { largura: 6.2, altura: 8.8, comprimento: 4.0 });
+  log('mesma caixa, eixo 22 px à direita       →  ' + fmt(lados(r)) + ' cm · eixo ' + r.meta.eixoPx + ' px (direto ' + r.meta.eixoDireto + ')');
+  confere(Math.abs(r.meta.eixoPx - 22) <= 1.5, 'eixo encontrado a até 1,5 px do verdadeiro');
+  confere(!r.vazio && erroMax(r, [6.2, 8.8, 4.0]) < 12, 'peça igual à do produto centralizado (erro máx. ' + erroMax(r, [6.2, 8.8, 4.0]).toFixed(1) + '%)');
+}
+
+// 2.3 — celular na mão, olhando de cima (30°): o giroscópio corrige e a saia é cortada
+{
+  const r = reconstruir(capturar(caixa(0.50, 0.60, 0.35), { sensor: true, elev: 30 }), { largura: 5.0, altura: 6.0, comprimento: 3.5 });
+  log('caixa 5,0 × 6,0 × 3,5 cm, câmera a 30° →  ' + fmt(lados(r)) + ' cm · saia ' + (r.meta.saiaCortada || 0) + '% · elevação ' + r.meta.elevacao + '°');
+  confere(!r.vazio && erroMax(r, [5.0, 6.0, 3.5]) < 18, 'os três lados a menos de 18% do real (erro máx. ' + erroMax(r, [5.0, 6.0, 3.5]).toFixed(1) + '%)');
+  confere(r.meta.saiaCortada > 0, 'a "saia" sob a base foi cortada');
+}
+
+// 2.4 — sem giroscópio (computador): vale a elevação suposta, e a peça ainda sai
+{
+  const r = reconstruir(capturar(caixa(0.62, 0.88, 0.40), { sensor: false, elev: 15 }), { largura: 6.2, altura: 8.8, comprimento: 4.0 });
+  log('mesma caixa, câmera a 15° sem sensor    →  ' + fmt(lados(r)) + ' cm · elevação suposta ' + r.meta.elevacao + '°');
+  confere(r.meta.sensor === false, 'reconhece que não há giroscópio');
+  confere(!r.vazio && erroMax(r, [6.2, 8.8, 4.0]) < 18, 'os três lados a menos de 18% do real (erro máx. ' + erroMax(r, [6.2, 8.8, 4.0]).toFixed(1) + '%)');
+}
+
+// 2.5 — medidas da EMBALAGEM bem diferentes do produto: não pode deformar
+{
+  const q = capturar(cilindro(0.30, 0.83), { sensor: true });
+  const r = reconstruir(q, { largura: 7, altura: 5, comprimento: 3 });       // o caso que achatava a peça
+  const l = lados(r);
+  log('frasco ø3,0 × 8,3 com embalagem 3×7×5   →  ' + fmt(l) + ' cm');
+  confere(r.medidasConfiaveis === false, 'percebe que as medidas não são do produto');
+  confere(Math.abs(l[0] - 7) < 0.05, 'o maior lado vai até 7 cm (o maior que cabe na embalagem)');
+  confere(pct(l[1] / l[0], 0.30 / 0.83) < 15 && pct(l[2] / l[0], 0.30 / 0.83) < 15,
+    'a proporção continua a do frasco (largura/altura ' + (l[1] / l[0]).toFixed(3) + ', real 0,361)');
+  confere(Math.abs(r.dims.altura - 7) < 0.05, 'e o lado maior continua sendo a altura — a peça não deitou');
+  const s = reconstruir(q, {});
+  confere(Math.abs(s.dims.altura - 20) < 0.05, 'sem medida nenhuma: 20 cm de altura, para o lojista corrigir');
+}
+
+// 2.6 — um quadro com o recorte quebrado não pode esvaziar a peça
+{
+  const q = capturar(caixa(0.62, 0.88, 0.40), { sensor: true });
+  const ruim = q[11].mascara;                                   // some a metade de cima do produto
+  for (let y = 0; y < ALT / 2; y++) ruim.fill(0, y * LARG, (y + 1) * LARG);
+  const r = reconstruir(q, { largura: 6.2, altura: 8.8, comprimento: 4.0 });
+  log('caixa com 1 quadro pela metade           →  ' + (r.vazio ? 'VAZIA' : fmt(lados(r)) + ' cm') + ' · descartados ' + r.meta.descartados);
+  confere(r.meta.descartados === 1, 'o quadro quebrado foi descartado (e só ele)');
+  confere(!r.vazio && erroMax(r, [6.2, 8.8, 4.0]) < 12, 'a peça sai inteira (erro máx. ' + (r.vazio ? '-' : erroMax(r, [6.2, 8.8, 4.0]).toFixed(1)) + '%)');
+}
+
+// 2.7 — a malha final: base no chão, centrada, sem face virada para dentro
+{
+  const r = reconstruir(capturar(cilindro(0.50, 0.80), { sensor: true }), { largura: 5, altura: 8, comprimento: 5 });
+  const p = r.final.pos, ix = r.final.idx;
+  let mn = [1e9, 1e9, 1e9], mx = [-1e9, -1e9, -1e9];
+  for (let i = 0; i < p.length; i += 3) for (let k = 0; k < 3; k++) { mn[k] = Math.min(mn[k], p[i + k]); mx[k] = Math.max(mx[k], p[i + k]); }
+  let dentro = 0;
+  const cy = (mn[1] + mx[1]) / 2;
+  for (let i = 0; i < ix.length; i += 3) {
+    const a = ix[i] * 3, b = ix[i + 1] * 3, c = ix[i + 2] * 3;
+    const ux = p[b] - p[a], uy = p[b + 1] - p[a + 1], uz = p[b + 2] - p[a + 2];
+    const vx = p[c] - p[a], vy = p[c + 1] - p[a + 1], vz = p[c + 2] - p[a + 2];
+    const nx = uy * vz - uz * vy, ny = uz * vx - ux * vz, nz = ux * vy - uy * vx;
+    const gx = (p[a] + p[b] + p[c]) / 3, gy = (p[a + 1] + p[b + 1] + p[c + 1]) / 3 - cy, gz = (p[a + 2] + p[b + 2] + p[c + 2]) / 3;
+    if (nx * gx + ny * gy + nz * gz <= 0) dentro++;
+  }
+  log('frasco ø5,0 × 8,0 cm                     →  ' + fmt(lados(r)) + ' cm · ' + (ix.length / 3) + ' triângulos');
+  confere(Math.abs(mn[1]) < 1e-6, 'base apoiada em y = 0');
+  confere(Math.abs(mn[0] + mx[0]) < 1e-6 && Math.abs(mn[2] + mx[2]) < 1e-6, 'centrada em x e z');
+  confere(dentro / (ix.length / 3) < 0.005, 'faces viradas para fora (' + (100 * dentro / (ix.length / 3)).toFixed(2) + '% invertidas)');
+  confere(erroMax(r, [5, 8, 5]) < 8, 'os três lados a menos de 8% do real (erro máx. ' + erroMax(r, [5, 8, 5]).toFixed(1) + '%)');
+}
+
+log('\n' + (falhas ? falhas + ' FALHA(S)' : 'tudo certo'));
+document.title = 'PRONTO';
+</script></body></html>
