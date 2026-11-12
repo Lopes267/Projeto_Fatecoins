@@ -65,23 +65,56 @@ cloudinary.config({
 
 // ============================================================
 //  E-MAIL – CONFIGURAÇÃO (códigos de verificação)
-//  Qualquer servidor SMTP serve: Gmail com senha de app, Outlook, Brevo...
-//  Sem SMTP no .env o código aparece só no terminal do servidor: dá para
+//  Dois caminhos, nesta ordem:
+//   1. Script do Google (Apps Script) chamado por HTTPS — EMAIL_SCRIPT_URL e
+//      EMAIL_SCRIPT_SEGREDO. É o que vale no Render: o plano grátis de lá
+//      bloqueia as portas de SMTP (25, 465 e 587) desde set/2025, e o envio
+//      ficava 2 minutos pendurado até dar erro. O script manda o e-mail pela
+//      própria conta do Gmail. Código do script: email-apps-script.gs.
+//   2. SMTP (Gmail com senha de app, Outlook, Brevo...) — no computador.
+//  Sem nenhum dos dois o código aparece só no terminal do servidor: dá para
 //  testar em desenvolvimento, mas ninguém recebe e-mail.
 // ============================================================
 
+const EMAIL_SCRIPT_URL = (process.env.EMAIL_SCRIPT_URL || '').trim();
+const EMAIL_SCRIPT_SEGREDO = (process.env.EMAIL_SCRIPT_SEGREDO || '').trim();
 const SMTP_PORTA = Number(process.env.SMTP_PORT) || 465;
 const emailTransporte = process.env.SMTP_HOST && process.env.SMTP_USER && process.env.SMTP_PASS
   ? nodemailer.createTransport({
       host: process.env.SMTP_HOST,
       port: SMTP_PORTA,
       secure: SMTP_PORTA === 465,                 // 465 = TLS direto; 587 = STARTTLS
-      auth: { user: process.env.SMTP_USER, pass: process.env.SMTP_PASS }
+      auth: { user: process.env.SMTP_USER, pass: process.env.SMTP_PASS },
+      // Sem estes limites, porta bloqueada deixava a pessoa esperando 2 minutos
+      connectionTimeout: 10000, greetingTimeout: 10000, socketTimeout: 20000
     })
   : null;
 const EMAIL_REMETENTE = process.env.EMAIL_REMETENTE || `Mercado Local <${process.env.SMTP_USER}>`;
-if (!emailTransporte) {
-  console.warn('⚠️  SMTP não configurado no .env: os códigos de verificação aparecem só neste terminal.');
+if (EMAIL_SCRIPT_URL && !EMAIL_SCRIPT_SEGREDO) {
+  console.warn('⚠️  EMAIL_SCRIPT_URL sem EMAIL_SCRIPT_SEGREDO: o envio pelo script do Google fica desligado.');
+}
+const emailPorScript = !!(EMAIL_SCRIPT_URL && EMAIL_SCRIPT_SEGREDO);
+if (emailPorScript) console.log('✉️  E-mails saem pelo script do Google (HTTPS).');
+else if (!emailTransporte) {
+  console.warn('⚠️  E-mail não configurado: os códigos de verificação aparecem só neste terminal.');
+}
+
+// Manda pelo script do Google. O script devolve {ok:true} ou {ok:false, erro}.
+async function enviarPorScript({ para, assunto, texto, html }) {
+  const r = await fetch(EMAIL_SCRIPT_URL, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ segredo: EMAIL_SCRIPT_SEGREDO, para, assunto, texto, html,
+      nome: (EMAIL_REMETENTE.match(/^\s*"?([^"<]+?)"?\s*</) || [])[1] || 'Mercado Local' }),
+    redirect: 'follow',                          // o Google responde com um redirecionamento
+    signal: AbortSignal.timeout(20000)
+  });
+  const corpo = await r.text();
+  let resp = null;
+  try { resp = JSON.parse(corpo); } catch {}
+  if (!r.ok || !resp || resp.ok !== true) {
+    throw new Error('Script de e-mail recusou o envio: ' + ((resp && resp.erro) || `HTTP ${r.status} ${corpo.slice(0, 120)}`));
+  }
 }
 
 // ============================================================
@@ -381,24 +414,25 @@ const TEXTOS_EMAIL = {
 };
 
 async function mandarEmailCodigo(finalidade, email, codigo) {
-  if (!emailTransporte) {
-    console.log(`[e-mail] SMTP não configurado. Código de ${finalidade} para ${email}: ${codigo}`);
+  if (!emailPorScript && !emailTransporte) {
+    console.log(`[e-mail] Envio não configurado. Código de ${finalidade} para ${email}: ${codigo}`);
     return;
   }
   const t = TEXTOS_EMAIL[finalidade];
   const aviso = 'O código vale por 10 minutos. Se não foi você que pediu, ignore este e-mail: nada muda na sua conta.';
-  await emailTransporte.sendMail({
-    from: EMAIL_REMETENTE,
-    to: email,
-    subject: `${codigo} é o seu código do Mercado Local`,
-    text: `${t.titulo}\n\n${t.frase}\n\n${codigo}\n\n${aviso}`,
+  const msg = {
+    para: email,
+    assunto: `${codigo} é o seu código do Mercado Local`,
+    texto: `${t.titulo}\n\n${t.frase}\n\n${codigo}\n\n${aviso}`,
     html: `<div style="font-family:Arial,Helvetica,sans-serif;max-width:480px;margin:0 auto;padding:24px;color:#1f1b16">
       <p style="font-size:18px;font-weight:bold;margin:0 0 12px">${t.titulo}</p>
       <p style="margin:0 0 20px;line-height:1.5">${t.frase}</p>
       <p style="font-size:32px;font-weight:bold;letter-spacing:8px;margin:0 0 20px;padding:16px;background:#f4f1ea;border-radius:8px;text-align:center">${codigo}</p>
       <p style="margin:0;color:#6b645a;font-size:13px;line-height:1.5">${aviso}</p>
     </div>`
-  });
+  };
+  if (emailPorScript) return enviarPorScript(msg);
+  await emailTransporte.sendMail({ from: EMAIL_REMETENTE, to: msg.para, subject: msg.assunto, text: msg.texto, html: msg.html });
 }
 
 async function enviarCodigo(finalidade, email) {
