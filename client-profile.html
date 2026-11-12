@@ -227,6 +227,49 @@
     }
     .track-dist{font-size:.875rem;color:var(--accent2);margin-top:.5rem}
     .track-aprox{font-size:.8125rem;color:var(--accent2);margin:.3rem 0 .1rem;line-height:1.5}
+
+    /* Filtro por etapa. No celular é uma fileira que rola para o lado (não
+       empurra a lista para baixo); no computador, os botões quebram linha. */
+    .filtro-etapas{display:flex;gap:.45rem;flex-wrap:wrap;margin:0 0 1.2rem}
+    .filtro-btn{display:inline-flex;align-items:center;gap:.4rem;padding:.5rem .85rem;min-height:40px;
+      border-radius:999px;border:1px solid var(--border);background:var(--card2);color:var(--muted);
+      font-family:var(--font-texto);font-size:.875rem;font-weight:600;cursor:pointer;white-space:nowrap;
+      transition:border-color .2s,color .2s,background .2s}
+    .filtro-btn:hover{border-color:var(--accent);color:var(--text)}
+    .filtro-btn:focus-visible{outline:2px solid var(--accent2);outline-offset:2px}
+    .filtro-btn[aria-pressed="true"]{background:var(--accent);border-color:var(--accent);color:#fff}
+    .filtro-btn .qtd{min-width:1.4rem;padding:.05rem .4rem;border-radius:999px;font-size:.75rem;text-align:center;
+      background:rgba(255,255,255,.08);color:inherit;font-variant-numeric:tabular-nums}
+    .filtro-btn[aria-pressed="true"] .qtd{background:rgba(255,255,255,.22)}
+    .filtro-btn.vazio{opacity:.55}
+    .filtro-vazio{color:var(--muted);text-align:center;padding:2rem 1rem;border:1px dashed var(--border);border-radius:14px}
+    @media(max-width:640px){
+      .filtro-etapas{flex-wrap:nowrap;overflow-x:auto;margin-left:-.25rem;margin-right:-.25rem;
+        padding:0 .25rem .35rem;scrollbar-width:none;-webkit-overflow-scrolling:touch}
+      .filtro-etapas::-webkit-scrollbar{display:none}
+      .filtro-btn{flex:0 0 auto}
+      /* As abas do perfil quebravam em 3 linhas e empurravam o rastreio para
+         baixo: no celular viram uma fileira que rola para o lado */
+      #profile-tabs{flex-wrap:nowrap;overflow-x:auto;scrollbar-width:none;-webkit-overflow-scrolling:touch}
+      #profile-tabs::-webkit-scrollbar{display:none}
+      #profile-tabs .tab{flex:0 0 auto;white-space:nowrap}
+      /* Menos moldura em volta dos pedidos: o espaço vai para o conteúdo */
+      #tab-entregas .form-card{padding:1.1rem .9rem}
+    }
+
+    /* Card do pedido: no computador, informações à esquerda e mapa à direita */
+    .track-corpo{display:grid;gap:.2rem}
+    .track-info{min-width:0}
+    .track-entregue-em{font-size:.875rem;color:var(--green);margin:.3rem 0}
+    @media(min-width:900px){
+      .track-card.com-mapa .track-corpo{grid-template-columns:minmax(0,1fr) minmax(300px,44%);gap:1.2rem;align-items:start}
+      .track-card.com-mapa .track-map{height:300px;margin-top:0}
+    }
+    @media(max-width:520px){
+      .track-card{padding:.95rem}
+      .track-step{font-size:.6875rem}
+      .track-codigo-num{font-size:2rem}
+    }
   </style>
 
   <!-- ABAS -->
@@ -348,6 +391,8 @@
       <p style="color:var(--muted);font-size:.9375rem;margin-bottom:1.2rem">
         Acompanhe seus pedidos: assim que um entregador aceitar, você vê o nome dele e a posição no mapa em tempo real.
       </p>
+      <!-- Filtro por etapa: cada botão mostra quantos pedidos estão nela -->
+      <div class="filtro-etapas" id="filtro-etapas" role="group" aria-label="Filtrar pedidos por etapa" hidden></div>
       <div id="entregas-list"><p style="color:var(--muted)">Carregando…</p></div>
     </div>
   </div>
@@ -575,6 +620,12 @@ const ABAS_PERFIL = ['perfil','compras','entregas','avaliacoes'];
 function switchTab(name){
   document.querySelectorAll('#profile-tabs .tab').forEach(t => t.classList.toggle('active', t.dataset.tab === name));
   document.querySelectorAll('.tab-panel').forEach(p => p.hidden = (p.id !== 'tab-' + name));
+  // No celular as abas rolam para o lado: a aberta fica à vista
+  const barra = document.getElementById('profile-tabs');
+  const ativa = barra.querySelector('.tab.active');
+  if(ativa && barra.scrollWidth > barra.clientWidth){
+    barra.scrollTo({ left: ativa.offsetLeft - (barra.clientWidth - ativa.offsetWidth) / 2 });
+  }
   // Guarda a aba na URL: é o que permite ao checkout mandar o cliente direto
   // para o rastreio, e o que faz o link ser compartilhável.
   const u = new URL(location); u.searchParams.set('tab', name); history.replaceState({}, '', u);
@@ -610,15 +661,92 @@ function pararPollingEntregas(){
   if(pollEntregas){ clearInterval(pollEntregas); pollEntregas = null; }
 }
 
+// As etapas da entrega, na ordem. Os mesmos nomes servem à barra de progresso
+// do card e aos botões de filtro, para o cliente ver a mesma palavra nos dois.
+const ETAPAS_ENTREGA = [
+  { k:'aguardando', txt:'Pedido feito' },
+  { k:'aceito',     txt:'Entregador designado' },
+  { k:'a_caminho',  txt:'Saiu para entrega' },
+  { k:'entregue',   txt:'Entregue' }
+];
+
+// Etapa escolhida no filtro. Fica no endereço (?etapa=entregue) para sobreviver
+// ao recarregar a página e à atualização automática de 15 s.
+let filtroEtapa = (()=>{
+  const f = new URLSearchParams(location.search).get('etapa');
+  return ETAPAS_ENTREGA.some(e => e.k === f) ? f : 'todos';
+})();
+let ultimosPedidos = [];
+
+function setFiltroEtapa(k){
+  filtroEtapa = k;
+  const u = new URL(location);
+  if(k === 'todos') u.searchParams.delete('etapa'); else u.searchParams.set('etapa', k);
+  history.replaceState({}, '', u);
+  assinaturaEntregas = '';          // a lista muda inteira
+  renderEntregas();
+  mostrarFiltroAtivo();
+}
+
+// No celular os filtros rolam para o lado: o escolhido tem de ficar à vista
+function mostrarFiltroAtivo(){
+  const btn = document.querySelector(`#filtro-etapas [data-etapa="${filtroEtapa}"]`);
+  const box = document.getElementById('filtro-etapas');
+  if(!btn || box.scrollWidth <= box.clientWidth) return;
+  box.scrollTo({ left: btn.offsetLeft - (box.clientWidth - btn.offsetWidth) / 2, behavior: 'smooth' });
+}
+
+// Os botões são criados uma vez e só têm os números atualizados: recriá-los a
+// cada 15 s tiraria o foco de quem estiver navegando pelo teclado.
+function renderFiltros(pedidos){
+  const box = document.getElementById('filtro-etapas');
+  box.hidden = false;
+  const opcoes = [{ k:'todos', txt:'Todos' }, ...ETAPAS_ENTREGA];
+  const primeiraVez = !box.childElementCount;
+  if(primeiraVez){
+    box.innerHTML = opcoes.map(o =>
+      `<button type="button" class="filtro-btn" data-etapa="${o.k}" onclick="setFiltroEtapa('${o.k}')">
+         <span>${o.txt}</span><span class="qtd"></span>
+       </button>`).join('');
+    // aberto já filtrado (?etapa=entregue): o botão marcado aparece na fileira
+    setTimeout(mostrarFiltroAtivo, 50);
+  }
+  opcoes.forEach(o=>{
+    const btn = box.querySelector(`[data-etapa="${o.k}"]`);
+    const n = o.k === 'todos' ? pedidos.length : pedidos.filter(p => p.status === o.k).length;
+    btn.querySelector('.qtd').textContent = n;
+    btn.setAttribute('aria-pressed', String(filtroEtapa === o.k));
+    btn.setAttribute('aria-label', `${o.txt}: ${n} pedido${n === 1 ? '' : 's'}`);
+    btn.classList.toggle('vazio', !n && o.k !== 'todos');
+  });
+}
+
 async function loadEntregas(){
   const el = document.getElementById('entregas-list');
-  let pedidos = [];
-  try { pedidos = await DB.getMyTracking(); }
+  try { ultimosPedidos = await DB.getMyTracking(); }
   catch { el.innerHTML = '<p style="color:var(--red)">Não foi possível carregar suas entregas.</p>'; return; }
+  renderEntregas();
+}
 
-  if(!pedidos.length){
+function renderEntregas(){
+  const el = document.getElementById('entregas-list');
+  const todos = ultimosPedidos;
+
+  if(!todos.length){
+    document.getElementById('filtro-etapas').hidden = true;
     el.innerHTML = `<p style="color:var(--muted)">Você ainda não tem pedidos para rastrear.
       Suas compras aparecem aqui assim que o pedido é criado.</p>`;
+    assinaturaEntregas = '';
+    return;
+  }
+  renderFiltros(todos);
+
+  const pedidos = filtroEtapa === 'todos' ? todos : todos.filter(p => p.status === filtroEtapa);
+  if(!pedidos.length){
+    const etapa = ETAPAS_ENTREGA.find(e => e.k === filtroEtapa);
+    el.innerHTML = `<div class="filtro-vazio">Nenhum pedido na etapa “${etapa ? etapa.txt : ''}” agora.
+      <div style="margin-top:.8rem"><button type="button" class="filtro-btn" onclick="setFiltroEtapa('todos')">Ver todos</button></div></div>`;
+    assinaturaEntregas = 'vazio:' + filtroEtapa;
     return;
   }
 
@@ -626,11 +754,17 @@ async function loadEntregas(){
   // A DISTÂNCIA ficava aqui e mudava a cada leitura de GPS — o card inteiro era
   // refeito a cada 15s, recriando o mapa e fechando o código que o cliente
   // tinha acabado de revelar. Agora ela é atualizada no lugar, como texto.
-  const assinatura = pedidos.map(p =>
+  const assinatura = filtroEtapa + '#' + pedidos.map(p =>
     `${p.id}:${p.status}:${p.entregador ? p.entregador.id : ''}`).join('|');
   if(assinatura !== assinaturaEntregas){
     assinaturaEntregas = assinatura;
     el.innerHTML = pedidos.map(cardRastreio).join('');
+    // Mapas de cards que saíram da tela (filtro trocado) são desmontados
+    Object.keys(mapasEntrega).forEach(id=>{
+      if(!document.body.contains(mapasEntrega[id].mapa.getContainer())){
+        mapasEntrega[id].mapa.remove(); delete mapasEntrega[id];
+      }
+    });
   }
 
   // O que muda toda hora é atualizado sem tocar no HTML do card
@@ -651,12 +785,7 @@ async function loadEntregas(){
 
 function cardRastreio(p){
   const st = entregaLabel(p.status);
-  const etapas = [
-    { k:'aguardando', txt:'Pedido feito' },
-    { k:'aceito',     txt:'Entregador designado' },
-    { k:'a_caminho',  txt:'Saiu para entrega' },
-    { k:'entregue',   txt:'Entregue' }
-  ];
+  const etapas = ETAPAS_ENTREGA;
   const idx = etapas.findIndex(e => e.k === p.status);
 
   const passos = etapas.map((e,i)=>`
@@ -671,7 +800,10 @@ function cardRastreio(p){
   const prec = precisaoEntrega(p.entrega);
   const ent = p.entregador;
   const local = p.entregador_local;
-  const blocoEntregador = ent ? `
+  // Depois de entregue, só o nome de quem entregou: telefone e posição já não
+  // servem para nada, e "está cuidando" mentia sobre um pedido encerrado
+  const blocoEntregador = !ent ? '' : (p.status === 'entregue' ? `
+    <div class="track-itens">🛵 Entregue por <b style="color:var(--text)">${escapeHtmlCli(ent.nome || 'Entregador')}</b></div>` : `
     <div class="track-entregador">
       <span>🛵</span>
       <div>
@@ -679,9 +811,15 @@ function cardRastreio(p){
         ${ent.telefone ? `<div><a href="tel:${escapeHtmlCli(ent.telefone)}">${escapeHtmlCli(ent.telefone)}</a></div>` : ''}
       </div>
       ${local ? `<span class="track-fresh" id="track-fresh-${p.id}">posição ${tempoRelativo(local.atualizado_em)}</span>` : ''}
-    </div>` : '';
+    </div>`);
 
-  const temMapa = local || (p.entrega && p.entrega.lat != null);
+  // Mapa só enquanto há um entregador no caminho. Antes do aceite ele mostrava
+  // apenas o próprio endereço do cliente, e depois de entregue não diz mais
+  // nada — nos dois casos só alongava a lista, principalmente no celular.
+  const comEntregador = p.status === 'aceito' || p.status === 'a_caminho';
+  const temMapa = comEntregador && (local || (p.entrega && p.entrega.lat != null));
+  const entregueEm = (p.status === 'entregue' && p.entregue_em)
+    ? `<div class="track-entregue-em">✅ Entregue em ${new Date(p.entregue_em).toLocaleString('pt-BR', { dateStyle:'short', timeStyle:'short' })}</div>` : '';
   // Nasce no HTML com id fixo e é preenchido por loadEntregas — assim a distância
   // muda sem reconstruir o card (e sem recriar o mapa a cada 15 s).
   const mostraDist = p.distancia_km != null && p.status !== 'entregue';
@@ -702,7 +840,7 @@ function cardRastreio(p){
     </div>` : '';
 
   return `
-    <div class="track-card">
+    <div class="track-card${temMapa ? ' com-mapa' : ''}">
       <div class="track-head">
         <div>
           <div class="track-id">Pedido #${p.id.slice(0,6).toUpperCase()}</div>
@@ -713,12 +851,16 @@ function cardRastreio(p){
       </div>
 
       <div class="track-steps">${passos}</div>
+      <div class="track-corpo">
+      <div class="track-info">
+      ${entregueEm}
       <div class="track-itens">📦 ${itens || 'Itens do pedido'}</div>
-      <div class="track-itens">🏠 Entregar em: ${escapeHtmlCli(formatEndereco(p.entrega))}</div>
-      ${prec.exato ? '' : `<div class="track-aprox">⚠️ ${escapeHtmlCli(prec.texto)}. O entregador usa o endereço escrito para chegar até você.</div>`}
+      <div class="track-itens">🏠 ${p.status === 'entregue' ? 'Endereço' : 'Entregar em'}: ${escapeHtmlCli(formatEndereco(p.entrega))}</div>
+      ${(prec.exato || p.status === 'entregue') ? '' : `<div class="track-aprox">⚠️ ${escapeHtmlCli(prec.texto)}. O entregador usa o endereço escrito para chegar até você.</div>`}
       ${blocoCodigo}
       ${blocoEntregador}
       ${dist}
+      </div>
       ${temMapa ? `
         <div class="track-map-wrap">
           <div class="track-map" id="map-${p.id}"></div>
@@ -730,6 +872,7 @@ function cardRastreio(p){
               <span class="mapa-codigo-num" data-codigo="${escapeHtmlCli(p.codigo)}">••••</span>
             </button>` : ''}
         </div>` : ''}
+      </div>
     </div>`;
 }
 

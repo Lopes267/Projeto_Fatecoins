@@ -231,8 +231,20 @@ main{max-width:calc(var(--container) + 2 * var(--gutter));margin:0 auto;padding:
 
 .acoes{display:flex;gap:.6rem;flex-wrap:wrap;margin-top:1rem}
 
-#mapa{height:330px;border-radius:14px;border:1px solid var(--border);margin-top:1rem;background:var(--card2)}
+#mapa{height:330px;border-radius:14px;border:1px solid var(--border);background:var(--card2)}
 .leaflet-container{background:#1a1a1a}
+/* Minhas entregas: no computador, pedidos à esquerda e o mapa à direita,
+   acompanhando a rolagem; no celular, o mapa vem primeiro, sem precisar rolar
+   a lista inteira para achá-lo. */
+.minhas-layout{display:grid;gap:1rem;align-items:start}
+.minhas-layout .lista{min-width:0}
+.painel-mapa{min-width:0}
+.map-dica{width:100%;color:var(--accent2)}
+@media(min-width:960px){
+  .minhas-layout{grid-template-columns:minmax(0,1fr) minmax(340px,42%)}
+  .painel-mapa{order:2;position:sticky;top:5.5rem}
+  .painel-mapa #mapa{height:min(62vh,520px)}
+}
 .map-legend{display:flex;gap:1.1rem;flex-wrap:wrap;font-size:.8125rem;color:var(--muted);margin-top:.6rem}
 .map-legend b{display:inline-block;width:9px;height:9px;border-radius:50%;margin-right:.3rem}
 
@@ -253,6 +265,7 @@ main{max-width:calc(var(--container) + 2 * var(--gutter));margin:0 auto;padding:
   .page-head h1{font-size:1.6rem}
   .pedido-valor{margin-left:0;text-align:left}
   .acoes .btn{flex:1}
+  #mapa{height:260px}
 }
 </style>
 <link rel="stylesheet" href="site.css"/>
@@ -340,7 +353,21 @@ main{max-width:calc(var(--container) + 2 * var(--gutter));margin:0 auto;padding:
   </section>
 
   <section id="tab-minhas" hidden>
-    <div class="lista" id="lista-minhas"><p style="color:var(--muted)">Carregando…</p></div>
+    <!-- O mapa fica FORA da lista: a lista é redesenhada a cada 30 s, e o mapa
+         que morava dentro dela perdia o quadro e sumia (tela cinza no celular).
+         No computador ele fica ao lado dos pedidos; no celular, em cima deles. -->
+    <div class="minhas-layout">
+      <aside class="painel-mapa" id="painel-mapa" hidden>
+        <div id="mapa"></div>
+        <div class="map-legend">
+          <span><b style="background:#e8854a"></b>Você</span>
+          <span><b style="background:#5dcfa0"></b>Cliente</span>
+          <span id="legenda-dist"></span>
+          <span class="map-dica">💡 Posição errada? Toque ou clique no mapa onde você está de verdade.</span>
+        </div>
+      </aside>
+      <div class="lista" id="lista-minhas"><p style="color:var(--muted)">Carregando…</p></div>
+    </div>
   </section>
 
   <section id="tab-historico" hidden>
@@ -808,6 +835,7 @@ function renderMinhas(){
   badge.hidden = !ativas.length;
   badge.textContent = ativas.length;
 
+  const painelMapa = document.getElementById('painel-mapa');
   if(!ativas.length){
     el.innerHTML = `
       <div class="vazio">
@@ -815,9 +843,11 @@ function renderMinhas(){
         <h3>Você não tem entregas em andamento</h3>
         <p>Vá em <b>Disponíveis</b> e escolha um pedido para entregar.</p>
       </div>`;
+    painelMapa.hidden = true;
     destruirMapa();
     return;
   }
+  painelMapa.hidden = false;
 
   let html = '';
   ORDEM_ETAPA.forEach(st=>{
@@ -832,16 +862,9 @@ function renderMinhas(){
   const restantes = ativas.filter(p => !ORDEM_ETAPA.includes(p.status));
   html += restantes.map(p => cardPedido(p, 'ativa')).join('');
 
-  el.innerHTML = html +
-    `<div>
-       <div id="mapa"></div>
-       <div class="map-legend">
-         <span><b style="background:#e8854a"></b>Você</span>
-         <span><b style="background:#5dcfa0"></b>Endereço do cliente</span>
-         <span id="legenda-dist"></span>
-         <span style="width:100%;color:var(--accent2)">💡 Posição errada? Clique no mapa para marcar onde você está de verdade.</span>
-       </div>
-     </div>`;
+  // Só os cards são redesenhados; o mapa (fora da lista) continua o mesmo,
+  // com o zoom e a posição que o entregador deixou
+  el.innerHTML = html;
 
   setTimeout(ajustarMapa, 60);
 }
@@ -1256,7 +1279,7 @@ function iniciarGPS(){
         // Posição grosseira demais: mostra no seu mapa, mas não manda para o cliente
         statusGPS('err', `Sinal impreciso — margem de ~${formatarMetros(metros)}`,
           'Provavelmente é a localização estimada pela internet, não o GPS. Abra pelo celular ' +
-          'com o GPS ligado, ou clique no mapa para marcar onde você está.');
+          'com o GPS ligado, ou toque no mapa para marcar onde você está.');
         atualizarBotoesGPS();
         return;
       }
@@ -1277,7 +1300,7 @@ function iniciarGPS(){
         3: 'Tempo esgotado ao buscar o GPS'
       };
       statusGPS('err', msgs[err.code] || 'Erro no GPS',
-        'Você ainda pode aceitar entregas. Clique no mapa para marcar sua posição à mão.');
+        'Você ainda pode aceitar entregas. Toque no mapa para marcar sua posição à mão.');
       pararGPS(true);
     },
     // maximumAge:0 evita reaproveitar uma posição antiga e errada que o navegador guardou
@@ -1330,7 +1353,7 @@ function atualizarBotoesGPS(){
   if(posManual){
     partes.push(`<button class="btn btn-ghost btn-sm" onclick="voltarAoGPS()">↺ Voltar ao GPS</button>`);
   } else if(ultimaPrecisaoM !== null && ultimaPrecisaoM > RUIM_M){
-    partes.push(`<span class="gps-aviso">Clique no mapa (aba “Minhas entregas”) para marcar sua posição real</span>`);
+    partes.push(`<span class="gps-aviso">Toque no mapa (aba “Minhas entregas”) para marcar sua posição real</span>`);
   }
   el.innerHTML = partes.join('');
 }
@@ -1420,14 +1443,23 @@ function desenharMapaFila(){
 }
 
 // ---------- MAPA ----------
+// O destino no mapa é o da entrega que está NA RUA; sem nenhuma na rua, o da
+// primeira aceita. Antes valia a primeira da lista, que podia ser uma aceita
+// enquanto o entregador já levava outra.
 function destinoAtivo(){
-  const p = ativas.find(x => x.entrega && x.entrega.lat != null);
+  const comCoord = x => x.entrega && x.entrega.lat != null;
+  const p = ativas.find(x => x.status === 'a_caminho' && comCoord(x)) || ativas.find(comCoord);
   return p ? { lat: p.entrega.lat, lng: p.entrega.lng } : null;
 }
 
 function ajustarMapa(){
   const el = document.getElementById('mapa');
   if(!el || typeof L === 'undefined') return;
+  // Mapa preso a um quadro que já saiu da página não desenha nada (era o que
+  // deixava o mapa cinza depois da atualização automática): refaz no atual
+  if(mapa && mapa.getContainer() !== el) destruirMapa();
+  // Quadro escondido mede zero; o mapa é dimensionado quando a aba aparece
+  if(el.offsetParent === null && mapa) return;
 
   if(!mapa){
     const centro = minhaPos || destinoAtivo() || { lat: -23.55, lng: -46.63 };  // fallback: SP
