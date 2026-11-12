@@ -2813,28 +2813,67 @@ const PRAZO_BASE = {
 const CEP_CACHE_MAX = 5000;
 const cepCache = new Map();
 
-// Resolve um CEP em { uf, regiao, cidade }. Usa cache para não repetir chamadas.
+// Serviços de CEP, tentados em ordem. Um só não basta: o ViaCEP recusa pedidos
+// que saem de servidores na nuvem (no Render, TODO CEP voltava "não encontrado"
+// e o frete não calculava). Cada um devolve { uf, cidade, logradouro, bairro },
+// null quando diz que o CEP não existe, ou lança erro quando falhou.
+const SERVICOS_CEP = [
+  { nome: 'ViaCEP', url: c => `https://viacep.com.br/ws/${c}/json/`,
+    ler: d => d.erro ? null : { uf: d.uf, cidade: d.localidade, logradouro: d.logradouro, bairro: d.bairro } },
+  { nome: 'BrasilAPI', url: c => `https://brasilapi.com.br/api/cep/v2/${c}`,
+    ler: d => ({ uf: d.state, cidade: d.city, logradouro: d.street, bairro: d.neighborhood }) },
+  { nome: 'OpenCEP', url: c => `https://opencep.com/v1/${c}`,
+    ler: d => d.error ? null : { uf: d.uf, cidade: d.localidade, logradouro: d.logradouro, bairro: d.bairro } },
+  { nome: 'AwesomeAPI', url: c => `https://cep.awesomeapi.com.br/json/${c}`,
+    ler: d => ({ uf: d.state, cidade: d.city, logradouro: d.address, bairro: d.district }) }
+];
+// Serviço que falhou (bloqueio, fora do ar, lento) fica de fora por 10 minutos,
+// para cada consulta não pagar de novo o tempo de esperar por ele
+const CEP_PAUSA_MS = 10 * 60 * 1000;
+const cepServicoPausadoAte = new Map();
+
+async function consultarServicoCep(s, cep) {
+  const r = await fetch(s.url(cep), {
+    headers: { 'User-Agent': 'MercadoLocal/1.0', 'Accept': 'application/json' },
+    signal: AbortSignal.timeout(6000)
+  });
+  if (r.status === 404 || r.status === 400) return null;        // CEP não existe
+  if (!r.ok) throw new Error('HTTP ' + r.status);
+  const d = await r.json();                                      // HTML de bloqueio cai no catch
+  const out = s.ler(d);
+  if (out && !UF_REGIAO[out.uf]) throw new Error('resposta sem UF válida');
+  return out;
+}
+
+// Resolve um CEP em { uf, regiao, cidade, logradouro, bairro }. Usa cache para não repetir chamadas.
 async function resolverCep(cep, cache = cepCache) {
   const limpo = String(cep || '').replace(/\D/g, '');
   if (limpo.length !== 8) return null;
   if (cache && cache.has(limpo)) return cache.get(limpo);
-  try {
-    const r = await fetch(`https://viacep.com.br/ws/${limpo}/json/`);
-    if (!r.ok) throw new Error('ViaCEP indisponível');
-    const data = await r.json();
-    if (data.erro) throw new Error('CEP não encontrado');
+  for (const s of SERVICOS_CEP) {
+    if ((cepServicoPausadoAte.get(s.nome) || 0) > Date.now()) continue;
+    let dados;
+    try {
+      dados = await consultarServicoCep(s, limpo);
+    } catch (e) {
+      cepServicoPausadoAte.set(s.nome, Date.now() + CEP_PAUSA_MS);
+      console.warn(`[CEP] ${s.nome} falhou (${e.message}); pulando por 10 min.`);
+      continue;
+    }
+    // "Não existe" de um serviço não é a palavra final: as bases diferem, e
+    // CEP novo às vezes só aparece em uma delas
+    if (!dados) continue;
     const out = {
-      uf: data.uf, regiao: UF_REGIAO[data.uf], cidade: data.localidade,
-      logradouro: data.logradouro || null, bairro: data.bairro || null
+      uf: dados.uf, regiao: UF_REGIAO[dados.uf], cidade: dados.cidade || null,
+      logradouro: dados.logradouro || null, bairro: dados.bairro || null
     };
     if (cache) {
       if (cache.size >= CEP_CACHE_MAX) cache.clear();
       cache.set(limpo, out);
     }
     return out;
-  } catch (e) {
-    return null;
   }
+  return null;
 }
 
 // Frete de UMA loja: leva em conta a distância entre a origem (loja) e o destino (cliente).
