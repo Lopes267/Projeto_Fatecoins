@@ -708,7 +708,7 @@ document.querySelectorAll('.reveal').forEach(el => revealObserver.observe(el));
 /* Stats from API */
 async function loadStats() {
   try {
-    const res = await fetch('http://localhost:4000/api/stats');
+    const res = await fetch('/api/stats');
     const data = await res.json();
     if (data.ok) {
       document.getElementById('stat-produtos').textContent = data.produtos ?? '–';
@@ -807,7 +807,7 @@ function pReset(){ clearInterval(pTimer); if(PRODUTOS.length > 1) pTimer = setIn
 async function initProductShowcase(){
   const sec = document.getElementById('showcase-section');
   try{
-    const res = await fetch('http://localhost:4000/api/products');
+    const res = await fetch('/api/products');
     const data = await res.json();
     let prods = (data.products || []).filter(p => p.nome);
     if(!prods.length){ if(sec) sec.style.display = 'none'; return; }   // sem produtos → esconde

@@ -23,7 +23,26 @@ const nodemailer = require('nodemailer');
 
 const FIREBASE_WEB_API_KEY = process.env.FIREBASE_WEB_API_KEY;
 
-const serviceAccount = require('./' + process.env.FIREBASE_SERVICE_ACCOUNT);
+// Online (Render) o servidor roda em produção: sem dados de demonstração e
+// com o endereço vindo do proxy. O Render define RENDER=true sozinho.
+const EM_PRODUCAO = process.env.NODE_ENV === 'production' || !!process.env.RENDER;
+
+// Credencial do Firebase. Online ela vem da variável FIREBASE_SERVICE_ACCOUNT_JSON
+// com o CONTEÚDO do arquivo da chave (o arquivo não vai para o GitHub, então
+// não existe no servidor). No computador continua vindo do arquivo apontado
+// por FIREBASE_SERVICE_ACCOUNT no .env.
+function lerCredencialFirebase() {
+  const conteudo = (process.env.FIREBASE_SERVICE_ACCOUNT_JSON || '').trim();
+  if (conteudo) {
+    // aceita o JSON colado direto ou codificado em base64
+    const texto = conteudo.startsWith('{') ? conteudo : Buffer.from(conteudo, 'base64').toString('utf8');
+    return JSON.parse(texto);
+  }
+  if (process.env.FIREBASE_SERVICE_ACCOUNT) return require('./' + process.env.FIREBASE_SERVICE_ACCOUNT);
+  throw new Error('Credencial do Firebase ausente: defina FIREBASE_SERVICE_ACCOUNT_JSON (online) ' +
+    'ou FIREBASE_SERVICE_ACCOUNT no .env (no computador).');
+}
+const serviceAccount = lerCredencialFirebase();
 
 admin.initializeApp({
   credential: admin.credential.cert(serviceAccount)
@@ -71,9 +90,36 @@ if (!emailTransporte) {
 
 const app = express();
 
+// Online, todo acesso chega pelo proxy do Render. Sem isto req.ip seria o IP
+// do proxy para TODO visitante — e o limite de envio de códigos por e-mail
+// (que conta por IP) passaria a valer para o site inteiro junto.
+app.set('trust proxy', 1);
+
 app.use(cors({ origin: true, credentials: true }));
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true }));
+
+// A pasta do projeto é servida inteira (as páginas estão na raiz), então o
+// que é do SERVIDOR tem de ser barrado antes: sem isto qualquer um baixava a
+// chave privada do Firebase, o .env do servidor, o código do server.js e o
+// banco local, só digitando o nome do arquivo.
+const ARQUIVOS_PRIVADOS = new Set(['server.js', 'backfill-entregas.js', 'backfill-loja-ids.js',
+  'corrigir-coordenadas.js', 'iniciar.bat']);
+const EXTENSOES_PRIVADAS = /\.(json|db|sqlite|sql|md|bat|log|env|pem|key)$/i;
+app.use((req, res, next) => {
+  if (req.path.startsWith('/api/')) return next();
+  let caminho;
+  try { caminho = decodeURIComponent(req.path); } catch { return res.status(400).end(); }
+  const partes = caminho.split(/[\\/]+/).filter(Boolean);
+  const privado =
+    partes.some(p => p.startsWith('.')) ||                       // .env, .git, .claude…
+    (partes[0] || '').toLowerCase() === 'node_modules' ||
+    EXTENSOES_PRIVADAS.test(caminho) ||
+    (partes.length === 1 && ARQUIVOS_PRIVADOS.has(partes[0].toLowerCase()));
+  if (privado) return res.status(404).send('Não encontrado');
+  next();
+});
+
 app.use(express.static(path.join(__dirname), {
   // Evita que o navegador rode HTML/JS antigos em cache (correções passam a valer na hora)
   setHeaders: (res, filePath) => {
@@ -245,7 +291,8 @@ app.get('/.well-known/appspecific/com.chrome.devtools.json', (req, res) => {
 });
 
 app.get('/api/config', (req, res) => {
-  res.json({ api_url: `http://localhost:${req.socket.localPort}`, version: '1.0.0', environment: 'development' });
+  res.json({ api_url: `${req.protocol}://${req.get('host')}`, version: '1.0.0',
+    environment: EM_PRODUCAO ? 'production' : 'development' });
 });
 
 // Os contadores da página inicial não precisam ser ao vivo: valem por 1 minuto
@@ -2867,6 +2914,8 @@ app.post('/api/shipping/quote', async (req, res) => {
 let bancoJaTemUsuarios = false;
 
 app.post('/api/seed', async (req, res) => {
+  // Cria contas com senha 123456: só no computador, nunca no site publicado
+  if (EM_PRODUCAO) return res.status(403).json({ ok: false, msg: 'Indisponível no servidor online.' });
   try {
     if (bancoJaTemUsuarios) return res.json({ ok: false, msg: 'Dados de demo já existem.' });
     const snap = await db.collection('usuarios').limit(1).get();
@@ -2949,6 +2998,14 @@ function findAvailablePort(startPort = 3000, maxAttempts = 100) {
 }
 
 async function startServer() {
+  // Online o Render diz em que porta escutar (variável PORT)
+  if (process.env.PORT) {
+    const porta = Number(process.env.PORT);
+    app.listen(porta, '0.0.0.0', () => {
+      console.log(`🚀 Servidor rodando na porta ${porta}${EM_PRODUCAO ? ' (produção)' : ''}`);
+    });
+    return;
+  }
   try {
     let port;
     try { await findAvailablePort(4000, 1); port = 4000; }

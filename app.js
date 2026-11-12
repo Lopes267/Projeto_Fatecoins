@@ -2,24 +2,12 @@
 //  app.js  –  Marketplace logic (conectado a Node.js)
 // ============================================================
 
-// Detectar URL da API dinamicamente
-let API_URL = 'http://localhost:4000'; // fallback
-
-async function initAPI() {
-  try {
-    const res = await fetch('http://localhost:4000/api/config');
-    if (res.ok) {
-      const config = await res.json();
-      API_URL = config.api_url;
-      console.log('API URL detectada:', API_URL);
-    }
-  } catch (err) {
-    console.log('Usando API URL padrão:', API_URL);
-  }
-}
-
-// Inicializar API na carga da página
-initAPI();
+// A API mora no mesmo servidor que entrega as páginas, então o endereço dela
+// é o da própria página: http://localhost:4000 no computador e o domínio do
+// site quando ele está online. Fixar localhost:4000 fazia cada visitante do
+// site publicado tentar falar com o PRÓPRIO computador.
+// (Só a página aberta direto do disco, file://, usa o servidor local.)
+let API_URL = /^https?:$/.test(location.protocol) ? location.origin : 'http://localhost:4000';
 
 // Remove QUALQUER carrinho legado em localStorage (de versões antigas do site).
 // O carrinho hoje vive 100% online no Firebase, vinculado ao cliente.
@@ -961,4 +949,8 @@ async function seedDemo() {
   }
 }
 
-document.addEventListener('DOMContentLoaded', seedDemo);
+// Só no computador de desenvolvimento: no site publicado a rota é bloqueada,
+// e cada visitante faria um pedido inútil ao servidor a cada página aberta.
+if (/^(localhost|127\.0\.0\.1)$/.test(location.hostname)) {
+  document.addEventListener('DOMContentLoaded', seedDemo);
+}
