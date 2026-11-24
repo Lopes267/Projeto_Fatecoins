@@ -1782,16 +1782,35 @@ function atualizarStatusModelo(texto, previewURL){
 }
 
 // ---- ESCANEAMENTO 3D PELA CÂMERA ----
-// DESATIVADO: o scanner (scanner-3d.js) fica no projeto só como conceito e
-// não é carregado no painel. O botão avisa que está em desenvolvimento; o
-// envio de .glb continua funcionando normalmente.
+// Abre o serviço de reconstrução 3D (pasta reconstrucao-3d: serviço Python à
+// parte no Render, com profundidade do ARCore + TSDF) já com o login do
+// lojista. O token do Firebase vai depois do "#" do endereço — essa parte não
+// é enviada a servidor nenhum nem fica em log — e o serviço confere com as
+// chaves públicas do Google. No celular abre a captura; no computador, o
+// visualizador onde a malha aparece. O .glb sai de lá e entra no produto pelo
+// botão "Enviar .glb".
+const URL_ESCANEAMENTO_3D = ['localhost', '127.0.0.1'].includes(location.hostname)
+  ? 'http://localhost:8000'                                  // iniciar.bat da pasta reconstrucao-3d
+  : 'https://mercado-local-reconstrucao-3d.onrender.com';    // serviço do render.yaml
+
 function abrirScanner3D(){
-  toast('Em desenvolvimento', 'info');
+  const token = DB._getToken();
+  if(!token || DB.isSessionExpired()){
+    toast('Sua sessão expirou. Entre de novo para escanear.','error');
+    return;
+  }
+  const celular = /Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
+  const url = URL_ESCANEAMENTO_3D + '/entrar#token=' + encodeURIComponent(token) +
+              '&ir=' + encodeURIComponent(celular ? '/captura' : '/');
+  window.open(url, '_blank', 'noopener');
+  toast(celular
+    ? 'Abrindo o escaneamento 3D. No fim, baixe o .glb e use "Enviar .glb" aqui.'
+    : 'Abrindo o visualizador 3D. Para escanear, toque neste botão pelo celular.', 'info');
 }
 
-// Implementação original, mantida para quando o scanner voltar. Para
-// reativar: carregar scanner-3d.js no fim da página e trocar o corpo de
-// abrirScanner3D() por uma chamada a esta função.
+// Scanner antigo, feito só no navegador (scanner-3d.js, por silhueta).
+// Desativado em 10/11/2026 a pedido ("não funciona, manter só como conceito");
+// não é carregado no painel e nada chama esta função.
 function abrirScanner3DConceito(){
   if(!window.Scanner3D || !Scanner3D.suportado()){
     toast('Este aparelho não tem câmera ou WebGL para escanear.','error');

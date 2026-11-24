@@ -18,10 +18,13 @@ Rotas:
 Rodar:  .venv\\Scripts\\python -m backend.servidor   (de dentro de reconstrucao-3d)
 Escuta só em 127.0.0.1: o celular chega pelo cabo (adb reverse tcp:8000 tcp:8000).
 
-Online (Render, ver Dockerfile): com a variável CHAVE_ACESSO definida, as
-páginas, as sessões e os WebSockets só abrem com a chave — quem tiver o
-endereço não vê a captura de ninguém nem derruba o celular de quem está
-escaneando. A chave é digitada uma vez e fica num cookie por 30 dias.
+Online (Render, ver Dockerfile) só entra quem está logado no site: o botão
+"Escanear com a câmera" do painel abre /entrar#token=<ID token do Firebase>,
+o token é conferido com as chaves públicas do Google (backend/acesso.py) e
+vira um cookie deste serviço. Quem só tem o endereço não vê a captura de
+ninguém nem derruba o celular de quem está escaneando. CHAVE_ACESSO, se
+definida, é uma segunda porta (chave digitada uma vez, cookie de 30 dias).
+No computador (sem a variável RENDER) fica aberto, como antes.
 """
 from __future__ import annotations
 
@@ -39,6 +42,7 @@ from fastapi import FastAPI, HTTPException, Request, WebSocket, WebSocketDisconn
 from fastapi.responses import FileResponse, HTMLResponse, JSONResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 
+from .acesso import Cookies, TokenInvalido, VerificadorFirebase
 from .reconstrucao.sessao import Sessao
 
 RAIZ = Path(__file__).resolve().parents[1]
@@ -48,20 +52,53 @@ SITE = Path(os.environ.get("SITE_DIR") or RAIZ.parent)
 ID_SESSAO = re.compile(r"^\d{8}-\d{6}(-\d+)?$")
 ARQUIVOS = {"modelo.glb": "model/gltf-binary", "modelo.obj": "text/plain",
             "modelo.ply": "application/octet-stream", "sessao.json": "application/json"}
-COOKIE = "rec3d_chave"
-PUBLICOS = ("/saude", "/site/ar-viewer.js")      # e tudo em /web/ (só código das páginas)
+COOKIE_CHAVE = "rec3d_chave"
+COOKIE_SESSAO = "rec3d_sessao"
+# Não é segredo: vai dentro de todo token do site (campo aud)
+PROJETO_FIREBASE = "fatecoin-mercado"
+PUBLICOS = ("/saude", "/site/ar-viewer.js", "/entrar", "/api/entrar")   # e tudo em /web/
 
-PAGINA_CHAVE = """<!DOCTYPE html><html lang="pt-BR"><head><meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1"><title>Acesso restrito</title>
+_ESTILO = """<meta name="viewport" content="width=device-width, initial-scale=1">
 <style>body{margin:0;background:#0d0d0d;color:#f0ece3;font:16px/1.5 system-ui,sans-serif}
-main{max-width:380px;margin:12vh auto;padding:0 16px}h1{font-size:20px}p{color:#9a9a9a}
+main{max-width:400px;margin:12vh auto;padding:0 16px}h1{font-size:20px}p{color:#a8a8a8}
 input,button{width:100%;box-sizing:border-box;padding:12px;border-radius:10px;font:inherit;margin-top:10px}
 input{border:1px solid #2a2a2a;background:#1f1f1f;color:#f0ece3}
-button{border:0;background:#e8854a;color:#1a0f08;font-weight:600}.erro{color:#e0605a}</style></head>
-<body><main><h1>Reconstrução 3D</h1><p>Área de teste. Digite a chave de acesso
-(variável CHAVE_ACESSO no Render).</p>__ERRO__<form method="get" action="__ACAO__">
-<input name="chave" type="password" autocomplete="current-password" placeholder="Chave de acesso" required autofocus>
-<button>Entrar</button></form></main></body></html>"""
+button{border:0;background:#e8854a;color:#1a0f08;font-weight:600}.erro{color:#e0605a}</style>"""
+
+PAGINA_FORA = """<!DOCTYPE html><html lang="pt-BR"><head><meta charset="UTF-8"><title>Escaneamento 3D</title>
+__ESTILO__</head><body><main><h1>Escaneamento 3D</h1>
+<p>Este serviço abre pelo painel do Mercado Local: entre na sua loja, abra o cadastro
+de um produto e toque em <b>Escanear com a câmera</b>.</p>__CHAVE__</main></body></html>"""
+
+FORM_CHAVE = """<p>Ou use a chave de acesso:</p>__ERRO__<form method="get" action="__ACAO__">
+<input name="chave" type="password" autocomplete="current-password" placeholder="Chave de acesso" required>
+<button>Entrar</button></form>"""
+
+PAGINA_ENTRAR = """<!DOCTYPE html><html lang="pt-BR"><head><meta charset="UTF-8"><title>Entrando…</title>
+__ESTILO__</head><body><main><h1>Escaneamento 3D</h1><p id="msg">Entrando com o seu login do site…</p></main>
+<script>
+(async function () {
+  var p = new URLSearchParams(location.hash.slice(1));
+  var token = p.get('token'), ir = p.get('ir') || '/';
+  if (!/^\\/(?!\\/)/.test(ir)) ir = '/';
+  history.replaceState(null, '', location.pathname);          // o token sai do endereço
+  var msg = document.getElementById('msg');
+  if (!token) { location.replace(ir); return; }
+  try {
+    var r = await fetch('/api/entrar', { method: 'POST', credentials: 'same-origin',
+      headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ token: token }) });
+    var d = await r.json();
+    if (d.ok) { location.replace(ir); return; }
+    msg.innerHTML = d.motivo === 'sessão do site expirada'
+      ? 'Sua sessão no site expirou. Entre de novo no painel e toque no botão outra vez.'
+      : 'Não deu para confirmar o seu login (' + d.motivo + '). Volte ao painel e tente de novo.';
+    msg.className = 'erro';
+  } catch (e) {
+    msg.textContent = 'O serviço não respondeu. Se ele estava dormindo, espere 1 minuto e toque no botão de novo.';
+    msg.className = 'erro';
+  }
+})();
+</script></body></html>"""
 
 
 class Gerente:
@@ -115,48 +152,92 @@ class Gerente:
         return self.sessao
 
 
-def criar_app(pasta_sessoes: Path | None = None, chave: str | None = None) -> FastAPI:
+def criar_app(pasta_sessoes: Path | None = None, chave: str | None = None,
+              exigir_login: bool | None = None, verificador=None) -> FastAPI:
     pasta = Path(pasta_sessoes or os.environ.get("RECONSTRUCAO_SESSOES") or RAIZ / "sessoes")
     pasta.mkdir(parents=True, exist_ok=True)
     chave = (chave if chave is not None else os.environ.get("CHAVE_ACESSO", "")).strip()
+    if exigir_login is None:            # o Render define RENDER=true sozinho
+        exigir_login = bool(os.environ.get("RENDER") or os.environ.get("EXIGIR_LOGIN"))
+    protegido = exigir_login or bool(chave)
+    verificador = verificador or VerificadorFirebase(
+        os.environ.get("FIREBASE_PROJECT_ID") or PROJETO_FIREBASE)
+    # Sem SEGREDO_SESSAO, um segredo por processo: reiniciar pede o botão de novo
+    cookies = Cookies(os.environ.get("SEGREDO_SESSAO") or secrets.token_hex(32))
     g = Gerente(pasta)
     # No plano grátis do Render (0,1 CPU) extrair a prévia a cada segundo come a fusão
     g.intervalo_malha = float(os.environ.get("INTERVALO_MALHA", "1.0"))
     app = FastAPI(title="Reconstrução 3D — Mercado Local")
     app.state.gerente = g
 
-    def confere(valor: str | None) -> bool:
-        return bool(valor) and secrets.compare_digest(valor.encode(), chave.encode())
+    def confere_chave(valor: str | None) -> bool:
+        return bool(chave) and bool(valor) and secrets.compare_digest(valor.encode(), chave.encode())
+
+    def liberado(cookies_req, consulta) -> bool:
+        return (not protegido
+                or cookies.conferir(cookies_req.get(COOKIE_SESSAO)) is not None
+                or confere_chave(cookies_req.get(COOKIE_CHAVE))
+                or confere_chave(consulta.get("chave")))
+
+    def pagina_fora(caminho: str, chave_errada: bool) -> HTMLResponse:
+        form = ""
+        if chave:
+            form = (FORM_CHAVE.replace("__ERRO__", '<p class="erro">Chave errada.</p>' if chave_errada else "")
+                    .replace("__ACAO__", html.escape(caminho)))
+        return HTMLResponse(PAGINA_FORA.replace("__ESTILO__", _ESTILO).replace("__CHAVE__", form),
+                            status_code=401)
 
     @app.middleware("http")
     async def porteiro(request: Request, call_next):
         # "//outro-site" viraria um redirecionamento para fora: fica "/outro-site"
         caminho = "/" + request.url.path.lstrip("/")
-        if not chave or caminho in PUBLICOS or caminho.startswith("/web/"):
+        if caminho in PUBLICOS or caminho.startswith("/web/"):
             return await call_next(request)
-        if confere(request.cookies.get(COOKIE)):
+        if liberado(request.cookies, {}):
             return await call_next(request)
         dada = request.query_params.get("chave")
-        if confere(dada) and request.method == "GET":
+        if confere_chave(dada) and request.method == "GET":
             # Tira a chave do endereço (histórico, prints) e guarda no cookie
             resto = [(k, v) for k, v in request.query_params.multi_items() if k != "chave"]
             destino = caminho + ("?" + urlencode(resto) if resto else "")
             resp = RedirectResponse(destino, status_code=303)
-            resp.set_cookie(COOKIE, chave, max_age=30 * 24 * 3600, httponly=True,
+            resp.set_cookie(COOKIE_CHAVE, chave, max_age=30 * 24 * 3600, httponly=True,
                             secure=request.url.scheme == "https", samesite="lax")
             return resp
         if caminho.startswith("/api/") or caminho.startswith("/sessoes/"):
-            return JSONResponse({"erro": "chave de acesso"}, status_code=401)
-        erro = '<p class="erro">Chave errada.</p>' if dada else ""
-        return HTMLResponse(PAGINA_CHAVE.replace("__ERRO__", erro)
-                            .replace("__ACAO__", html.escape(caminho)), status_code=401)
+            return JSONResponse({"erro": "entre pelo painel do site"}, status_code=401)
+        return pagina_fora(caminho, chave_errada=bool(dada))
 
     def ws_liberado(ws: WebSocket) -> bool:
-        return not chave or confere(ws.cookies.get(COOKIE)) or confere(ws.query_params.get("chave"))
+        return liberado(ws.cookies, ws.query_params)
 
     @app.get("/saude")
     async def saude():
         return {"ok": True}
+
+    @app.get("/entrar")
+    async def pagina_entrar():
+        return HTMLResponse(PAGINA_ENTRAR.replace("__ESTILO__", _ESTILO),
+                            headers={"Cache-Control": "no-store", "Referrer-Policy": "no-referrer"})
+
+    @app.post("/api/entrar")
+    async def entrar(request: Request):
+        try:
+            corpo = await request.json()
+            token = str(corpo.get("token", "")) if isinstance(corpo, dict) else ""
+        except (json.JSONDecodeError, UnicodeDecodeError):
+            return JSONResponse({"ok": False, "motivo": "pedido inválido"}, status_code=400)
+        try:
+            uid = await asyncio.to_thread(verificador.verificar, token)
+        except TokenInvalido as e:
+            return JSONResponse({"ok": False, "motivo": str(e)}, status_code=401)
+        except Exception:          # chaves do Google fora do ar
+            return JSONResponse({"ok": False, "motivo": "não deu para conferir com o Google"},
+                                status_code=503)
+        resp = JSONResponse({"ok": True})
+        resp.set_cookie(COOKIE_SESSAO, cookies.emitir(uid), max_age=cookies.duracao, httponly=True,
+                        secure=request.url.scheme == "https", samesite="lax")
+        return resp
 
     @app.get("/")
     async def visualizador():

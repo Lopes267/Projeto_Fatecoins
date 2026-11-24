@@ -15,8 +15,12 @@ services:
       paths:
         - reconstrucao-3d/**
         - ar-viewer.js
+    # Entrada pelo login do site: o botão "Escanear com a câmera" do painel manda
+    # o token do Firebase e o serviço confere com as chaves públicas do Google.
     envVars:
-      - key: CHAVE_ACESSO
-        generateValue: true      # o Render sorteia; veja em Environment depois de criar
+      - key: FIREBASE_PROJECT_ID
+        value: fatecoin-mercado  # não é segredo (vai dentro de todo token)
+      - key: SEGREDO_SESSAO
+        generateValue: true      # assina o cookie do serviço; não precisa copiar
       - key: INTERVALO_MALHA
         value: "3"               # plano grátis (0,1 CPU): prévia a cada 3 s

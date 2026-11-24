@@ -319,8 +319,11 @@
     box.style.display = 'block';
     if (r.ok) {
       const m = r.medidas_cm;
-      box.innerHTML = `<b>Modelo pronto.</b><p style="margin:6px 0 0">${m.largura} × ${m.altura} × ${m.profundidade} cm,
-        ${r.estado.integrados} quadros. Veja e baixe no computador.</p>`;
+      box.innerHTML = `<b>Modelo pronto.</b><p style="margin:6px 0 12px">${m.largura} × ${m.altura} × ${m.profundidade} cm,
+        ${r.estado.integrados} quadros.</p>
+        <a class="baixar" href="${r.arquivos.glb}" download>Baixar o modelo (.glb)</a>
+        <p style="margin:10px 0 0;font-size:14px">Depois, no cadastro do produto, toque em <b>Enviar .glb</b>
+        e escolha o arquivo baixado.</p>`;
     } else {
       box.innerHTML = `<b>Não deu para montar o modelo.</b><p style="margin:6px 0 0">${r.motivo}</p>`;
     }

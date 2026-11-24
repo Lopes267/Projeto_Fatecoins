@@ -10,9 +10,11 @@ WebXR simulado no Chrome. **Ainda não foi testado num celular de verdade.** O
 Galaxy A14 5G aparece na lista do ARCore, mas sem a nota "Supports Depth API" — a
 página `/captura` diz na hora se o aparelho tem ou não.
 
-Não está ligado ao painel do site: o botão "Escanear com a câmera" continua
-mostrando "Em desenvolvimento". O servidor Node não serve esta pasta (bloqueada em
-`server.js`). Online, roda como um serviço Python separado no Render (ver abaixo).
+No painel do site, o botão **"Escanear com a câmera"** (cadastro do produto) abre
+este serviço já com o login do lojista: no celular cai na captura, no computador no
+visualizador. O `.glb` baixado entra no produto pelo botão "Enviar .glb". O servidor
+Node não serve esta pasta (bloqueada em `server.js`). Online, roda como um serviço
+Python separado no Render (ver abaixo).
 
 ## Online (Render)
 
@@ -26,17 +28,20 @@ Criar uma vez:
 1. Render → **New → Blueprint** → repositório `Projeto_Fatecoins`, branch `Detalhes_Finais`.
 2. Ele lê o `render.yaml` e cria `mercado-local-reconstrucao-3d` (plano grátis).
    O site não é alterado.
-3. Quando o deploy terminar: serviço → **Environment** → copie o valor de `CHAVE_ACESSO`
-   (sorteado pelo Render).
+3. Se o endereço criado não for `https://mercado-local-reconstrucao-3d.onrender.com`
+   (nome já usado por outra pessoa), troque `URL_ESCANEAMENTO_3D` em `dashboard.html`.
 
-Usar:
+Usar: entre no painel do site (celular ou computador), abra um produto e toque em
+**Escanear com a câmera**. Online já é HTTPS, então o celular não precisa de cabo.
 
-- Computador: `https://<serviço>.onrender.com` → digitar a chave → visualizador.
-- Celular (Chrome, sem cabo — online já é HTTPS): `https://<serviço>.onrender.com/captura`.
-- Sem celular: `.venv\Scripts\python -m backend.sintetico.enviar wss://<serviço>.onrender.com --chave <CHAVE>`.
-
-Sem a chave, páginas, sessões e WebSockets recusam (só `/saude` e os `.js` das
-páginas são públicos). A chave fica num cookie por 30 dias.
+Quem entra: só quem está logado no site. O painel manda o ID token do Firebase
+depois do `#` do endereço (não vai para servidor nem log); o serviço confere com as
+chaves públicas do Google (`backend/acesso.py`, projeto `fatecoin-mercado`) e guarda
+um cookie próprio, assinado, por 7 dias. Sem login, páginas, sessões e WebSockets
+recusam (só `/saude`, `/entrar` e os `.js` das páginas são públicos). O bloqueio liga
+sozinho no Render (variável `RENDER`); no computador fica aberto como antes.
+`CHAVE_ACESSO`, se for definida, vira uma segunda porta (útil para o envio sintético:
+`.venv\Scripts\python -m backend.sintetico.enviar wss://<serviço>.onrender.com --chave <CHAVE>`).
 
 Limites do plano grátis: 0,1 CPU (a fusão fica ~10× mais lenta e quadros são
 descartados — a prévia sai a cada 3 s, `INTERVALO_MALHA`), 512 MB de memória (o
@@ -80,7 +85,7 @@ Reprocessar uma captura gravada (todo quadro recebido fica em `sessoes/<id>/quad
 ## Testes
 
 ```bat
-.venv\Scripts\python -m pytest backend\testes -q      :: 22 testes, ~20 s
+.venv\Scripts\python -m pytest backend\testes -q      :: 35 testes, ~20 s
 node testes-navegador\rodar.mjs                         :: 17 conferências no Chrome headless
 ```
 
@@ -89,7 +94,8 @@ node testes-navegador\rodar.mjs                         :: 17 conferências no C
   quadros inválidos recusados.
 - `test_ponta_a_ponta.py` — servidor de verdade + WebSocket + caneca sintética,
   medida contra a caneca verdadeira.
-- `test_acesso.py` — chave de acesso: páginas, sessões e WebSockets recusam sem ela.
+- `test_acesso.py` — login do site (tokens RS256 no formato do Firebase: válido,
+  expirado, outro projeto, assinatura falsa…), cookie assinado e chave opcional.
 - `testes-navegador/` — a página `/captura` real com um WebXR falso injetado
   (parede a 1 m), o visualizador ao vivo e o `.glb` dentro do `ar-viewer.js` do site.
 
@@ -154,4 +160,4 @@ confere se lê o mapa igual ao navegador e corrige sozinho se o eixo y vier inve
    fotogrametria offline.
 2. Com captura real: comparar a medida do modelo com uma régua e reprocessar
    (`backend.reprocessar`) ajustando voxel/truncamento.
-3. Só depois: ligar o botão "Escanear com a câmera" do painel a este serviço.
+3. Trazer o `.glb` direto para o cadastro do produto, sem baixar e reenviar.

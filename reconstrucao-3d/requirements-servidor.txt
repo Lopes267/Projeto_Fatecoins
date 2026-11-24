@@ -7,3 +7,6 @@ fastapi==0.165.0
 uvicorn[standard]==0.54.0
 websockets==17.4
 pillow==13.0.0
+# confere o login do site (ID token do Firebase) com as chaves públicas do Google
+PyJWT==2.15.1
+cryptography==50.0.2
