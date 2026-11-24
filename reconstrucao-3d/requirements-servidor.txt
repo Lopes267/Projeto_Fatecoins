@@ -1,0 +1,9 @@
+# Só o que o servidor online precisa (Linux, Python 3.12, imagem do Dockerfile).
+# open3d-cpu: mesma API do open3d, sem CUDA (105 MB em vez de 400 MB).
+# Sem numba/pytest: servem para os testes e o gerador sintético, não para o servidor.
+numpy==2.5.5
+open3d-cpu==0.20.0
+fastapi==0.165.0
+uvicorn[standard]==0.54.0
+websockets==17.4
+pillow==13.0.0

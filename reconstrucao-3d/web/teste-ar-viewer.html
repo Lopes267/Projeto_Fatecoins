@@ -1,0 +1,45 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Modelo no visualizador do site</title>
+<!-- O ar-viewer.js do site importa o three por este mapa, como em marketplace.html -->
+<script type="importmap">
+{"imports":{"three":"https://unpkg.com/three@0.161.0/build/three.module.js",
+            "three/addons/":"https://unpkg.com/three@0.161.0/examples/jsm/"}}
+</script>
+<style>
+  :root{--bg:#0d0d0d;--card:#161616;--card2:#1c1c1c;--border:#2a2a2a;--text:#f0ece3;--muted:#888;--accent:#e8854a;--accent2:#f4c56a}
+  body{margin:0;background:var(--bg);color:var(--text);font:14px system-ui,sans-serif}
+  #info{position:fixed;left:16px;bottom:16px;z-index:99999;background:#000c;padding:8px 10px;border-radius:8px;max-width:calc(100% - 32px)}
+</style>
+</head>
+<body>
+<div id="info">Abrindo o modelo no visualizador do site…</div>
+<script src="/site/ar-viewer.js"></script>
+<script>
+  // Medidas da "embalagem" de propósito diferentes (30 cm): se o arquivo
+  // trouxer escalaReal, o visualizador tem de usar o tamanho do modelo.
+  const glb = new URLSearchParams(location.search).get('glb');
+  window.toast = (m) => console.log('toast:', m);
+  const v = ARViewer.open({
+    id: 'reconstruido', nome: 'Modelo reconstruído', categoria: 'Casa & Decoração',
+    imagem_url: null, modelo_3d_url: glb, largura: 30, altura: 30, comprimento: 30
+  });
+  window.__arv = { pronto: false };
+  (async function esperar() {
+    for (let i = 0; i < 200 && !(v && v.objeto); i++) await new Promise((r) => setTimeout(r, 50));
+    const o = v && v.objeto;
+    window.__arv = {
+      pronto: !!o, tipo: o && o.userData.tipo,
+      dimsModelo: o && o.userData.dimsModelo, dims: v && v.dims
+    };
+    const d = window.__arv.dimsModelo;
+    document.getElementById('info').textContent = d
+      ? `Tamanho real no visualizador: ${(d.w * 100).toFixed(1)} × ${(d.h * 100).toFixed(1)} × ${(d.d * 100).toFixed(1)} cm`
+      : `Visualizador sem tamanho real (tipo: ${window.__arv.tipo})`;
+  })();
+</script>
+</body>
+</html>

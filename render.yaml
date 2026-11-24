@@ -1,0 +1,22 @@
+# Blueprint do Render só para o serviço de reconstrução 3D (Python/Docker).
+# O site (Node) continua configurado pelo painel e não é tocado por este arquivo.
+# Criar: Render > New > Blueprint > este repositório, branch Detalhes_Finais.
+services:
+  - type: web
+    name: mercado-local-reconstrucao-3d
+    runtime: docker
+    plan: free
+    branch: Detalhes_Finais
+    dockerfilePath: ./reconstrucao-3d/Dockerfile
+    dockerContext: .
+    healthCheckPath: /saude
+    # Só refaz a imagem quando muda algo da reconstrução (ou o visualizador do site)
+    buildFilter:
+      paths:
+        - reconstrucao-3d/**
+        - ar-viewer.js
+    envVars:
+      - key: CHAVE_ACESSO
+        generateValue: true      # o Render sorteia; veja em Environment depois de criar
+      - key: INTERVALO_MALHA
+        value: "3"               # plano grátis (0,1 CPU): prévia a cada 3 s

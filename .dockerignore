@@ -1,0 +1,12 @@
+# Build do serviço Python (reconstrucao-3d/Dockerfile) usa a raiz como contexto:
+# nada de segredo, dependências ou dados locais entra na imagem.
+.git
+.env*
+*firebase-adminsdk*.json
+node_modules
+marketplace.db
+*.log
+reconstrucao-3d/.venv
+reconstrucao-3d/sessoes
+**/__pycache__
+.claude

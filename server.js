@@ -138,7 +138,7 @@ app.use(express.urlencoded({ extended: true }));
 // banco local, só digitando o nome do arquivo.
 const ARQUIVOS_PRIVADOS = new Set(['server.js', 'backfill-entregas.js', 'backfill-loja-ids.js',
   'corrigir-coordenadas.js', 'iniciar.bat']);
-const EXTENSOES_PRIVADAS = /\.(json|db|sqlite|sql|md|bat|log|env|pem|key)$/i;
+const EXTENSOES_PRIVADAS = /\.(json|db|sqlite|sql|md|bat|log|env|pem|key|ya?ml)$/i;
 app.use((req, res, next) => {
   if (req.path.startsWith('/api/')) return next();
   let caminho;
@@ -147,6 +147,9 @@ app.use((req, res, next) => {
   const privado =
     partes.some(p => p.startsWith('.')) ||                       // .env, .git, .claude…
     (partes[0] || '').toLowerCase() === 'node_modules' ||
+    // Reconstrução 3D (teste local em Python): o código e as capturas, que
+    // podem mostrar a casa de quem escaneou, não saem pelo site.
+    (partes[0] || '').toLowerCase() === 'reconstrucao-3d' ||
     EXTENSOES_PRIVADAS.test(caminho) ||
     (partes.length === 1 && ARQUIVOS_PRIVADOS.has(partes[0].toLowerCase()));
   if (privado) return res.status(404).send('Não encontrado');

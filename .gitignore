@@ -22,3 +22,9 @@ Thumbs.db
 
 # Skills do Claude Code (ferramentas locais, nao fazem parte do site)
 .claude/skills/
+
+# Reconstrucao 3D (Python): ambiente, caches e capturas de cada sessao
+reconstrucao-3d/.venv/
+reconstrucao-3d/sessoes/
+__pycache__/
+.pytest_cache/
